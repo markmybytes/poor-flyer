@@ -29,27 +29,22 @@ def compute_37_best(
     if not (past := [d for d in values if d <= today]):
         return None
 
-    split = start + timedelta(days=int((end - start).days * 0.37))
-    latest = float(values[max(past)])
-
-    all_fares = [float(f) for f in values.values()]
-    all_time_high = max(all_fares) if all_fares else None
-    all_time_low = min(all_fares) if all_fares else None
-
+    cutoff_date = start + timedelta(days=int((end - start).days * 0.37))
+    latest_val = float(values[max(past)])
     m = min(
-        [float(fare) for d, fare in values.items() if start <= d < split],
+        [float(fare) for d, fare in values.items() if start <= d < cutoff_date],
         default=float("inf"),
     )
 
     return DeadlineRule37(
-        cutoff_date=split,
+        cutoff_date=cutoff_date,
         phase=(
             Phase.OBSERVING
-            if today < split
-            else (Phase.BUY_SIGNAL if latest < m else Phase.WAITING)
+            if today < cutoff_date
+            else (Phase.BUY_SIGNAL if latest_val < m else Phase.WAITING)
         ),
-        history_best_val=None if today < split or m == float("inf") else m,
-        latest_val=latest,
-        all_time_high=all_time_high,
-        all_time_low=all_time_low,
+        history_best_val=None if today < cutoff_date or m == float("inf") else m,
+        latest_val=latest_val,
+        all_time_high=max(map(float, values.values()), default=None),
+        all_time_low=min(map(float, values.values()), default=None),
     )
