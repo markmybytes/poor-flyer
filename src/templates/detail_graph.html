@@ -2,31 +2,22 @@
     {% if daily_groups %}
     <canvas id="priceChart" height="80"></canvas>
     <script>
-        // Flatten all snapshots from daily groups into a time-ordered list
-        const allSnapshots = [
+        const dailyData = [
             {% for group in daily_groups %}
-        {% for snap in group.snapshots %}
-        {
-            date: "{{ snap.created_at.strftime('%Y-%m-%d') }}",
-            fare: {{ snap.fare if snap.fare else 'null' }},
-            status: "{{ snap.scrape_status }}"
-        },
-        {% endfor %}
-        {% endfor %}
-            ];
-
-        // Filter and sort for chart
-        const chartData = allSnapshots
-            .filter(s => s.status === 'success' && s.fare !== null)
-            .sort((a, b) => new Date(a.date) - new Date(b.date));
-
+            {
+                date: "{{ group.date }}",
+                fare: {{ group.lowest_fare if group.lowest_fare else 'null' }}
+            },
+            {% endfor %}
+        ];
+        const chartData = dailyData.filter(d => d.fare !== null).reverse();
         const ctx = document.getElementById('priceChart').getContext('2d');
         new Chart(ctx, {
             type: 'line',
             data: {
                 labels: chartData.map(d => d.date),
                 datasets: [{
-                    label: 'Fare (HKD)',
+                    label: '票價 (港幣)',
                     data: chartData.map(d => d.fare),
                     borderColor: '#2563eb',
                     backgroundColor: 'rgba(37, 99, 235, 0.05)',
@@ -38,19 +29,14 @@
             options: {
                 responsive: true,
                 plugins: { legend: { display: true } },
-                scales: {
-                    y: {
-                        beginAtZero: false,
-                        title: { display: true, text: 'Fare (HKD)' }
-                    }
-                }
+                scales: { y: { beginAtZero: false } }
             }
         });
     </script>
-    <p class="text-xs text-gray-300 mt-3">Price history over time</p>
+    <p class="text-xs text-gray-300 mt-3">每日最低價格</p>
     {% else %}
     <div class="p-12 text-center">
-        <p class="text-gray-400">No data to graph yet.</p>
+        <p class="text-gray-400">還沒有圖表數據。</p>
     </div>
     {% endif %}
 </div>

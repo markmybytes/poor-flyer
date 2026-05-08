@@ -1,111 +1,102 @@
 {% extends "base.html" %}
 
-{% block title %}{{ entry.origin }} → {{ entry.destination }} | {{ entry.flight_date.strftime('%Y/%m/%d') }}{% endblock %}
+{% block title %}{{ entry.origin }} → {{ entry.destination }} | {{ entry.flight_date.strftime('%Y/%m/%d') }}{% endblock
+%}
 
 {% block content %}
 <div class="mb-5">
-    <a href="{{ url_for('pages.list_entries') }}" class="text-sm text-blue-600 hover:underline">← Back to list</a>
+    <a href="{{ url_for('pages.list_entries') }}" class="text-sm text-blue-600">← 返回列表</a>
 </div>
 
-{# ── Header ──────────────────────────────────────────────────────────── #}
 <div class="bg-white rounded-lg border shadow-sm p-6 mb-5">
     <div class="flex justify-between items-start">
         <div>
             <h2 class="text-3xl font-bold mb-1">{{ entry.origin }} → {{ entry.destination }}</h2>
             <p class="text-sm text-gray-600">
-                Flight <strong>{{ entry.flight_date.strftime('%Y/%m/%d') }}</strong>
-                {% if entry.past_departure %}<span class="ml-2 text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Past</span>{% endif %}
-            </p>
-            <p class="text-sm text-gray-600">
-                Passengers:
-                {% set pax = [] %}
-                {% if entry.adult_count %}{{ pax.append(entry.adult_count|string + ' adult' + ('s' if entry.adult_count != 1 else '')) or '' }}{% endif %}
-                {% if entry.child_count %}{{ pax.append(entry.child_count|string + ' child' + ('ren' if entry.child_count != 1 else '')) or '' }}{% endif %}
-                {% if entry.infant_count %}{{ pax.append(entry.infant_count|string + ' infant' + ('s' if entry.infant_count != 1 else '')) or '' }}{% endif %}
-                {{ pax|join(', ') }}
+                航班 <strong>{{ entry.flight_date.strftime('%Y/%m/%d') }}</strong>
+                {% if entry.past_departure %}<span
+                    class="ml-2 text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">已過</span>{% endif %}
             </p>
             {% if entry.deadline %}
-            <p class="text-sm text-gray-600 mt-1">Buy deadline: <strong>{{ entry.deadline.strftime('%Y/%m/%d') }}</strong></p>
+            <p class="text-sm text-gray-600 mt-1">限期： <strong>{{ entry.deadline.strftime('%Y/%m/%d') }}</strong></p>
             {% endif %}
         </div>
         <div class="flex gap-2">
             <form method="POST" action="{{ url_for('api.toggle_entry', entry_id=entry.id) }}" class="inline">
-                <button class="px-3 py-1.5 text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors">
-                    {% if entry.is_active %}Disable{% else %}Enable{% endif %}
+                <button class="px-3 py-1.5 text-sm bg-gray-100 text-gray-600 rounded-lg">
+                    {% if entry.is_active %}禁用{% else %}啟用{% endif %}
                 </button>
             </form>
             {% if entry.flight_date >= today %}
             <form method="POST" action="{{ url_for('api.scrape_now', entry_id=entry.id) }}" class="inline">
-                <button class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">Scrape Now</button>
+                <button class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg">擷取最新價格</button>
             </form>
             {% endif %}
             <form method="POST" action="{{ url_for('api.delete_entry', entry_id=entry.id) }}" class="inline"
-                onsubmit="return confirm('Delete this entry and all its data?');">
-                <button class="px-3 py-1.5 text-sm bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors">Delete</button>
+                onsubmit="return confirm('刪除此項和所有數據?');">
+                <button class="px-3 py-1.5 text-sm bg-red-50 text-red-600 rounded-lg">刪除</button>
             </form>
         </div>
     </div>
 </div>
 
-{# ── 37% Rule Status ─────────────────────────────────────────────────── #}
 {% if rule37_status %}
 <div class="bg-white rounded-lg border shadow-sm p-6 mb-5">
-    <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Deadline 37% Rule</p>
+    <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">37% 法則</p>
     <p class="text-sm text-gray-600 mb-3">
-        Key date: <strong class="{% if rule37_status.phase.value == 'BUY_SIGNAL' %}text-green-700{% elif rule37_status.phase.value == 'OBSERVING' %}text-amber-700{% else %}text-gray-700{% endif %}">
+        觀察期：<strong
+            class="{% if rule37_status.phase.value == 'BUY_SIGNAL' %}text-green-700{% elif rule37_status.phase.value == 'OBSERVING' %}text-amber-700{% else %}text-gray-700{% endif %}">
             {{ rule37_status.key_date.strftime('%Y/%m/%d') }}
         </strong>
         {% if rule37_status.phase.value == 'OBSERVING' %}
-        <span class="text-xs text-gray-400 ml-1">({{ (rule37_status.key_date - today).days }} days away)</span>
+        <span class="text-xs text-gray-400 ml-1">({{ (rule37_status.key_date - today).days }}天後)</span>
         {% endif %}
     </p>
 
     {% if rule37_status.phase.value == 'BUY_SIGNAL' %}
     <div class="flex items-center gap-2 mb-2">
         <span class="text-2xl">🟢</span>
-        <span class="text-xl font-bold text-green-600">BUY SIGNAL</span>
+        <span class="text-xl font-bold text-green-600">購買信號</span>
     </div>
-    <p class="text-sm text-gray-600">Current: <strong>HKD {{ "%.0f"|format(rule37_status.latest_fare) }}</strong></p>
-    <p class="text-sm text-gray-600">Best observed: <strong>HKD {{ "%.0f"|format(rule37_status.min_observed) }}</strong></p>
+    <p class="text-sm text-gray-600">門檻：<strong>{{ "$%.0f"|format(rule37_status.min_observed) }}</strong></p>
+    <p class="text-sm text-gray-600">最新：<strong>{{ "$%.0f"|format(rule37_status.latest_fare) }}</strong></p>
     {% elif rule37_status.phase.value == 'OBSERVING' %}
     <div class="flex items-center gap-2 mb-2">
         <span class="text-2xl">🟡</span>
-        <span class="text-xl font-bold text-amber-600">OBSERVING</span>
+        <span class="text-xl font-bold text-amber-600">觀察中</span>
     </div>
-    <p class="text-sm text-gray-600">Watching until key date passes</p>
-    {% if rule37_status.latest_fare %}
-    <p class="text-sm text-gray-500 mt-1">Latest: HKD {{ "%.0f"|format(rule37_status.latest_fare) }}</p>
-    {% endif %}
+
+    <p class="text-sm text-gray-600">門檻：<strong>{{ "$%.0f"|format(rule37_status.min_observed) }}</strong></p>
     {% else %}
     <div class="flex items-center gap-2 mb-2">
         <span class="text-2xl">⚪</span>
-        <span class="text-xl font-bold text-gray-600">WAITING</span>
+        <span class="text-xl font-bold text-gray-600">等待中</span>
     </div>
-    <p class="text-sm text-gray-600">Current: <strong>HKD {{ "%.0f"|format(rule37_status.latest_fare) if rule37_status.latest_fare else '—' }}</strong></p>
-    <p class="text-sm text-gray-600">Best observed: <strong>HKD {{ "%.0f"|format(rule37_status.min_observed) if rule37_status.min_observed else '—' }}</strong></p>
+    <p class="text-sm text-gray-600">
+        最新：<strong>{{ "$%.0f"|format(rule37_status.latest_fare) if
+            rule37_status.latest_fare else '—' }}</strong>
+    </p>
+    <p class="text-sm text-gray-600">
+        最佳觀察：<strong>{{ "$%.0f"|format(rule37_status.min_observed) if
+            rule37_status.min_observed else '—' }}</strong>
+    </p>
     {% endif %}
 </div>
 {% else %}
 <div class="bg-amber-50 rounded-lg border border-amber-200 shadow-sm p-6 mb-5">
-    <p class="text-sm text-amber-800">No deadline set. Set a buy deadline when creating the entry to enable the 37% rule.</p>
+    <p class="text-sm text-amber-800">未設定期限。設定購買期限以啟用37%規則。</p>
 </div>
 {% endif %}
 
-{# ── Table / Graph Tabs ──────────────────────────────────────────────── #}
 <div class="bg-white rounded-lg border shadow-sm">
     <div class="flex border-b">
         <button onclick="switchTab('table')"
             class="tab-button flex-1 py-3.5 text-center text-sm font-medium border-b-2 border-blue-600 text-blue-600"
-            data-tab="table">Table</button>
+            data-tab="table">列表</button>
         <button onclick="switchTab('graph')"
-            class="tab-button flex-1 py-3.5 text-center text-sm font-medium text-gray-500 hover:text-gray-800"
-            data-tab="graph">Graph</button>
+            class="tab-button flex-1 py-3.5 text-center text-sm font-medium text-gray-500" data-tab="graph">圖表</button>
     </div>
-
-    {# Table view #}
     {% include 'detail_table.html' %}
-
-    {# Graph view #}
     {% include 'detail_graph.html' %}
 </div>
 {% endblock %}

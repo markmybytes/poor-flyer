@@ -1,10 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
-
+<html lang="zh-HK">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Airline Price Tracker{% endblock %}</title>
+    <title>{% block title %}航班價格追蹤器{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -13,25 +12,16 @@
         .tab-content.active { display: block; }
     </style>
 </head>
-
 <body class="bg-gray-50 min-h-screen">
     <nav class="bg-white border-b">
         <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-            <a href="{{ url_for('pages.list_entries') }}" class="text-xl font-bold text-gray-800 hover:text-blue-600 transition-colors">
-                ✈ Price Tracker
-            </a>
-            <a href="{{ url_for('pages.create') }}"
-                class="text-sm font-medium bg-blue-600 text-white px-4 py-1.5 rounded-lg hover:bg-blue-700 transition-colors">
-                + Track Flight
-            </a>
+            <a href="{{ url_for('pages.list_entries') }}" class="text-xl font-bold text-gray-800">✈ 價格追蹤器</a>
+            <a href="{{ url_for('pages.create') }}" class="bg-blue-600 text-white px-4 py-1.5 rounded-lg">+ 追蹤航班</a>
         </div>
     </nav>
-
     <main class="max-w-6xl mx-auto px-4 py-8">
         {% block content %}{% endblock %}
     </main>
-
     <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
-
 </html>

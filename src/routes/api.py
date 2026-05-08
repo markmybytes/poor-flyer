@@ -23,9 +23,6 @@ def create_entry():
             origin=data.get("origin").upper(),
             destination=data.get("destination").upper(),
             flight_date=datetime.strptime(data.get("flight_date"), "%Y-%m-%d").date(),
-            adult_count=int(data.get("adult_count", 1)),
-            child_count=int(data.get("child_count", 0)),
-            infant_count=int(data.get("infant_count", 0)),
             deadline=deadline,
             is_active=True,
         )
@@ -91,9 +88,6 @@ def scrape_now(entry_id):
             origin=entry.origin,
             destination=entry.destination,
             flight_date=entry.flight_date,
-            adult_count=entry.adult_count,
-            child_count=entry.child_count,
-            infant_count=entry.infant_count,
         )
 
         snapshot = PriceSnapshot(

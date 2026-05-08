@@ -63,9 +63,6 @@ def scrape_prices(
     origin: str,
     destination: str,
     flight_date: date,
-    adult_count: int,
-    child_count: int,
-    infant_count: int,
 ) -> ScrapeResult:
     payload = {
         "application_code": "IBE",
@@ -79,9 +76,9 @@ def scrape_prices(
         "currency_code": "HKD",
         "promotion_code": "",
         "passengers": {
-            "adult_count": adult_count,
-            "infant_count": infant_count,
-            "children_count": child_count,
+            "adult_count": 1,
+            "infant_count": 0,
+            "children_count": 0,
         },
     }
 
