@@ -90,13 +90,31 @@ def detail_entry(entry_id):
                 }
             )
 
+        # Compute rule37 status with ATH/ATL
+        rule37_data = (
+            compute_37_best(c_date, date.today(), e.deadline, vals)
+            if e.deadline
+            else None
+        )
+
+        # Use rule37 values or fallback to basic computation
+        all_time_high = (
+            rule37_data.all_time_high
+            if rule37_data
+            else (max(fares, default=None) if fares else None)
+        )
+        all_time_low = (
+            rule37_data.all_time_low
+            if rule37_data
+            else (min(fares, default=None) if fares else None)
+        )
+
         return render_template(
             "detail.html",
             entry=e,
             daily_groups=daily,
             today=date.today(),
-            rule37_status=compute_37_best(c_date, date.today(), e.deadline, vals)
-            if e.deadline
-            else None,
-            all_time_low=min(fares, default=None),
+            rule37_status=rule37_data,
+            all_time_low=all_time_low,
+            all_time_high=all_time_high,
         )

@@ -19,6 +19,10 @@ class DeadlineRule37:
     phase: Phase
     history_best_val: Optional[float]
     latest_val: Optional[float]
+    all_time_high: Optional[float] = None
+    all_time_low: Optional[float] = None
+    observation_high: Optional[float] = None
+    observation_low: Optional[float] = None
 
 
 def compute_37_best(
@@ -30,10 +34,21 @@ def compute_37_best(
     split = start + timedelta(days=int((end - start).days * 0.37))
     latest = float(values[max(past)])
 
+    all_fares = [float(f) for f in values.values()]
+    all_time_high = max(all_fares) if all_fares else None
+    all_time_low = min(all_fares) if all_fares else None
+
     m = min(
         [float(fare) for d, fare in values.items() if start <= d < split],
         default=float("inf"),
     )
+
+    obs_high = obs_low = None
+    if today >= split:
+        obs_vals = [float(f) for d, f in values.items() if d >= split]
+        if obs_vals:
+            obs_high = max(obs_vals)
+            obs_low = min(obs_vals)
 
     return DeadlineRule37(
         cutoff_date=split,
@@ -44,4 +59,8 @@ def compute_37_best(
         ),
         history_best_val=None if today < split or m == float("inf") else m,
         latest_val=latest,
+        all_time_high=all_time_high,
+        all_time_low=all_time_low,
+        observation_high=obs_high,
+        observation_low=obs_low,
     )
