@@ -1,92 +1,100 @@
 from datetime import date
 
 from flask import Blueprint, redirect, render_template, url_for
-from sqlalchemy.orm import Session
 
 from src.database import SessionLocal, TrackingEntry
-from src.rule37 import compute_rule37
+from src.rule37 import compute_deadline_rule37, compute_dynamic_rule37
 
 pages_bp = Blueprint("pages", __name__)
 
 
 @pages_bp.route("/")
+def list_entries():
+    db = SessionLocal()
+    try:
+        today = date.today()
+        entries = db.query(TrackingEntry).order_by(TrackingEntry.flight_date).all()
+        entries_data = []
+
+        for entry in entries:
+            snapshots = entry.price_snapshots
+            successful_fares = [
+                float(s.fare) for s in snapshots if s.scrape_status == "success" and s.fare
+            ]
+            deadline_status = compute_deadline_rule37(entry, snapshots, today)
+            dynamic_status = compute_dynamic_rule37(snapshots)
+            last_snap = max(snapshots, key=lambda s: s.scraped_at) if snapshots else None
+
+            entries_data.append({
+                "entry": entry,
+                "deadline_status": deadline_status,
+                "dynamic_status": dynamic_status,
+                "min_fare": min(successful_fares) if successful_fares else None,
+                "max_fare": max(successful_fares) if successful_fares else None,
+                "last_scraped": last_snap.scraped_at if last_snap else None,
+                "past_departure": entry.flight_date < today,
+            })
+
+        return render_template("list.html", entries=entries_data, today=today)
+    finally:
+        db.close()
+
+
+@pages_bp.route("/create")
 def create():
     return render_template("create.html")
 
 
 @pages_bp.route("/list")
-def list_entries():
-    db = SessionLocal()
-    try:
-        entries = db.query(TrackingEntry).all()
-        entries_with_status = []
-
-        for entry in entries:
-            status = compute_rule37(entry, entry.price_snapshots, date.today())
-            entries_with_status.append(
-                {
-                    "entry": entry,
-                    "status": status,
-                }
-            )
-
-        return render_template("list.html", entries=entries_with_status)
-    finally:
-        db.close()
+def list_redirect():
+    return redirect(url_for("pages.list_entries"))
 
 
 @pages_bp.route("/detail/<entry_id>")
 def detail_entry(entry_id):
     db = SessionLocal()
     try:
+        today = date.today()
         entry = db.query(TrackingEntry).filter(TrackingEntry.id == entry_id).first()
         if not entry:
             return redirect(url_for("pages.list_entries"))
 
-        status = compute_rule37(entry, entry.price_snapshots, date.today())
+        snapshots = entry.price_snapshots
+        deadline_status = compute_deadline_rule37(entry, snapshots, today)
+        dynamic_status = compute_dynamic_rule37(snapshots)
 
-        snapshots_with_type = []
-        if entry.rule_mode == "fixed_window":
-            from datetime import datetime
+        successful_ordered = sorted(
+            [s for s in snapshots if s.scrape_status == "success"],
+            key=lambda s: s.scraped_at,
+        )
+        observation_ids = {s.id for s in successful_ordered[: dynamic_status.observation_count]}
 
-            cutoff_datetime = datetime.combine(
-                entry.monitor_start + (entry.monitor_end - entry.monitor_start) * 0.37,
-                datetime.min.time(),
-            )
-            for snap in sorted(
-                entry.price_snapshots, key=lambda s: s.scraped_at, reverse=True
-            ):
-                snapshots_with_type.append(
-                    {
-                        "snapshot": snap,
-                        "is_observation": snap.scraped_at < cutoff_datetime
-                        and snap.scrape_status == "success",
-                    }
-                )
-        else:
-            sample_size = entry.rule_sample_size
-            observation_count = int(sample_size * 0.37)
-            successful = sorted(
-                [s for s in entry.price_snapshots if s.scrape_status == "success"],
-                key=lambda s: s.scraped_at,
-            )
-            for snap in sorted(
-                entry.price_snapshots, key=lambda s: s.scraped_at, reverse=True
-            ):
-                is_observation = (
-                    snap.scrape_status == "success"
-                    and len([s for s in successful if s.scraped_at <= snap.scraped_at])
-                    <= observation_count
-                )
-                snapshots_with_type.append(
-                    {
-                        "snapshot": snap,
-                        "is_observation": is_observation,
-                    }
-                )
+        # Build table rows (newest first) with ORM objects for Jinja
+        table_rows = []
+        for snap in sorted(snapshots, key=lambda s: s.scraped_at, reverse=True):
+            table_rows.append({
+                "snap": snap,
+                "is_dynamic_observation": snap.id in observation_ids,
+            })
+
+        # Build chart data (oldest first, JSON-serializable)
+        chart_data = []
+        for snap in sorted(snapshots, key=lambda s: s.scraped_at):
+            if snap.scrape_status == "success" and snap.fare:
+                chart_data.append({
+                    "date": snap.scraped_at.strftime("%Y-%m-%d"),
+                    "fare": float(snap.fare),
+                    "is_observation": snap.id in observation_ids,
+                })
 
         return render_template(
-            "detail.html", entry=entry, status=status, snapshots=snapshots_with_type
+            "detail.html",
+            entry=entry,
+            deadline_status=deadline_status,
+            dynamic_status=dynamic_status,
+            table_rows=table_rows,
+            chart_data=chart_data,
+            today=today,
         )
     finally:
         db.close()

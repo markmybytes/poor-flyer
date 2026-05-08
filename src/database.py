@@ -36,10 +36,7 @@ class TrackingEntry(Base):
     adult_count = Column(Integer, default=1)
     child_count = Column(Integer, default=0)
     infant_count = Column(Integer, default=0)
-    rule_mode = Column(String, nullable=False)
-    monitor_start = Column(Date, nullable=True)
-    monitor_end = Column(Date, nullable=True)
-    rule_sample_size = Column(Integer, default=30)
+    deadline = Column(Date, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 

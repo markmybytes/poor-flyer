@@ -2,10 +2,8 @@ import uuid
 from datetime import date, datetime
 
 from flask import Blueprint, jsonify, redirect, request, url_for
-from sqlalchemy.orm import Session
 
 from src.database import PriceSnapshot, SessionLocal, TrackingEntry
-from src.rule37 import compute_rule37
 from src.scraper import scrape_prices
 
 api_bp = Blueprint("api", __name__)
@@ -15,20 +13,10 @@ api_bp = Blueprint("api", __name__)
 def create_entry():
     db = SessionLocal()
     try:
-        data = request.get_json() or request.form.to_dict()
+        data = request.get_json(silent=True) or request.form.to_dict()
 
-        rule_mode = data.get("rule_mode")
-        monitor_start = None
-        monitor_end = None
-        rule_sample_size = 30
-
-        if rule_mode == "fixed_window":
-            monitor_start = datetime.strptime(
-                data.get("monitor_start"), "%Y-%m-%d"
-            ).date()
-            monitor_end = datetime.strptime(data.get("monitor_end"), "%Y-%m-%d").date()
-        else:
-            rule_sample_size = int(data.get("rule_sample_size", 30))
+        deadline_str = data.get("deadline")
+        deadline = datetime.strptime(deadline_str, "%Y-%m-%d").date() if deadline_str else None
 
         entry = TrackingEntry(
             id=str(uuid.uuid4()),
@@ -39,10 +27,7 @@ def create_entry():
             adult_count=int(data.get("adult_count", 1)),
             child_count=int(data.get("child_count", 0)),
             infant_count=int(data.get("infant_count", 0)),
-            rule_mode=rule_mode,
-            monitor_start=monitor_start,
-            monitor_end=monitor_end,
-            rule_sample_size=rule_sample_size,
+            deadline=deadline,
             is_active=True,
         )
 
@@ -99,6 +84,9 @@ def scrape_now(entry_id):
         entry = db.query(TrackingEntry).filter(TrackingEntry.id == entry_id).first()
         if not entry:
             return jsonify({"error": "Entry not found"}), 404
+
+        if entry.flight_date < date.today():
+            return jsonify({"error": "Cannot scrape: flight date has passed"}), 400
 
         result = scrape_prices(
             origin=entry.origin,

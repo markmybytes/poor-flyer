@@ -1,4 +1,5 @@
 from flask import Flask
+import atexit
 import os
 
 from src.database import init_db
@@ -19,19 +20,7 @@ def create_app():
     app.register_blueprint(pages_bp)
     app.register_blueprint(api_bp)
 
-    @app.before_request
-    def before_request():
-        pass
-
-    @app.teardown_appcontext
-    def shutdown_session(exception=None):
-        pass
-
     start_scheduler()
-
-    @app.teardown_appcontext
-    def teardown(exception):
-        if exception and app.config.get("TESTING"):
-            stop_scheduler()
+    atexit.register(stop_scheduler)
 
     return app

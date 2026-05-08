@@ -1,10 +1,10 @@
 import logging
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from src.database import SessionLocal, TrackingEntry
+from src.database import PriceSnapshot, SessionLocal, TrackingEntry
 from src.scraper import scrape_prices
 
 logger = logging.getLogger(__name__)
@@ -15,7 +15,11 @@ scheduler = BackgroundScheduler()
 def daily_scrape_job():
     db = SessionLocal()
     try:
-        entries = db.query(TrackingEntry).filter(TrackingEntry.is_active == True).all()
+        today = date.today()
+        entries = db.query(TrackingEntry).filter(
+            TrackingEntry.is_active == True,
+            TrackingEntry.flight_date >= today,
+        ).all()
 
         for entry in entries:
             result = scrape_prices(
@@ -26,8 +30,6 @@ def daily_scrape_job():
                 child_count=entry.child_count,
                 infant_count=entry.infant_count,
             )
-
-            from src.database import PriceSnapshot
 
             snapshot = PriceSnapshot(
                 id=str(uuid.uuid4()),
