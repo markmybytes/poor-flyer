@@ -83,11 +83,11 @@ No cookies sent. If the API rejects the request, the error is stored in the snap
 
 ## 37% Rule Logic (`src/rule37.py`)
 
-Computed on-the-fly from snapshots (never stored). Two rule types **always co-exist** on every entry.
+Computed on-the-fly from snapshots (never stored). Only **Deadline Rule 37** is used.
 
 ### Deadline Rule 37 (`DeadlineRule37`)
 
-Only active when `deadline` is set. Key date = `created_at + (deadline − created_at) × 0.37`.
+Only computed when `deadline` is set. Key date = `created_at + (deadline − created_at) × 0.37`.
 
 ```
 key_date = created_at + (deadline - created_at) * 0.37
@@ -103,24 +103,7 @@ else:
         phase = WAITING
 ```
 
-### Dynamic Rule 37 (`DynamicRule37`)
-
-Always computed. Observation window = first 37% of all successful snapshots collected so far.
-
-```
-obs_count = floor(total_successful_snapshots * 0.37)
-
-if obs_count == 0:          # < 3 snapshots → not enough data
-    phase = OBSERVING
-else:
-    min_observed = min(fare of first obs_count snapshots)
-    if latest_fare < min_observed:
-        phase = BUY_SIGNAL
-    else:
-        phase = WAITING
-```
-
-The dynamic cutoff shifts outward as more data is collected. Both types are shown simultaneously on the detail page.
+If no deadline is set, returns `None` and no 37% rule is applied.
 
 ---
 
@@ -134,69 +117,51 @@ Scraping is skipped (scheduler and Scrape Now button) when:
 
 ## Web UI Pages
 
-### Create Page — `GET /create`
-
-Form fields:
-- **Label** (text, optional)
-- **From** (text, e.g. `HKG`)
-- **To** (text, e.g. `NRT`)
-- **Flight Date** (date picker)
-- **Buy Deadline** (date picker, optional) — enables Deadline 37% rule; key date auto-calculated
-- **Passengers**: Adults (default 1), Children (default 0), Infants (default 0)
-- **Submit** → `POST /entries` → redirect to `/`
-
 ### List / Index Page — `GET /`
 
-Two sections:
-
-**Summary section** — stat cards per entry (low / current / high fare + signal badges):
-
-| HKG→NRT Jun 1 | | HKG→TYO Jul 30 |
-|---|---|---|
-| Low 680 · Now 770 · High 950 | | Low 1100 · Now 1300 · High 1500 |
-| 🟡 Deadline: Watching · 🟢 Dynamic Buy | | 🟢 Deadline Buy · ⚪ Dynamic: Wait |
-
-**Entry list section** — one card per entry with action buttons:
+One integrated card per entry with all info:
 
 ```
-HKG → NRT  Active  Flight Jun 01 2026  Deadline May 31  1 adult  Scraped May 07 09:00
-[View]  [Disable]  [Delete]
+┌──────────────────────────────────────────────────────────────┐
+│ HKG → NRT  Tokyo Summer        Active                        │
+│ Jun 07, 2026 · 1A, 1I                                        │
+├──────────────────────────────────────────────────────────────┤
+│ Low 671 · Now 727 · High 765 · Key Date 06/02               │
+├──────────────────────────────────────────────────────────────┤
+│ 🟡 OBSERVING    [View] [Disable] [Delete]                   │
+└──────────────────────────────────────────────────────────────┘
 ```
+
+- Route, date, label, passenger count
+- Price stats (Low / Current / High) + deadline key date
+- 37% status badge (BUY SIGNAL / OBSERVING / WAITING) or "No deadline"
+- Action buttons
 
 ### Detail Page — `GET /detail/{id}`
 
 **Header section:**
-- Route: `HKG → NRT | Jun 01 2026`
-- Passengers: `1 adult`
-- Buy deadline (if set): `May 31 2026`
+- Route: `HKG → NRT | Jun 07 2026`
+- Label, passengers, deadline (if set)
 - Buttons: [Enable/Disable] [Scrape Now] (hidden if past departure) [← Back to list]
 
-**37% Analysis — two side-by-side panels:**
+**37% Rule status** (if deadline set):
+- Key date display
+- Phase badge: `🟢 BUY SIGNAL` / `🟡 OBSERVING` / `⚪ WAITING`
+- Current fare vs. best observed
 
-*Dynamic 37% Rule* (always shown):
-- Status badge: `🟡 OBSERVING — 2 snapshots collected` or `🟢 BUY SIGNAL — Current HKD 770 vs best HKD 820`
-- Footer: `Observation window: 7 of 19 snapshots`
+**Daily collapsible groups:**
+- Each day appears as a collapsible section, grouped newest-first
+- Header shows: date + lowest price that day + flight count
+- Click to expand → shows all flights for that day in table format
 
-*Deadline 37% Rule* (shown only when deadline is set):
-- Key date: `May 12, 2026` (5 days away)
-- Status badge: `🟡 OBSERVING` / `🟢 BUY SIGNAL` / `⚪ WAITING`
-- Card has a green ring when BUY SIGNAL
+**Color coding:**
+- 🔵 **BLUE**: All-time low price (lowest in entire dataset)
+- 🟢 **GREEN**: 37% observation best (min_observed)
+- 🔴 **RED**: Missing price (scrape error)
+- ⚪ **NO COLOR**: Regular snapshots
 
-**Two tabs: Table | Graph** (JS tab-switch, no page reload)
-
-**Table tab:**
-
-- Rows newest-first
-- Separator `↑ After observation · ↓ Dynamic 37% observation (N of M)` between action and observation windows
-- Separator `↑ After key date · ↓ Deadline 37% observation (key date: ...)` when crossing deadline key date
-- Observation rows: amber background; best-price row: green; error rows: red
-- Legend at bottom
-
-**Graph tab:**
-
-- X axis: Date Scraped
-- Y axis: Fare (HKD)
-- Blue line + dots; amber dots for observation-window points
+**Key date bar:**
+- Blue separator bar showing the 37% key date (if deadline set)
 
 ---
 

@@ -8,7 +8,7 @@
 </div>
 
 {# ── Header ──────────────────────────────────────────────────────────── #}
-<div class="bg-white rounded-xl border shadow-sm p-6 mb-5">
+<div class="bg-white rounded-lg border shadow-sm p-6 mb-5">
     <div class="flex justify-between items-start">
         <div>
             <h2 class="text-3xl font-bold mb-1">{{ entry.origin }} → {{ entry.destination }}</h2>
@@ -39,216 +39,151 @@
             </form>
             {% if entry.flight_date >= today %}
             <form method="POST" action="{{ url_for('api.scrape_now', entry_id=entry.id) }}" class="inline">
-                <button class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                    Scrape Now
-                </button>
+                <button class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">Scrape Now</button>
             </form>
             {% endif %}
         </div>
     </div>
 </div>
 
-{# ── 37% Analysis ────────────────────────────────────────────────────── #}
-<div class="grid gap-4 {% if deadline_status %}md:grid-cols-2{% endif %} mb-5">
+{# ── 37% Rule Status ─────────────────────────────────────────────────── #}
+{% if rule37_status %}
+<div class="bg-white rounded-lg border shadow-sm p-6 mb-5">
+    <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Deadline 37% Rule</p>
+    <p class="text-sm text-gray-600 mb-3">
+        Key date: <strong class="{% if rule37_status.phase.value == 'BUY_SIGNAL' %}text-green-700{% elif rule37_status.phase.value == 'OBSERVING' %}text-amber-700{% else %}text-gray-700{% endif %}">
+            {{ rule37_status.key_date.strftime('%b %d, %Y') }}
+        </strong>
+        {% if rule37_status.phase.value == 'OBSERVING' %}
+        <span class="text-xs text-gray-400 ml-1">({{ (rule37_status.key_date - today).days }} days away)</span>
+        {% endif %}
+    </p>
 
-    {# Dynamic Rule 37 – always shown #}
-    <div class="bg-white rounded-xl border shadow-sm p-6">
-        <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Dynamic 37% Rule</p>
-        {% if dynamic_status.phase.value == 'BUY_SIGNAL' %}
-        <div class="flex items-center gap-2 mb-2">
-            <span class="text-2xl">🟢</span>
-            <span class="text-xl font-bold text-emerald-600">BUY SIGNAL</span>
-        </div>
-        <p class="text-sm text-gray-600">Current: <strong>HKD {{ "%.0f"|format(dynamic_status.latest_fare) }}</strong></p>
-        <p class="text-sm text-gray-600">Best observed: <strong>HKD {{ "%.0f"|format(dynamic_status.min_observed) }}</strong></p>
-        {% elif dynamic_status.phase.value == 'OBSERVING' %}
-        <div class="flex items-center gap-2 mb-2">
-            <span class="text-2xl">🟡</span>
-            <span class="text-xl font-bold text-amber-600">OBSERVING</span>
-        </div>
-        <p class="text-sm text-gray-600">{{ dynamic_status.total_snapshots }} snapshot{% if dynamic_status.total_snapshots != 1 %}s{% endif %} collected — need ≥3 to enter decision phase</p>
-        {% if dynamic_status.latest_fare %}
-        <p class="text-sm text-gray-500 mt-1">Latest: HKD {{ "%.0f"|format(dynamic_status.latest_fare) }}</p>
-        {% endif %}
-        {% else %}
-        <div class="flex items-center gap-2 mb-2">
-            <span class="text-2xl">⚪</span>
-            <span class="text-xl font-bold text-gray-600">WAITING</span>
-        </div>
-        <p class="text-sm text-gray-600">Current: <strong>HKD {{ "%.0f"|format(dynamic_status.latest_fare) if dynamic_status.latest_fare else '—' }}</strong></p>
-        <p class="text-sm text-gray-600">Best observed: <strong>HKD {{ "%.0f"|format(dynamic_status.min_observed) if dynamic_status.min_observed else '—' }}</strong></p>
-        {% endif %}
-        <p class="text-xs text-gray-300 mt-3 border-t pt-2">
-            Observation window: {{ dynamic_status.observation_count }} of {{ dynamic_status.total_snapshots }} snapshots
-        </p>
+    {% if rule37_status.phase.value == 'BUY_SIGNAL' %}
+    <div class="flex items-center gap-2 mb-2">
+        <span class="text-2xl">🟢</span>
+        <span class="text-xl font-bold text-green-600">BUY SIGNAL</span>
     </div>
+    <p class="text-sm text-gray-600">Current: <strong>HKD {{ "%.0f"|format(rule37_status.latest_fare) }}</strong></p>
+    <p class="text-sm text-gray-600">Best observed: <strong>HKD {{ "%.0f"|format(rule37_status.min_observed) }}</strong></p>
+    {% elif rule37_status.phase.value == 'OBSERVING' %}
+    <div class="flex items-center gap-2 mb-2">
+        <span class="text-2xl">🟡</span>
+        <span class="text-xl font-bold text-amber-600">OBSERVING</span>
+    </div>
+    <p class="text-sm text-gray-600">Watching until key date passes</p>
+    {% if rule37_status.latest_fare %}
+    <p class="text-sm text-gray-500 mt-1">Latest: HKD {{ "%.0f"|format(rule37_status.latest_fare) }}</p>
+    {% endif %}
+    {% else %}
+    <div class="flex items-center gap-2 mb-2">
+        <span class="text-2xl">⚪</span>
+        <span class="text-xl font-bold text-gray-600">WAITING</span>
+    </div>
+    <p class="text-sm text-gray-600">Current: <strong>HKD {{ "%.0f"|format(rule37_status.latest_fare) if rule37_status.latest_fare else '—' }}</strong></p>
+    <p class="text-sm text-gray-600">Best observed: <strong>HKD {{ "%.0f"|format(rule37_status.min_observed) if rule37_status.min_observed else '—' }}</strong></p>
+    {% endif %}
+</div>
+{% else %}
+<div class="bg-amber-50 rounded-lg border border-amber-200 shadow-sm p-6 mb-5">
+    <p class="text-sm text-amber-800">No deadline set. Set a buy deadline when creating/editing the entry to enable the 37% rule.</p>
+</div>
+{% endif %}
 
-    {# Deadline Rule 37 – only if deadline set #}
-    {% if deadline_status %}
-    <div class="bg-white rounded-xl border shadow-sm p-6 {% if deadline_status.phase.value == 'BUY_SIGNAL' %}ring-2 ring-emerald-400{% endif %}">
-        <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Deadline 37% Rule</p>
-        <p class="text-sm text-gray-600 mb-3">
-            37% key date:
-            <strong class="{% if deadline_status.phase.value == 'BUY_SIGNAL' %}text-emerald-700{% elif deadline_status.phase.value == 'OBSERVING' %}text-amber-700{% else %}text-gray-700{% endif %}">
-                {{ deadline_status.key_date.strftime('%b %d, %Y') }}
-            </strong>
-            {% if deadline_status.phase.value == 'OBSERVING' %}
-            <span class="text-xs text-gray-400 ml-1">({{ (deadline_status.key_date - today).days }} days away)</span>
-            {% endif %}
-        </p>
-        {% if deadline_status.phase.value == 'BUY_SIGNAL' %}
-        <div class="flex items-center gap-2 mb-2">
-            <span class="text-2xl">🟢</span>
-            <span class="text-xl font-bold text-emerald-600">BUY SIGNAL</span>
-        </div>
-        <p class="text-sm text-gray-600">Current: <strong>HKD {{ "%.0f"|format(deadline_status.latest_fare) }}</strong></p>
-        <p class="text-sm text-gray-600">Best observed: <strong>HKD {{ "%.0f"|format(deadline_status.min_observed) }}</strong></p>
-        {% elif deadline_status.phase.value == 'OBSERVING' %}
-        <div class="flex items-center gap-2 mb-2">
-            <span class="text-2xl">🟡</span>
-            <span class="text-xl font-bold text-amber-600">OBSERVING</span>
-        </div>
-        <p class="text-sm text-gray-600">Watching until key date passes</p>
-        {% if deadline_status.latest_fare %}
-        <p class="text-sm text-gray-500 mt-1">Latest: HKD {{ "%.0f"|format(deadline_status.latest_fare) }}</p>
-        {% endif %}
-        {% else %}
-        <div class="flex items-center gap-2 mb-2">
-            <span class="text-2xl">⚪</span>
-            <span class="text-xl font-bold text-gray-600">WAITING</span>
-        </div>
-        <p class="text-sm text-gray-600">Current: <strong>HKD {{ "%.0f"|format(deadline_status.latest_fare) if deadline_status.latest_fare else '—' }}</strong></p>
-        <p class="text-sm text-gray-600">Best observed: <strong>HKD {{ "%.0f"|format(deadline_status.min_observed) if deadline_status.min_observed else '—' }}</strong></p>
-        {% endif %}
+{# ── Daily Groups (Collapsible) ──────────────────────────────────────── #}
+<div class="space-y-2">
+    {% if daily_groups %}
+
+    {# Key date separator #}
+    {% if rule37_status %}
+    <div class="bg-blue-50 border-l-4 border-blue-400 px-4 py-2 my-3">
+        <p class="text-xs font-semibold text-blue-700">KEY DATE: {{ rule37_status.key_date.strftime('%a, %b %d, %Y') }}</p>
     </div>
     {% endif %}
 
-</div>
+    {% for group in daily_groups %}
+    <div class="bg-white rounded-lg border shadow-sm overflow-hidden">
+        {# Daily header (collapsible) #}
+        <button class="w-full px-5 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors group-toggle"
+            onclick="toggleGroup(this)" data-group-id="group-{{ loop.index }}">
 
-{# ── Table + Graph ───────────────────────────────────────────────────── #}
-<div class="bg-white rounded-xl border shadow-sm">
-    <div class="flex border-b">
-        <button onclick="switchTab('table')"
-            class="tab-button flex-1 py-3.5 text-center text-sm font-medium border-b-2 border-blue-600 text-blue-600"
-            data-tab="table">Table</button>
-        <button onclick="switchTab('graph')"
-            class="tab-button flex-1 py-3.5 text-center text-sm font-medium text-gray-500 hover:text-gray-800"
-            data-tab="graph">Graph</button>
-    </div>
+            <div class="flex items-center gap-4 flex-1 text-left">
+                <div class="flex items-center justify-center w-6">
+                    <span class="text-gray-400 group-toggle-icon">▶</span>
+                </div>
 
-    {# Table tab #}
-    <div id="table" class="tab-content active p-5">
-        {% if table_rows %}
-        <table class="w-full text-sm">
-            <thead class="border-b">
-                <tr>
-                    <th class="pb-2 text-left text-xs font-semibold text-gray-400 uppercase">Scraped</th>
-                    <th class="pb-2 text-left text-xs font-semibold text-gray-400 uppercase">Flight</th>
-                    <th class="pb-2 text-left text-xs font-semibold text-gray-400 uppercase">Dep</th>
-                    <th class="pb-2 text-left text-xs font-semibold text-gray-400 uppercase">Arr</th>
-                    <th class="pb-2 text-right text-xs font-semibold text-gray-400 uppercase">Fare (HKD)</th>
-                    <th class="pb-2 text-left text-xs font-semibold text-gray-400 uppercase">Notes</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y">
-                {% set ns = namespace(dynamic_cut_shown=false, deadline_cut_shown=false) %}
-                {% for item in table_rows %}
-                {% set snap = item.snap %}
-
-                {# Dynamic 37% cutoff separator — insert before first observation-window row (table is newest-first) #}
-                {% if item.is_dynamic_observation and not ns.dynamic_cut_shown and dynamic_status.observation_count > 0 %}
-                {% set ns.dynamic_cut_shown = true %}
-                <tr class="bg-blue-50">
-                    <td colspan="6" class="px-2 py-1.5 text-xs text-blue-500 font-medium text-center">
-                        ↑ After observation &nbsp;·&nbsp; ↓ Dynamic 37% observation window ({{ dynamic_status.observation_count }} of {{ dynamic_status.total_snapshots }} snapshots)
-                    </td>
-                </tr>
-                {% endif %}
-
-                {# Deadline 37% cutoff separator — insert when crossing key_date (newest-first) #}
-                {% if deadline_status and snap.scraped_at.date() < deadline_status.key_date and not ns.deadline_cut_shown %}
-                {% set ns.deadline_cut_shown = true %}
-                <tr class="bg-violet-50">
-                    <td colspan="6" class="px-2 py-1.5 text-xs text-violet-500 font-medium text-center">
-                        ↑ After key date &nbsp;·&nbsp; ↓ Deadline 37% observation (key date {{ deadline_status.key_date.strftime('%b %d, %Y') }})
-                    </td>
-                </tr>
-                {% endif %}
-
-                {% set is_best = snap.scrape_status == 'success' and snap.fare and dynamic_status.min_observed and snap.fare|float == dynamic_status.min_observed %}
-                <tr class="{% if is_best %}bg-emerald-50{% elif snap.scrape_status == 'error' %}bg-red-50{% elif item.is_dynamic_observation %}bg-amber-50{% endif %}">
-                    <td class="py-2.5 pr-3 text-gray-600 whitespace-nowrap">{{ snap.scraped_at.strftime('%Y-%m-%d %H:%M') }}</td>
-                    <td class="py-2.5 pr-3">{{ snap.flight_number or '—' }}</td>
-                    <td class="py-2.5 pr-3">{{ snap.departure_time or '—' }}</td>
-                    <td class="py-2.5 pr-3">{{ snap.arrival_time or '—' }}</td>
-                    <td class="py-2.5 text-right font-medium {% if is_best %}text-emerald-700{% endif %}">
-                        {% if snap.scrape_status == 'success' and snap.fare %}{{ "%.0f"|format(snap.fare) }}{% else %}—{% endif %}
-                    </td>
-                    <td class="py-2.5 pl-3 text-xs text-gray-400">
-                        {% if snap.scrape_status == 'error' %}
-                        <span class="text-red-500">{{ snap.error_message }}</span>
+                <div>
+                    <p class="font-semibold text-gray-900">{{ group.date.strftime('%a, %b %d') }}</p>
+                    <p class="text-xs text-gray-500">
+                        {% if group.lowest_snapshot %}
+                            {% set lowest_color = 'text-blue-600' if group.lowest_snapshot.fare|float == all_time_low else 'text-gray-600' %}
+                            Low: <span class="font-semibold {{ lowest_color }}">HKD {{ "%.0f"|format(group.lowest_fare) }}</span>
+                            {% if group.lowest_snapshot.flight_number %}· {{ group.lowest_snapshot.flight_number }}{% endif %}
                         {% else %}
-                        {% if is_best %}<span class="text-emerald-600 font-medium">Best price</span>{% endif %}
-                        {% if item.is_dynamic_observation %}<span class="text-amber-500 ml-1">obs</span>{% endif %}
-                        {% if deadline_status and snap.scraped_at.date() < deadline_status.key_date %}<span class="text-violet-400 ml-1">d-obs</span>{% endif %}
+                            <span class="text-red-500">No price data (errors only)</span>
                         {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <p class="text-xs text-gray-300 mt-3">
-            <span class="inline-block w-2.5 h-2.5 rounded bg-amber-100 border border-amber-300 mr-1"></span>obs = dynamic observation window
-            {% if deadline_status %}&ensp;<span class="inline-block w-2.5 h-2.5 rounded bg-violet-100 border border-violet-300 mr-1"></span>d-obs = before deadline key date{% endif %}
-            &ensp;<span class="inline-block w-2.5 h-2.5 rounded bg-emerald-100 border border-emerald-300 mr-1"></span>best observed price
-        </p>
-        {% else %}
-        <p class="text-gray-400 text-center py-12">No snapshots yet. Click "Scrape Now" to collect the first price data.</p>
-        {% endif %}
-    </div>
+                    </p>
+                </div>
+            </div>
 
-    {# Graph tab #}
-    <div id="graph" class="tab-content p-5">
-        {% if chart_data %}
-        <canvas id="priceChart" height="80"></canvas>
-        <script>
-            const chartData = {{ chart_data|tojson }};
+            <div class="text-right shrink-0">
+                <p class="text-xs text-gray-400">{{ group.snapshots|length }} flight{{ 's' if group.snapshots|length != 1 else '' }}</p>
+            </div>
+        </button>
 
-            const ctx = document.getElementById('priceChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: chartData.map(d => d.date),
-                    datasets: [{
-                        label: 'Fare (HKD)',
-                        data: chartData.map(d => d.fare),
-                        borderColor: '#2563eb',
-                        backgroundColor: 'rgba(37, 99, 235, 0.05)',
-                        tension: 0.3,
-                        pointBackgroundColor: chartData.map(d => d.is_observation ? '#f59e0b' : '#2563eb'),
-                        pointBorderColor: chartData.map(d => d.is_observation ? '#d97706' : '#1d4ed8'),
-                        pointRadius: 5,
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: { legend: { display: true } },
-                    scales: {
-                        y: {
-                            beginAtZero: false,
-                            title: { display: true, text: 'Fare (HKD)' }
-                        }
-                    }
-                }
-            });
-        </script>
-        <p class="text-xs text-gray-300 mt-3">
-            <span class="inline-block w-2.5 h-2.5 rounded-full bg-amber-400 mr-1"></span>Observation window points
-            &ensp;<span class="inline-block w-2.5 h-2.5 rounded-full bg-blue-600 mr-1"></span>Decision phase points
-        </p>
-        {% else %}
-        <p class="text-gray-400 text-center py-12">No data to graph yet.</p>
-        {% endif %}
+        {# Daily details (collapsible, hidden by default) #}
+        <div class="group-content hidden border-t" id="group-{{ loop.index }}">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-5 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Time</th>
+                        <th class="px-5 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Flight</th>
+                        <th class="px-5 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Departs</th>
+                        <th class="px-5 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Arrives</th>
+                        <th class="px-5 py-2 text-right text-xs font-semibold text-gray-500 uppercase">Fare (HKD)</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    {% for snap in group.snapshots %}
+                    {% set is_all_time_low = snap.scrape_status == 'success' and snap.fare and snap.fare|float == all_time_low %}
+                    {% set is_observation_best = snap.scrape_status == 'success' and snap.fare and rule37_status and snap.fare|float == rule37_status.min_observed %}
+                    {% set is_error = snap.scrape_status == 'error' %}
+
+                    <tr class="{% if is_error %}bg-red-50{% elif is_all_time_low %}bg-blue-50{% elif is_observation_best %}bg-green-50{% endif %}">
+                        <td class="px-5 py-2.5 text-gray-600 whitespace-nowrap">{{ snap.scraped_at.strftime('%H:%M') }}</td>
+                        <td class="px-5 py-2.5 font-medium">{{ snap.flight_number or '—' }}</td>
+                        <td class="px-5 py-2.5">{{ snap.departure_time or '—' }}</td>
+                        <td class="px-5 py-2.5">{{ snap.arrival_time or '—' }}</td>
+                        <td class="px-5 py-2.5 text-right font-semibold
+                            {% if is_error %}text-red-600{% elif is_all_time_low %}text-blue-700{% elif is_observation_best %}text-green-700{% else %}text-gray-900{% endif %}">
+                            {% if snap.scrape_status == 'success' and snap.fare %}
+                                {{ "%.0f"|format(snap.fare) }}
+                                {% if is_all_time_low %}<span class="text-xs ml-1">[all-time low]</span>{% endif %}
+                                {% if is_observation_best %}<span class="text-xs ml-1">[37% best]</span>{% endif %}
+                            {% else %}
+                                <span class="text-red-500">error</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
+    {% endfor %}
+
+    <p class="text-xs text-gray-300 mt-4 px-1">
+        <span class="inline-block w-3 h-3 bg-blue-100 border border-blue-300 rounded mr-2"></span>All-time low
+        &ensp;
+        <span class="inline-block w-3 h-3 bg-green-100 border border-green-300 rounded mr-2"></span>37% best observed
+        &ensp;
+        <span class="inline-block w-3 h-3 bg-red-100 border border-red-300 rounded mr-2"></span>Missing price (error)
+    </p>
+
+    {% else %}
+    <div class="bg-white rounded-lg border shadow-sm p-12 text-center">
+        <p class="text-gray-400">No snapshots yet. Click "Scrape Now" to collect the first price data.</p>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}

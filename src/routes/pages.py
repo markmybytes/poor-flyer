@@ -1,9 +1,10 @@
 from datetime import date
+from collections import defaultdict
 
 from flask import Blueprint, redirect, render_template, url_for
 
 from src.database import SessionLocal, TrackingEntry
-from src.rule37 import compute_deadline_rule37, compute_dynamic_rule37
+from src.rule37 import compute_deadline_rule37
 
 pages_bp = Blueprint("pages", __name__)
 
@@ -21,14 +22,12 @@ def list_entries():
             successful_fares = [
                 float(s.fare) for s in snapshots if s.scrape_status == "success" and s.fare
             ]
-            deadline_status = compute_deadline_rule37(entry, snapshots, today)
-            dynamic_status = compute_dynamic_rule37(snapshots)
+            rule37_status = compute_deadline_rule37(entry, snapshots, today)
             last_snap = max(snapshots, key=lambda s: s.scraped_at) if snapshots else None
 
             entries_data.append({
                 "entry": entry,
-                "deadline_status": deadline_status,
-                "dynamic_status": dynamic_status,
+                "rule37_status": rule37_status,
                 "min_fare": min(successful_fares) if successful_fares else None,
                 "max_fare": max(successful_fares) if successful_fares else None,
                 "last_scraped": last_snap.scraped_at if last_snap else None,
@@ -60,40 +59,39 @@ def detail_entry(entry_id):
             return redirect(url_for("pages.list_entries"))
 
         snapshots = entry.price_snapshots
-        deadline_status = compute_deadline_rule37(entry, snapshots, today)
-        dynamic_status = compute_dynamic_rule37(snapshots)
+        rule37_status = compute_deadline_rule37(entry, snapshots, today)
 
-        successful_ordered = sorted(
-            [s for s in snapshots if s.scrape_status == "success"],
-            key=lambda s: s.scraped_at,
-        )
-        observation_ids = {s.id for s in successful_ordered[: dynamic_status.observation_count]}
+        # Compute all-time low and observation window min
+        all_fares = [float(s.fare) for s in snapshots if s.scrape_status == "success" and s.fare]
+        all_time_low = min(all_fares) if all_fares else None
 
-        # Build table rows (newest first) with ORM objects for Jinja
-        table_rows = []
-        for snap in sorted(snapshots, key=lambda s: s.scraped_at, reverse=True):
-            table_rows.append({
-                "snap": snap,
-                "is_dynamic_observation": snap.id in observation_ids,
+        # Group snapshots by date (scraped_at.date())
+        by_date = defaultdict(list)
+        for snap in snapshots:
+            day = snap.scraped_at.date()
+            by_date[day].append(snap)
+
+        # Build daily groups sorted by date (newest first)
+        daily_groups = []
+        for day in sorted(by_date.keys(), reverse=True):
+            day_snapshots = by_date[day]
+            # Find lowest price for this day
+            successful = [s for s in day_snapshots if s.scrape_status == "success" and s.fare]
+            lowest_snap = min(successful, key=lambda s: s.fare) if successful else None
+
+            daily_groups.append({
+                "date": day,
+                "lowest_fare": float(lowest_snap.fare) if lowest_snap else None,
+                "lowest_snapshot": lowest_snap,
+                "snapshots": sorted(day_snapshots, key=lambda s: s.scraped_at, reverse=True),
             })
-
-        # Build chart data (oldest first, JSON-serializable)
-        chart_data = []
-        for snap in sorted(snapshots, key=lambda s: s.scraped_at):
-            if snap.scrape_status == "success" and snap.fare:
-                chart_data.append({
-                    "date": snap.scraped_at.strftime("%Y-%m-%d"),
-                    "fare": float(snap.fare),
-                    "is_observation": snap.id in observation_ids,
-                })
 
         return render_template(
             "detail.html",
             entry=entry,
-            deadline_status=deadline_status,
-            dynamic_status=dynamic_status,
-            table_rows=table_rows,
-            chart_data=chart_data,
+            rule37_status=rule37_status,
+            daily_groups=daily_groups,
+            all_time_low=all_time_low,
             today=today,
         )
     finally:
