@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from flask import Blueprint, jsonify, redirect, request, url_for
 
@@ -16,7 +16,9 @@ def create_entry():
         data = request.get_json(silent=True) or request.form.to_dict()
 
         deadline_str = data.get("deadline")
-        deadline = datetime.strptime(deadline_str, "%Y-%m-%d").date() if deadline_str else None
+        deadline = (
+            datetime.strptime(deadline_str, "%Y-%m-%d").date() if deadline_str else None
+        )
 
         entry = TrackingEntry(
             id=str(uuid.uuid4()),
@@ -91,9 +93,8 @@ def scrape_now(entry_id):
         )
 
         snapshot = PriceSnapshot(
-            id=str(uuid.uuid4()),
             entry_id=entry_id,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
             fare=result.fare,
             flight_number=result.flight_number,
             departure_time=result.departure_time,
