@@ -13,6 +13,7 @@ dependencies = [
     "httpx",
     "apscheduler",
     "gunicorn",
+    "fake-useragent>=2.2.0",
 ]
 
 [project.optional-dependencies]
