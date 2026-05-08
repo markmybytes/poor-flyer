@@ -1,6 +1,6 @@
 import logging
 import uuid
-from datetime import date, datetime
+from datetime import date
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -35,7 +35,6 @@ def daily_scrape_job():
             snapshot = PriceSnapshot(
                 id=str(uuid.uuid4()),
                 entry_id=entry.id,
-                created_at=datetime.utcnow(),
                 fare=result.fare,
                 flight_number=result.flight_number,
                 departure_time=result.departure_time,

@@ -1,6 +1,6 @@
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     Boolean,
@@ -8,7 +8,6 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
-    Integer,
     Numeric,
     String,
     create_engine,
@@ -48,13 +47,16 @@ class PriceSnapshot(Base):
     entry_id = Column(
         String, ForeignKey("tracking_entries.id", ondelete="CASCADE"), nullable=False
     )
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     fare = Column(Numeric(10, 2), nullable=True)
     flight_number = Column(String, nullable=True)
     departure_time = Column(String, nullable=True)
     arrival_time = Column(String, nullable=True)
     scrape_status = Column(String, nullable=False)
     error_message = Column(String, nullable=True)
+
+    created_at = Column(
+        DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
+    )
 
     tracking_entry = relationship("TrackingEntry", back_populates="price_snapshots")
 
