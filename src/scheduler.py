@@ -16,10 +16,14 @@ def daily_scrape_job():
     db = SessionLocal()
     try:
         today = date.today()
-        entries = db.query(TrackingEntry).filter(
-            TrackingEntry.is_active == True,
-            TrackingEntry.flight_date >= today,
-        ).all()
+        entries = (
+            db.query(TrackingEntry)
+            .filter(
+                TrackingEntry.is_active,
+                TrackingEntry.flight_date >= today,
+            )
+            .all()
+        )
 
         for entry in entries:
             result = scrape_prices(
