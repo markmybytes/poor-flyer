@@ -56,7 +56,13 @@ def daily_scrape_job():
 
 def start_scheduler():
     if not scheduler.running:
-        scheduler.add_job(daily_scrape_job, "cron", hour=9, minute=0, timezone="UTC")
+        scheduler.add_job(
+            daily_scrape_job,
+            "cron",
+            hour=9,
+            minute=0,
+            jitter=1800,
+        )
         scheduler.start()
         logger.info("Scheduler started")
 
