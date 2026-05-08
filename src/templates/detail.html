@@ -46,10 +46,10 @@
     <p class="text-sm text-gray-600 mb-3">
         觀察期：<strong
             class="{% if rule37_status.phase.value == 'BUY_SIGNAL' %}text-green-700{% elif rule37_status.phase.value == 'OBSERVING' %}text-amber-700{% else %}text-gray-700{% endif %}">
-            {{ rule37_status.key_date.strftime('%Y/%m/%d') }}
+            {{ rule37_status.cutoff_date.strftime('%Y/%m/%d') }}
         </strong>
         {% if rule37_status.phase.value == 'OBSERVING' %}
-        <span class="text-xs text-gray-400 ml-1">({{ (rule37_status.key_date - today).days }}天後)</span>
+        <span class="text-xs text-gray-400 ml-1">({{ (rule37_status.cutoff_date - today).days }}天後)</span>
         {% endif %}
     </p>
 
@@ -58,27 +58,27 @@
         <span class="text-2xl">🟢</span>
         <span class="text-xl font-bold text-green-600">購買信號</span>
     </div>
-    <p class="text-sm text-gray-600">門檻：<strong>{{ "$%.0f"|format(rule37_status.min_observed) }}</strong></p>
-    <p class="text-sm text-gray-600">最新：<strong>{{ "$%.0f"|format(rule37_status.latest_fare) }}</strong></p>
+    <p class="text-sm text-gray-600">門檻：<strong>{{ "$%.0f"|format(rule37_status.history_best_val) }}</strong></p>
+    <p class="text-sm text-gray-600">最新：<strong>{{ "$%.0f"|format(rule37_status.latest_val) }}</strong></p>
     {% elif rule37_status.phase.value == 'OBSERVING' %}
     <div class="flex items-center gap-2 mb-2">
         <span class="text-2xl">🟡</span>
         <span class="text-xl font-bold text-amber-600">觀察中</span>
     </div>
 
-    <p class="text-sm text-gray-600">門檻：<strong>{{ "$%.0f"|format(rule37_status.min_observed) }}</strong></p>
+    <p class="text-sm text-gray-600">門檻：<strong>{{ "$%.0f"|format(rule37_status.history_best_val) }}</strong></p>
     {% else %}
     <div class="flex items-center gap-2 mb-2">
         <span class="text-2xl">⚪</span>
         <span class="text-xl font-bold text-gray-600">等待中</span>
     </div>
     <p class="text-sm text-gray-600">
-        最新：<strong>{{ "$%.0f"|format(rule37_status.latest_fare) if
-            rule37_status.latest_fare else '—' }}</strong>
+        最新：<strong>{{ "$%.0f"|format(rule37_status.latest_val) if
+            rule37_status.latest_val else '—' }}</strong>
     </p>
     <p class="text-sm text-gray-600">
-        最佳觀察：<strong>{{ "$%.0f"|format(rule37_status.min_observed) if
-            rule37_status.min_observed else '—' }}</strong>
+        最佳觀察：<strong>{{ "$%.0f"|format(rule37_status.history_best_val) if
+            rule37_status.history_best_val else '—' }}</strong>
     </p>
     {% endif %}
 </div>

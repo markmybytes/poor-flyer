@@ -2,10 +2,10 @@
     {% if daily_groups %}
     {% for group in daily_groups %}
     <div class="border-b last:border-b-0">
-        {% set key_date_in_this_group = rule37_status and group.date == rule37_status.key_date %}
+        {% set key_date_in_this_group = rule37_status and group.date == rule37_status.cutoff_date %}
         {% set has_all_time_low = group.lowest_snapshot and group.lowest_snapshot.fare|float == all_time_low %}
-        {% set has_37_best = rule37_status and group.date >= rule37_status.key_date and group.lowest_snapshot and
-        group.lowest_snapshot.fare|float == rule37_status.min_observed %}
+        {% set has_37_best = rule37_status and group.date >= rule37_status.cutoff_date and group.lowest_snapshot and
+        group.lowest_snapshot.fare|float == rule37_status.history_best_val %}
         {% set bg_color = 'bg-blue-50' if has_all_time_low else ('bg-green-50' if has_37_best else '') %}
         <button class="w-full px-5 py-3 flex items-center justify-between hover:bg-gray-50 {{ bg_color }}"
             onclick="toggleGroup(this)" data-group-id="group-{{ loop.index }}">
@@ -33,7 +33,7 @@
         </button>
         {% if key_date_in_this_group %}
         <div class="bg-blue-50 border-y border-blue-200 px-5 py-2">
-            <p class="text-xs font-semibold text-blue-700">◆ {{ rule37_status.key_date.strftime('%Y/%m/%d') }} - 37%觀察期
+            <p class="text-xs font-semibold text-blue-700">◆ {{ rule37_status.cutoff_date.strftime('%Y/%m/%d') }} - 37%觀察期
                 ◆</p>
         </div>
         {% endif %}
@@ -52,7 +52,7 @@
                     {% set is_all_time_low = snap.scrape_status == 'success' and snap.fare and snap.fare|float ==
                     all_time_low %}
                     {% set is_observation_best = snap.scrape_status == 'success' and snap.fare and rule37_status and
-                    snap.created_at.date() >= rule37_status.key_date and snap.fare|float == rule37_status.min_observed
+                    snap.created_at.date() >= rule37_status.cutoff_date and snap.fare|float == rule37_status.history_best_val
                     %}
                     {% set is_error = snap.scrape_status == 'error' %}
                     <tr

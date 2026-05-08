@@ -1,52 +1,46 @@
-from datetime import date
 from collections import defaultdict
+from datetime import date
 
 from flask import Blueprint, redirect, render_template, url_for
 
 from src.database import SessionLocal, TrackingEntry
-from src.rule37 import compute_deadline_rule37
+from src.rule37 import compute_37_best
 
 pages_bp = Blueprint("pages", __name__)
 
 
 @pages_bp.route("/")
 def list_entries():
-    db = SessionLocal()
-    try:
-        today = date.today()
-        entries = db.query(TrackingEntry).order_by(TrackingEntry.flight_date).all()
-        entries_data = []
-
-        for entry in entries:
-            snapshots = entry.price_snapshots
-            successful_fares = [
-                float(s.fare) for s in snapshots if s.scrape_status == "success" and s.fare
+    with SessionLocal() as db:
+        today, entries_data = date.today(), []
+        for e in db.query(TrackingEntry).order_by(TrackingEntry.flight_date).all():
+            valid = [
+                s for s in e.price_snapshots if s.scrape_status == "success" and s.fare
             ]
-            rule37_status = compute_deadline_rule37(entry, snapshots, today)
-
-            # Get latest successful fare (skip errors)
-            successful_snapshots = sorted(
-                [s for s in snapshots if s.scrape_status == "success" and s.fare],
-                key=lambda s: s.created_at,
-                reverse=True
+            fares = [float(s.fare) for s in valid]
+            vals = {s.created_at.date(): f for s, f in zip(valid, fares)}
+            c_date = (
+                e.created_at.date() if hasattr(e.created_at, "date") else e.created_at
             )
-            latest_fare = float(successful_snapshots[0].fare) if successful_snapshots else None
 
-            last_snap = max(snapshots, key=lambda s: s.created_at) if snapshots else None
-
-            entries_data.append({
-                "entry": entry,
-                "rule37_status": rule37_status,
-                "min_fare": min(successful_fares) if successful_fares else None,
-                "max_fare": max(successful_fares) if successful_fares else None,
-                "latest_fare": latest_fare,
-                "last_scraped": last_snap.created_at if last_snap else None,
-                "past_departure": entry.flight_date < today,
-            })
-
+            entries_data.append(
+                {
+                    "entry": e,
+                    "rule37_status": compute_37_best(c_date, today, e.deadline, vals)
+                    if e.deadline
+                    else None,
+                    "min_fare": min(fares, default=None),
+                    "max_fare": max(fares, default=None),
+                    "latest_fare": vals.get(max(vals, default=None)),
+                    "last_scraped": max(
+                        e.price_snapshots, key=lambda s: s.created_at
+                    ).created_at
+                    if e.price_snapshots
+                    else None,
+                    "past_departure": e.flight_date < today,
+                }
+            )
         return render_template("list.html", entries=entries_data, today=today)
-    finally:
-        db.close()
 
 
 @pages_bp.route("/create")
@@ -61,48 +55,48 @@ def list_redirect():
 
 @pages_bp.route("/detail/<entry_id>")
 def detail_entry(entry_id):
-    db = SessionLocal()
-    try:
-        today = date.today()
-        entry = db.query(TrackingEntry).filter(TrackingEntry.id == entry_id).first()
-        if not entry:
+    with SessionLocal() as db:
+        # Fetch entry with walrus operator, aborting early if missing
+        if not (
+            e := db.query(TrackingEntry).filter(TrackingEntry.id == entry_id).first()
+        ):
             return redirect(url_for("pages.list_entries"))
 
-        snapshots = entry.price_snapshots
-        rule37_status = compute_deadline_rule37(entry, snapshots, today)
+        valid = [
+            s for s in e.price_snapshots if s.scrape_status == "success" and s.fare
+        ]
+        fares = [float(s.fare) for s in valid]
+        vals = {s.created_at.date(): f for s, f in zip(valid, fares)}
+        c_date = e.created_at.date() if hasattr(e.created_at, "date") else e.created_at
 
-        # Compute all-time low and observation window min
-        all_fares = [float(s.fare) for s in snapshots if s.scrape_status == "success" and s.fare]
-        all_time_low = min(all_fares) if all_fares else None
-
-        # Group snapshots by date (created_at.date())
         by_date = defaultdict(list)
-        for snap in snapshots:
-            day = snap.created_at.date()
-            by_date[day].append(snap)
+        for s in e.price_snapshots:
+            by_date[s.created_at.date()].append(s)
 
-        # Build daily groups sorted by date (newest first)
-        daily_groups = []
-        for day in sorted(by_date.keys(), reverse=True):
-            day_snapshots = by_date[day]
-            # Find lowest price for this day
-            successful = [s for s in day_snapshots if s.scrape_status == "success" and s.fare]
-            lowest_snap = min(successful, key=lambda s: s.fare) if successful else None
-
-            daily_groups.append({
-                "date": day,
-                "lowest_fare": float(lowest_snap.fare) if lowest_snap else None,
-                "lowest_snapshot": lowest_snap,
-                "snapshots": sorted(day_snapshots, key=lambda s: s.created_at, reverse=True),
-            })
+        # Unrolled back to a standard loop for scope safety and runtime stability
+        daily = []
+        for d, ss in sorted(by_date.items(), reverse=True):
+            low = min(
+                [s for s in ss if s.scrape_status == "success" and s.fare],
+                key=lambda x: x.fare,
+                default=None,
+            )
+            daily.append(
+                {
+                    "date": d,
+                    "lowest_fare": float(low.fare) if low else None,
+                    "lowest_snapshot": low,
+                    "snapshots": sorted(ss, key=lambda x: x.created_at, reverse=True),
+                }
+            )
 
         return render_template(
             "detail.html",
-            entry=entry,
-            rule37_status=rule37_status,
-            daily_groups=daily_groups,
-            all_time_low=all_time_low,
-            today=today,
+            entry=e,
+            daily_groups=daily,
+            today=date.today(),
+            rule37_status=compute_37_best(c_date, date.today(), e.deadline, vals)
+            if e.deadline
+            else None,
+            all_time_low=min(fares, default=None),
         )
-    finally:
-        db.close()
