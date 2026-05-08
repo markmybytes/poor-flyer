@@ -21,8 +21,6 @@ class DeadlineRule37:
     latest_val: Optional[float]
     all_time_high: Optional[float] = None
     all_time_low: Optional[float] = None
-    observation_high: Optional[float] = None
-    observation_low: Optional[float] = None
 
 
 def compute_37_best(
@@ -43,13 +41,6 @@ def compute_37_best(
         default=float("inf"),
     )
 
-    obs_high = obs_low = None
-    if today >= split:
-        obs_vals = [float(f) for d, f in values.items() if d >= split]
-        if obs_vals:
-            obs_high = max(obs_vals)
-            obs_low = min(obs_vals)
-
     return DeadlineRule37(
         cutoff_date=split,
         phase=(
@@ -61,6 +52,4 @@ def compute_37_best(
         latest_val=latest,
         all_time_high=all_time_high,
         all_time_low=all_time_low,
-        observation_high=obs_high,
-        observation_low=obs_low,
     )
