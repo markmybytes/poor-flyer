@@ -14,8 +14,11 @@
             <h2 class="text-3xl font-bold mb-1">{{ entry.origin }} → {{ entry.destination }}</h2>
             <p class="text-sm text-gray-600">
                 航班 <strong>{{ entry.flight_date.strftime('%Y/%m/%d') }}</strong>
-                {% if entry.past_departure %}<span
-                    class="ml-2 text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">已過</span>{% endif %}
+                {% if entry.past_departure %}
+                <span class="ml-2 text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
+                    已過期
+                </span>
+                {% endif %}
             </p>
             {% if entry.deadline %}
             <p class="text-sm text-gray-600 mt-1">限期： <strong>{{ entry.deadline.strftime('%Y/%m/%d') }}</strong></p>
@@ -24,7 +27,7 @@
         <div class="flex gap-2">
             <form method="POST" action="{{ url_for('api.toggle_entry', entry_id=entry.id) }}" class="inline">
                 <button class="px-3 py-1.5 text-sm bg-gray-100 text-gray-600 rounded-lg">
-                    {% if entry.is_active %}禁用{% else %}啟用{% endif %}
+                    {% if entry.is_active %}停用{% else %}啟用{% endif %}
                 </button>
             </form>
             {% if entry.flight_date >= today %}
