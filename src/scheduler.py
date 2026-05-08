@@ -30,9 +30,6 @@ def daily_scrape_job():
                 origin=entry.origin,
                 destination=entry.destination,
                 flight_date=entry.flight_date,
-                adult_count=entry.adult_count,
-                child_count=entry.child_count,
-                infant_count=entry.infant_count,
             )
 
             snapshot = PriceSnapshot(
