@@ -1,0 +1,56 @@
+    <div id="graph" class="tab-content p-5">
+        {% if daily_groups %}
+        <canvas id="priceChart" height="80"></canvas>
+        <script>
+            // Flatten all snapshots from daily groups into a time-ordered list
+            const allSnapshots = [
+                {% for group in daily_groups %}
+                    {% for snap in group.snapshots %}
+                        {
+                            date: "{{ snap.scraped_at.strftime('%Y-%m-%d') }}",
+                            fare: {{ snap.fare if snap.fare else 'null' }},
+                            status: "{{ snap.scrape_status }}"
+                        },
+                    {% endfor %}
+                {% endfor %}
+            ];
+
+            // Filter and sort for chart
+            const chartData = allSnapshots
+                .filter(s => s.status === 'success' && s.fare !== null)
+                .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartData.map(d => d.date),
+                    datasets: [{
+                        label: 'Fare (HKD)',
+                        data: chartData.map(d => d.fare),
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37, 99, 235, 0.05)',
+                        tension: 0.3,
+                        pointBackgroundColor: '#2563eb',
+                        pointRadius: 4,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: true } },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: { display: true, text: 'Fare (HKD)' }
+                        }
+                    }
+                }
+            });
+        </script>
+        <p class="text-xs text-gray-300 mt-3">Price history over time</p>
+        {% else %}
+        <div class="p-12 text-center">
+            <p class="text-gray-400">No data to graph yet.</p>
+        </div>
+        {% endif %}
+    </div>

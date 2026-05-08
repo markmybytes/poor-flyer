@@ -17,18 +17,13 @@
     <div class="bg-white rounded-lg border shadow-sm hover:shadow-md transition-all p-5">
         <div class="flex items-start justify-between mb-3">
             <div class="flex-1">
-                <div class="flex items-center gap-3 mb-1">
-                    <h3 class="font-bold text-lg text-gray-900">{{ item.entry.origin }} → {{ item.entry.destination }}</h3>
-                    {% if item.entry.name %}
-                    <span class="text-sm text-gray-500">{{ item.entry.name }}</span>
-                    {% endif %}
-                </div>
+                <h3 class="font-bold text-lg text-gray-900 mb-1">{{ item.entry.origin }} → {{ item.entry.destination }} | {{ item.entry.flight_date.strftime('%Y-%m-%d') }}</h3>
                 <p class="text-sm text-gray-500">
                     {% set pax = [] %}
                     {% if item.entry.adult_count %}{{ pax.append(item.entry.adult_count|string + 'A') or '' }}{% endif %}
                     {% if item.entry.child_count %}{{ pax.append(item.entry.child_count|string + 'C') or '' }}{% endif %}
                     {% if item.entry.infant_count %}{{ pax.append(item.entry.infant_count|string + 'I') or '' }}{% endif %}
-                    {{ item.entry.flight_date.strftime('%b %d, %Y') }} · {{ pax|join('/') }}
+                    {{ pax|join('/') }}
                 </p>
             </div>
 
@@ -43,19 +38,19 @@
             </div>
         </div>
 
-        {# Price stats row #}
+        {# Price stats row with colors #}
         <div class="grid grid-cols-4 gap-3 mb-3 text-center">
-            <div>
+            <div class="bg-green-50 rounded-lg py-2">
                 <p class="text-xs text-gray-400 mb-0.5">Low</p>
-                <p class="font-semibold text-gray-900">{{ "%.0f"|format(item.min_fare) if item.min_fare else '—' }}</p>
+                <p class="font-semibold text-green-700">{{ "%.0f"|format(item.min_fare) if item.min_fare else '—' }}</p>
             </div>
-            <div>
+            <div class="bg-blue-50 rounded-lg py-2">
                 <p class="text-xs text-gray-400 mb-0.5">Now</p>
-                <p class="font-semibold text-gray-900">{{ "%.0f"|format(item.rule37_status.latest_fare) if item.rule37_status and item.rule37_status.latest_fare else '—' }}</p>
+                <p class="font-semibold text-blue-700">{{ "%.0f"|format(item.latest_fare) if item.latest_fare else '—' }}</p>
             </div>
-            <div>
+            <div class="bg-red-50 rounded-lg py-2">
                 <p class="text-xs text-gray-400 mb-0.5">High</p>
-                <p class="font-semibold text-gray-900">{{ "%.0f"|format(item.max_fare) if item.max_fare else '—' }}</p>
+                <p class="font-semibold text-red-700">{{ "%.0f"|format(item.max_fare) if item.max_fare else '—' }}</p>
             </div>
             <div>
                 <p class="text-xs text-gray-400 mb-0.5">Key Date</p>
@@ -92,10 +87,6 @@
                     <button type="submit" class="px-3 py-1.5 text-sm bg-gray-100 text-gray-600 rounded hover:bg-gray-200 transition-colors">
                         {% if item.entry.is_active %}Disable{% else %}Enable{% endif %}
                     </button>
-                </form>
-                <form method="POST" action="{{ url_for('api.delete_entry', entry_id=item.entry.id) }}" class="inline"
-                    onsubmit="return confirm('Delete this entry and all its data?');">
-                    <button type="submit" class="px-3 py-1.5 text-sm bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors">Delete</button>
                 </form>
             </div>
         </div>

@@ -20,7 +20,6 @@ def create_entry():
 
         entry = TrackingEntry(
             id=str(uuid.uuid4()),
-            name=data.get("name") or None,
             origin=data.get("origin").upper(),
             destination=data.get("destination").upper(),
             flight_date=datetime.strptime(data.get("flight_date"), "%Y-%m-%d").date(),

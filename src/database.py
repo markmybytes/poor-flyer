@@ -29,7 +29,6 @@ class TrackingEntry(Base):
     __tablename__ = "tracking_entries"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    name = Column(String, nullable=True)
     origin = Column(String, nullable=False)
     destination = Column(String, nullable=False)
     flight_date = Column(Date, nullable=False)

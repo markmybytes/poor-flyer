@@ -23,6 +23,15 @@ def list_entries():
                 float(s.fare) for s in snapshots if s.scrape_status == "success" and s.fare
             ]
             rule37_status = compute_deadline_rule37(entry, snapshots, today)
+
+            # Get latest successful fare (skip errors)
+            successful_snapshots = sorted(
+                [s for s in snapshots if s.scrape_status == "success" and s.fare],
+                key=lambda s: s.scraped_at,
+                reverse=True
+            )
+            latest_fare = float(successful_snapshots[0].fare) if successful_snapshots else None
+
             last_snap = max(snapshots, key=lambda s: s.scraped_at) if snapshots else None
 
             entries_data.append({
@@ -30,6 +39,7 @@ def list_entries():
                 "rule37_status": rule37_status,
                 "min_fare": min(successful_fares) if successful_fares else None,
                 "max_fare": max(successful_fares) if successful_fares else None,
+                "latest_fare": latest_fare,
                 "last_scraped": last_snap.scraped_at if last_snap else None,
                 "past_departure": entry.flight_date < today,
             })
