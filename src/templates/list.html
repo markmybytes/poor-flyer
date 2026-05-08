@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Tracking Entries{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <h2 class="text-3xl font-bold">Tracking Entries</h2>
+    <a href="{{ url_for('pages.create') }}"
+        class="bg-blue-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-blue-700">
+        + New Entry
+    </a>
+</div>
+
+{% if entries %}
+<div class="bg-white rounded-lg shadow overflow-hidden">
+    <table class="w-full">
+        <thead class="bg-gray-100 border-b">
+            <tr>
+                <th class="px-6 py-3 text-left text-sm font-medium text-gray-700">Label/Route</th>
+                <th class="px-6 py-3 text-left text-sm font-medium text-gray-700">Flight Date</th>
+                <th class="px-6 py-3 text-left text-sm font-medium text-gray-700">Latest Fare (HKD)</th>
+                <th class="px-6 py-3 text-left text-sm font-medium text-gray-700">37% Signal</th>
+                <th class="px-6 py-3 text-left text-sm font-medium text-gray-700">Last Scraped</th>
+                <th class="px-6 py-3 text-left text-sm font-medium text-gray-700">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y">
+            {% for item in entries %}
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4">
+                    <div class="font-medium text-gray-900">{{ item.entry.name or item.entry.origin }}→{{
+                        item.entry.destination }}</div>
+                    {% if item.entry.name %}<div class="text-sm text-gray-500">{{ item.entry.origin }}→{{
+                        item.entry.destination }}</div>{% endif %}
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-900">{{ item.entry.flight_date.strftime('%b %d %Y') }}</td>
+                <td class="px-6 py-4 text-sm text-gray-900">
+                    {% if item.status.latest_fare %}{{ "%.0f"|format(item.status.latest_fare) }}{% else %}—{% endif %}
+                </td>
+                <td class="px-6 py-4 text-sm">
+                    {% if item.status.phase.value == 'OBSERVING' %}
+                    <span class="text-yellow-600">🟡 OBSERVING</span>
+                    {% elif item.status.phase.value == 'BUY_SIGNAL' %}
+                    <span class="text-green-600">🟢 BUY SIGNAL</span>
+                    {% else %}
+                    <span class="text-gray-600">⚪ WAITING</span>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-900">
+                    {% if item.entry.price_snapshots %}
+                    {% set last_snap = item.entry.price_snapshots[-1] %}
+                    {{ last_snap.scraped_at.strftime('%Y-%m-%d %H:%M') }}
+                    {% else %}
+                    Never
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 text-sm space-x-2">
+                    <a href="{{ url_for('pages.detail_entry', entry_id=item.entry.id) }}"
+                        class="text-blue-600 hover:underline">View</a>
+                    <form method="POST" action="{{ url_for('api.toggle_entry', entry_id=item.entry.id) }}"
+                        style="display: inline;">
+                        <button type="submit" class="text-blue-600 hover:underline">
+                            {% if item.entry.is_active %}Disable{% else %}Enable{% endif %}
+                        </button>
+                    </form>
+                    <form method="POST" action="{{ url_for('api.delete_entry', entry_id=item.entry.id) }}"
+                        style="display: inline;" onsubmit="return confirm('Delete this entry and all its data?');">
+                        <button type="submit" class="text-red-600 hover:underline">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="bg-white rounded-lg shadow p-12 text-center">
+    <p class="text-gray-600 mb-4">No tracking entries yet. Create one to get started.</p>
+    <a href="{{ url_for('pages.create') }}"
+        class="inline-block bg-blue-600 text-white font-medium py-2 px-6 rounded-lg hover:bg-blue-700">
+        Create First Entry
+    </a>
+</div>
+{% endif %}
+{% endblock %}
