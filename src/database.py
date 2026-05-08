@@ -51,7 +51,7 @@ class PriceSnapshot(Base):
     entry_id = Column(
         String, ForeignKey("tracking_entries.id", ondelete="CASCADE"), nullable=False
     )
-    scraped_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     fare = Column(Numeric(10, 2), nullable=True)
     flight_number = Column(String, nullable=True)
     departure_time = Column(String, nullable=True)

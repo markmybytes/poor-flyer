@@ -27,12 +27,12 @@ def list_entries():
             # Get latest successful fare (skip errors)
             successful_snapshots = sorted(
                 [s for s in snapshots if s.scrape_status == "success" and s.fare],
-                key=lambda s: s.scraped_at,
+                key=lambda s: s.created_at,
                 reverse=True
             )
             latest_fare = float(successful_snapshots[0].fare) if successful_snapshots else None
 
-            last_snap = max(snapshots, key=lambda s: s.scraped_at) if snapshots else None
+            last_snap = max(snapshots, key=lambda s: s.created_at) if snapshots else None
 
             entries_data.append({
                 "entry": entry,
@@ -40,7 +40,7 @@ def list_entries():
                 "min_fare": min(successful_fares) if successful_fares else None,
                 "max_fare": max(successful_fares) if successful_fares else None,
                 "latest_fare": latest_fare,
-                "last_scraped": last_snap.scraped_at if last_snap else None,
+                "last_scraped": last_snap.created_at if last_snap else None,
                 "past_departure": entry.flight_date < today,
             })
 
@@ -75,10 +75,10 @@ def detail_entry(entry_id):
         all_fares = [float(s.fare) for s in snapshots if s.scrape_status == "success" and s.fare]
         all_time_low = min(all_fares) if all_fares else None
 
-        # Group snapshots by date (scraped_at.date())
+        # Group snapshots by date (created_at.date())
         by_date = defaultdict(list)
         for snap in snapshots:
-            day = snap.scraped_at.date()
+            day = snap.created_at.date()
             by_date[day].append(snap)
 
         # Build daily groups sorted by date (newest first)
@@ -93,7 +93,7 @@ def detail_entry(entry_id):
                 "date": day,
                 "lowest_fare": float(lowest_snap.fare) if lowest_snap else None,
                 "lowest_snapshot": lowest_snap,
-                "snapshots": sorted(day_snapshots, key=lambda s: s.scraped_at, reverse=True),
+                "snapshots": sorted(day_snapshots, key=lambda s: s.created_at, reverse=True),
             })
 
         return render_template(

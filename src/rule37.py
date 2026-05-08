@@ -32,7 +32,7 @@ def compute_deadline_rule37(entry, snapshots, today: date) -> Optional[DeadlineR
     successful = [s for s in snapshots if s.scrape_status == "success"]
     latest_fare = None
     if successful:
-        latest = max(successful, key=lambda s: s.scraped_at)
+        latest = max(successful, key=lambda s: s.created_at)
         latest_fare = float(latest.fare) if latest.fare else None
 
     if today < key_date:
@@ -44,7 +44,7 @@ def compute_deadline_rule37(entry, snapshots, today: date) -> Optional[DeadlineR
         )
 
     key_datetime = datetime.combine(key_date, datetime.min.time())
-    obs_snapshots = [s for s in successful if s.scraped_at < key_datetime]
+    obs_snapshots = [s for s in successful if s.created_at < key_datetime]
     min_fares = [float(s.fare) for s in obs_snapshots if s.fare]
     min_observed = float(min(min_fares)) if min_fares else None
 

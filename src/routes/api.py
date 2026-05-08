@@ -99,7 +99,7 @@ def scrape_now(entry_id):
         snapshot = PriceSnapshot(
             id=str(uuid.uuid4()),
             entry_id=entry_id,
-            scraped_at=datetime.utcnow(),
+            created_at=datetime.utcnow(),
             fare=result.fare,
             flight_number=result.flight_number,
             departure_time=result.departure_time,
