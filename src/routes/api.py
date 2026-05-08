@@ -86,25 +86,26 @@ def scrape_now(entry_id):
         if entry.flight_date < date.today():
             return jsonify({"error": "Cannot scrape: flight date has passed"}), 400
 
-        result = scrape_prices(
+        results = scrape_prices(
             origin=entry.origin,
             destination=entry.destination,
             flight_date=entry.flight_date,
         )
 
-        snapshot = PriceSnapshot(
-            entry_id=entry_id,
-            created_at=datetime.now(timezone.utc),
-            fare=result.fare,
-            flight_number=result.flight_number,
-            departure_time=result.departure_time,
-            arrival_time=result.arrival_time,
-            scrape_status="success" if result.success else "error",
-            error_message=result.error_message,
-        )
+        for result in results.results:
+            snapshot = PriceSnapshot(
+                entry_id=entry_id,
+                created_at=datetime.now(timezone.utc),
+                fare=result.fare,
+                flight_number=result.flight_number,
+                departure_time=result.departure_time,
+                arrival_time=result.arrival_time,
+                scrape_status="success" if results.success else "error",
+                error_message=results.error_message,
+            )
 
-        db.add(snapshot)
-        db.commit()
+            db.add(snapshot)
+            db.commit()
         return redirect(url_for("pages.detail_entry", entry_id=entry_id))
     except Exception as e:
         db.rollback()

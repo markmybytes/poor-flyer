@@ -26,24 +26,25 @@ def daily_scrape_job():
         )
 
         for entry in entries:
-            result = scrape_prices(
+            results = scrape_prices(
                 origin=entry.origin,
                 destination=entry.destination,
                 flight_date=entry.flight_date,
             )
 
-            snapshot = PriceSnapshot(
-                id=str(uuid.uuid4()),
-                entry_id=entry.id,
-                fare=result.fare,
-                flight_number=result.flight_number,
-                departure_time=result.departure_time,
-                arrival_time=result.arrival_time,
-                scrape_status="success" if result.success else "error",
-                error_message=result.error_message,
-            )
+            for result in results.results:
+                snapshot = PriceSnapshot(
+                    id=str(uuid.uuid4()),
+                    entry_id=entry.id,
+                    fare=result.fare,
+                    flight_number=result.flight_number,
+                    departure_time=result.departure_time,
+                    arrival_time=result.arrival_time,
+                    scrape_status="success" if results.success else "error",
+                    error_message=results.error_message,
+                )
 
-            db.add(snapshot)
+                db.add(snapshot)
 
         db.commit()
         logger.info(f"Daily scrape job completed for {len(entries)} active entries")
