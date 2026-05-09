@@ -3,9 +3,8 @@ import uuid
 from datetime import date
 
 from apscheduler.schedulers.background import BackgroundScheduler
-
-from src.database import PriceSnapshot, SessionLocal, TrackingEntry
-from src.scraper import scrape_prices
+from src.backend.database import PriceSnapshot, SessionLocal, TrackingEntry
+from src.backend.services.scraper import scrape_prices
 
 logger = logging.getLogger(__name__)
 

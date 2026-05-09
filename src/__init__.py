@@ -7,7 +7,7 @@ from flask_inertia import Inertia
 from src.database import init_db
 from src.routes.api import api_bp
 from src.routes.pages import pages_bp
-from src.scheduler import start_scheduler, stop_scheduler
+from src.services.scheduler import start_scheduler, stop_scheduler
 
 
 def create_app():

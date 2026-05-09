@@ -4,7 +4,7 @@ from datetime import date, datetime, timezone
 from flask import Blueprint, jsonify, redirect, request, url_for
 
 from src.database import PriceSnapshot, SessionLocal, TrackingEntry
-from src.scraper import scrape_prices
+from src.services.scraper import scrape_prices
 
 api_bp = Blueprint("api", __name__)
 

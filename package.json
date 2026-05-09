@@ -9,8 +9,8 @@
     "build": "run-p type-check \"build-only {@}\" --",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
-    "format": "prettier --write 'src/frontend/{css,js}/**/*.{css,ts,js,vue}'",
-    "lint": "prettier --check 'src/frontend/{css,js}/**/*.{css,ts,js,vue}' && eslint ./src/frontend "
+    "format": "prettier --write 'src/frontend/**/*.{css,ts,js,vue}' 'src/frontend/**/*.d.ts'",
+    "lint": "prettier --check 'src/frontend/**/*.{css,ts,js,vue}' 'src/frontend/**/*.d.ts' && eslint ./src/frontend"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",

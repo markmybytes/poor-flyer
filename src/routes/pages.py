@@ -5,7 +5,7 @@ from flask import Blueprint, redirect, url_for
 from flask_inertia import render_inertia
 
 from src.database import SessionLocal, TrackingEntry
-from src.rule37 import DeadlineRule37, compute_37_best
+from src.services.rule37 import DeadlineRule37, compute_37_best
 
 pages_bp = Blueprint("pages", __name__)
 

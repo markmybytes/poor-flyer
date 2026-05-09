@@ -14,7 +14,15 @@ import {
 
 import AppLayout from '@/Layouts/AppLayout.vue'
 
-Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Legend, Tooltip)
+Chart.register(
+  LineController,
+  LineElement,
+  PointElement,
+  LinearScale,
+  CategoryScale,
+  Legend,
+  Tooltip,
+)
 
 interface Snapshot {
   id: string
@@ -286,10 +294,10 @@ function switchTab(tab: 'table' | 'graph') {
 
     <div v-if="rule37_status" class="mb-5 rounded-lg border bg-white p-6 shadow-sm">
       <p class="mb-3 text-xs font-semibold tracking-widest text-gray-400 uppercase">
-        37% 法則 | 最低：<span class="text-green-700">{{ formatFare(rule37_status.all_time_low) }}</span> | 最高：<span
-          class="text-red-700"
-          >{{ formatFare(rule37_status.all_time_high) }}</span
-        >
+        37% 法則 | 最低：<span class="text-green-700">{{
+          formatFare(rule37_status.all_time_low)
+        }}</span>
+        | 最高：<span class="text-red-700">{{ formatFare(rule37_status.all_time_high) }}</span>
       </p>
 
       <p class="mb-3 text-sm text-gray-600">
@@ -349,9 +357,7 @@ function switchTab(tab: 'table' | 'graph') {
         <button
           class="flex-1 py-3.5 text-center text-sm font-medium"
           :class="
-            activeTab === 'table'
-              ? 'border-b-2 border-blue-600 text-blue-600'
-              : 'text-gray-500'
+            activeTab === 'table' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'
           "
           @click="switchTab('table')"
         >
@@ -361,9 +367,7 @@ function switchTab(tab: 'table' | 'graph') {
         <button
           class="flex-1 py-3.5 text-center text-sm font-medium"
           :class="
-            activeTab === 'graph'
-              ? 'border-b-2 border-blue-600 text-blue-600'
-              : 'text-gray-500'
+            activeTab === 'graph' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'
           "
           @click="switchTab('graph')"
         >
@@ -374,7 +378,11 @@ function switchTab(tab: 'table' | 'graph') {
       <!-- Table Tab -->
       <div v-show="activeTab === 'table'" class="p-5">
         <template v-if="daily_groups.length">
-          <div v-for="(group, index) in daily_groups" :key="group.date" class="border-b last:border-b-0">
+          <div
+            v-for="(group, index) in daily_groups"
+            :key="group.date"
+            class="border-b last:border-b-0"
+          >
             <button
               class="flex w-full items-center justify-between px-5 py-3 hover:bg-gray-50"
               :class="groupBgClass(group, index)"
@@ -407,10 +415,7 @@ function switchTab(tab: 'table' | 'graph') {
             </button>
 
             <div
-              v-if="
-                rule37_status &&
-                group.date === rule37_status.cutoff_date
-              "
+              v-if="rule37_status && group.date === rule37_status.cutoff_date"
               class="border-y border-blue-200 bg-blue-50 px-5 py-2"
             >
               <p class="text-xs font-semibold text-blue-700">
@@ -422,22 +427,26 @@ function switchTab(tab: 'table' | 'graph') {
               <table class="w-full text-sm">
                 <thead class="bg-gray-50">
                   <tr>
-                    <th class="px-5 py-2 text-left text-xs font-semibold text-gray-500 uppercase">航班</th>
+                    <th class="px-5 py-2 text-left text-xs font-semibold text-gray-500 uppercase">
+                      航班
+                    </th>
 
-                    <th class="px-5 py-2 text-left text-xs font-semibold text-gray-500 uppercase">起飛時間</th>
+                    <th class="px-5 py-2 text-left text-xs font-semibold text-gray-500 uppercase">
+                      起飛時間
+                    </th>
 
-                    <th class="px-5 py-2 text-left text-xs font-semibold text-gray-500 uppercase">降落時間</th>
+                    <th class="px-5 py-2 text-left text-xs font-semibold text-gray-500 uppercase">
+                      降落時間
+                    </th>
 
-                    <th class="px-5 py-2 text-right text-xs font-semibold text-gray-500 uppercase">票價</th>
+                    <th class="px-5 py-2 text-right text-xs font-semibold text-gray-500 uppercase">
+                      票價
+                    </th>
                   </tr>
                 </thead>
 
                 <tbody class="divide-y">
-                  <tr
-                    v-for="snap in group.snapshots"
-                    :key="snap.id"
-                    :class="snapRowClass(snap)"
-                  >
+                  <tr v-for="snap in group.snapshots" :key="snap.id" :class="snapRowClass(snap)">
                     <td class="px-5 py-2.5 font-medium">{{ snap.flight_number ?? '—' }}</td>
 
                     <td class="px-5 py-2.5">
@@ -477,15 +486,16 @@ function switchTab(tab: 'table' | 'graph') {
           </div>
 
           <p class="mt-4 px-1 text-xs text-gray-300">
-            <span class="mr-2 inline-block h-3 w-3 rounded border border-red-300 bg-red-100"></span>歷史高位
-            &ensp;
+            <span class="mr-2 inline-block h-3 w-3 rounded border border-red-300 bg-red-100"></span
+            >歷史高位 &ensp;
             <span
               class="mr-2 inline-block h-3 w-3 rounded border border-green-300 bg-green-100"
-            ></span>歷史低位
-            &ensp;
+            ></span
+            >歷史低位 &ensp;
             <span
               class="mr-2 inline-block h-3 w-3 rounded border border-blue-300 bg-blue-100"
-            ></span>37% 最佳選擇
+            ></span
+            >37% 最佳選擇
           </p>
         </template>
 
