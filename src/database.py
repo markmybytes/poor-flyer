@@ -49,8 +49,8 @@ class PriceSnapshot(Base):
     )
     fare = Column(Numeric(10, 2), nullable=True)
     flight_number = Column(String, nullable=True)
-    departure_time = Column(String, nullable=True)
-    arrival_time = Column(String, nullable=True)
+    departure_at = Column(DateTime(timezone=True), nullable=True)
+    arrival_at = Column(DateTime(timezone=True), nullable=True)
     scrape_status = Column(String, nullable=False)
     error_message = Column(String, nullable=True)
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Generate test data for the airline price scraper."""
+"""Generate test data for the airline price scraper to cover all UI states."""
 
 import random
 import sys
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 sys.path.insert(0, str(__file__).rsplit("\\", 2)[0])
@@ -11,153 +11,202 @@ sys.path.insert(0, str(__file__).rsplit("\\", 2)[0])
 from src.database import PriceSnapshot, SessionLocal, TrackingEntry, init_db
 
 
-def generate_fares(base_price, num_samples, volatility=50):
-    """Generate realistic fare variations."""
-    fares = []
-    for i in range(num_samples):
-        variation = random.uniform(-volatility, volatility)
-        fare = max(base_price + variation, base_price * 0.7)
-        fares.append(round(fare, 2))
-    return fares
-
-
 def add_test_data():
     init_db()
     db = SessionLocal()
 
     try:
+        # Clear existing data safely
+        db.query(PriceSnapshot).delete()
         db.query(TrackingEntry).delete()
         db.commit()
 
-        today = date.today()
+        utc = timezone.utc
+        now = datetime.now(utc)
+        today = now.date()
 
-        # Entry 1: Completed (past flight) - created 1/1/2026, deadline 5/1/2026, departed 1/3/2026
-        entry1 = TrackingEntry(
-            origin="HKG",
-            destination="BKK",
-            flight_date=date(2026, 1, 3),
-            deadline=date(2026, 5, 1),
-            is_active=False,
-            created_at=datetime(2026, 1, 1, 10, 0, 0),
-        )
-        db.add(entry1)
-        db.flush()
-
-        start_date = datetime(2026, 1, 1, 6, 0, 0)
-        for i in range(20):
-            snap_time = start_date + timedelta(hours=6 * i)
+        def add_snap(entry, dt, fare, status="success"):
+            """Helper to generate structurally accurate snapshots"""
+            base_dt = dt + timedelta(
+                days=30
+            )  # Future flight times relative to snapshot
             db.add(
                 PriceSnapshot(
-                    entry_id=entry1.id,
-                    created_at=snap_time,
-                    fare=Decimal(str(1200 - 30 * i)) if i < 15 else None,
-                    flight_number="CX 601"
-                    if i % 3 == 0
-                    else ("TG 601" if i % 3 == 1 else "FD 601"),
-                    departure_time="08:00" if i % 2 == 0 else "14:30",
-                    arrival_time="12:00" if i % 2 == 0 else "18:30",
-                    scrape_status="success" if i < 15 else "error",
-                    error_message=None if i < 15 else "Timeout",
+                    entry_id=entry.id,
+                    created_at=dt,
+                    fare=Decimal(str(fare)) if fare and status == "success" else None,
+                    flight_number=f"CX{random.randint(100, 999)}"
+                    if status == "success"
+                    else None,
+                    departure_at=base_dt.replace(hour=10, minute=30)
+                    if status == "success"
+                    else None,
+                    arrival_at=base_dt.replace(hour=14, minute=45)
+                    if status == "success"
+                    else None,
+                    scrape_status=status,
+                    error_message="Connection timeout" if status == "error" else None,
                 )
             )
-        db.commit()
-        print("[OK] Entry 1 (completed): HKG->BKK on 2026-01-03 (20 snapshots)")
 
-        # Entry 2: Active, future flight
-        entry2 = TrackingEntry(
+        print("Generating daily test scenarios...")
+
+        # ---------------------------------------------------------
+        # Scenario 1: Rule 37 BUY_SIGNAL & All Table Row Colors
+        # ---------------------------------------------------------
+        # Created 30 days ago, Deadline is 10 days from now.
+        # Total window = 40 days. 37% Cutoff = ~15 days ago.
+        e1 = TrackingEntry(
+            origin="HKG",
+            destination="LHR",
+            flight_date=today + timedelta(days=30),
+            deadline=today + timedelta(days=10),
+            is_active=True,
+            created_at=now - timedelta(days=30),
+        )
+        db.add(e1)
+        db.flush()
+
+        # Add data for EVERY DAY over the last 30 days
+        for i in range(30, -1, -1):
+            dt = now - timedelta(days=i)
+
+            # Inject specific scenarios on specific days to trigger UI colors
+            if i == 20:
+                fare = 4500  # history_best_val (Observing phase)
+            elif i == 10:
+                fare = 6500  # All-Time High -> triggers bg-red-50
+            elif i == 8:
+                fare = 4000  # All-Time Low -> triggers bg-green-50
+            elif i == 5:
+                fare = (
+                    4500  # Matches history_best_val, but not ATL -> triggers bg-blue-50
+                )
+            elif i == 2:
+                add_snap(e1, dt, None, status="error")  # Error -> triggers bg-gray-50
+                continue
+            elif i == 0:
+                fare = 4200  # Current <= 4500 -> Triggers BUY_SIGNAL Green UI header
+            else:
+                # Normal background noise prices
+                fare = 5000 + random.randint(-100, 100)
+
+            add_snap(e1, dt, fare)
+
+        # ---------------------------------------------------------
+        # Scenario 2: Rule 37 OBSERVING
+        # ---------------------------------------------------------
+        # Created 10 days ago, deadline far in the future.
+        e2 = TrackingEntry(
             origin="HKG",
             destination="NRT",
-            flight_date=date(2026, 5, 20),
-            deadline=date(2026, 5, 10),
+            flight_date=today + timedelta(days=60),
+            deadline=today + timedelta(days=40),
             is_active=True,
-            created_at=datetime(2026, 4, 1, 9, 30, 0),
+            created_at=now - timedelta(days=10),
         )
-        db.add(entry2)
+        db.add(e2)
         db.flush()
 
-        start_date = datetime(2026, 4, 1, 8, 0, 0)
-        for i in range(30):
-            snap_time = start_date + timedelta(hours=4 * i)
-            fare = 3500 - (i * 25) + random.randint(-100, 100)
-            db.add(
-                PriceSnapshot(
-                    entry_id=entry2.id,
-                    created_at=snap_time,
-                    fare=Decimal(str(max(fare, 2800))),
-                    flight_number=random.choice(["NH 601", "JL 602", "ANA 603"]),
-                    departure_time="09:00" if i % 2 == 0 else "21:30",
-                    arrival_time="16:00" if i % 2 == 0 else "05:00+1",
-                    scrape_status="success",
-                    error_message=None,
-                )
-            )
-        db.commit()
-        print("[OK] Entry 2 (active): HKG->NRT on 2026-05-20 (30 snapshots)")
+        # Add data for EVERY DAY over the last 10 days
+        for i in range(10, -1, -1):
+            add_snap(e2, now - timedelta(days=i), 3500 + random.randint(-50, 50))
+        # Current day is still in observing window -> Triggers Yellow "觀察中" UI
 
-        # Entry 3: Paused, past flight
-        entry3 = TrackingEntry(
+        # ---------------------------------------------------------
+        # Scenario 3: Rule 37 WAITING
+        # ---------------------------------------------------------
+        # Cutoff has passed. Best price during observing was $5500. Current is $5800.
+        e3 = TrackingEntry(
+            origin="HKG",
+            destination="JFK",
+            flight_date=today + timedelta(days=40),
+            deadline=today + timedelta(days=15),
+            is_active=True,
+            created_at=now - timedelta(days=30),
+        )
+        db.add(e3)
+        db.flush()
+
+        # Add data for EVERY DAY over the last 30 days
+        for i in range(30, -1, -1):
+            dt = now - timedelta(days=i)
+            if i == 25:
+                fare = 5500  # Sets history_best_val
+            elif i > 15:  # Observing phase background noise
+                fare = 6000 + random.randint(-100, 100)
+            else:  # Post cutoff background noise
+                fare = 5800 + random.randint(0, 200)  # Always higher than 5500
+
+            add_snap(
+                e3, dt, fare
+            )  # Ends higher than history best -> Triggers Gray "等待中" UI
+
+        # ---------------------------------------------------------
+        # Scenario 4: Expired & Inactive
+        # ---------------------------------------------------------
+        # Flight departed 5 days ago. Created 40 days ago.
+        e4 = TrackingEntry(
+            origin="HKG",
+            destination="TPE",
+            flight_date=today - timedelta(days=5),
+            deadline=today - timedelta(days=10),
+            is_active=False,
+            created_at=now - timedelta(days=40),
+        )
+        db.add(e4)
+        db.flush()
+
+        # Add data for EVERY DAY from creation up to the flight date
+        for i in range(40, 4, -1):
+            add_snap(e4, now - timedelta(days=i), 1200 + random.randint(-50, 50))
+        # Triggers "已過期" badge
+
+        # ---------------------------------------------------------
+        # Scenario 5: No Deadline Set
+        # ---------------------------------------------------------
+        e5 = TrackingEntry(
             origin="HKG",
             destination="SIN",
-            flight_date=date(2026, 3, 15),
-            deadline=date(2026, 5, 10),
-            is_active=False,
-            created_at=datetime(2026, 2, 20, 14, 0, 0),
-        )
-        db.add(entry3)
-        db.flush()
-
-        start_date = datetime(2026, 2, 20, 10, 0, 0)
-        for i in range(25):
-            snap_time = start_date + timedelta(hours=5 * i)
-            db.add(
-                PriceSnapshot(
-                    entry_id=entry3.id,
-                    created_at=snap_time,
-                    fare=Decimal(str(850 + (i % 3) * 50 - (i // 3) * 20)),
-                    flight_number="SQ " + str(600 + (i % 3)),
-                    departure_time="11:00" if i % 2 == 0 else "17:45",
-                    arrival_time="13:00" if i % 2 == 0 else "19:45",
-                    scrape_status="success",
-                    error_message=None,
-                )
-            )
-        db.commit()
-        print("[OK] Entry 3 (paused): HKG->SIN on 2026-03-15 (25 snapshots)")
-
-        # Entry 4: Active, near-future flight
-        entry4 = TrackingEntry(
-            origin="HKG",
-            destination="LAX",
-            flight_date=date(2026, 6, 10),
-            deadline=date(2026, 5, 25),
+            flight_date=today + timedelta(days=20),
+            deadline=None,
             is_active=True,
-            created_at=datetime(2026, 4, 15, 11, 0, 0),
+            created_at=now - timedelta(days=10),
         )
-        db.add(entry4)
+        db.add(e5)
         db.flush()
 
-        start_date = datetime(2026, 4, 15, 7, 0, 0)
-        for i in range(35):
-            snap_time = start_date + timedelta(hours=3 * i)
-            fare = 5200 - (i * 40) + random.randint(-200, 150)
-            db.add(
-                PriceSnapshot(
-                    entry_id=entry4.id,
-                    created_at=snap_time,
-                    fare=Decimal(str(max(fare, 3800))),
-                    flight_number=random.choice(["AA 128", "UA 850", "DL 280"]),
-                    departure_time=random.choice(["10:30", "14:00", "22:15"]),
-                    arrival_time=random.choice(["14:30", "18:00", "02:15+1"]),
-                    scrape_status="success" if i < 32 else "error",
-                    error_message=None if i < 32 else "Connection error",
-                )
-            )
-        db.commit()
-        print("[OK] Entry 4 (active): HKG->LAX on 2026-06-10 (35 snapshots)")
+        # Add data for EVERY DAY over the last 10 days
+        for i in range(10, -1, -1):
+            add_snap(e5, now - timedelta(days=i), 1500 + random.randint(-50, 50))
+        # Triggers Amber Rule 37 warning box
 
-        print("\nSuccess! Test data generated.")
-        print("   - 4 entries with varying states (completed, active, paused)")
-        print("   - 110 total price snapshots")
+        # ---------------------------------------------------------
+        # Scenario 6: Completely Empty
+        # ---------------------------------------------------------
+        e6 = TrackingEntry(
+            origin="HKG",
+            destination="BKK",
+            flight_date=today + timedelta(days=10),
+            deadline=today + timedelta(days=5),
+            is_active=True,
+            created_at=now - timedelta(days=1),
+        )
+        db.add(e6)
+        db.flush()
+        # No snapshots added -> Triggers empty list/chart fallback UI
+
+        db.commit()
+
+        print("\nSuccess! UI Test Data Generated:")
+        print(
+            "  ✓ Entry 1 (HKG->LHR): Rule 37 BUY_SIGNAL (31 daily points + all table row colors)"
+        )
+        print("  ✓ Entry 2 (HKG->NRT): Rule 37 OBSERVING state (11 daily points)")
+        print("  ✓ Entry 3 (HKG->JFK): Rule 37 WAITING state (31 daily points)")
+        print("  ✓ Entry 4 (HKG->TPE): Expired Flight / Inactive UI (36 daily points)")
+        print("  ✓ Entry 5 (HKG->SIN): Missing Deadline fallback (11 daily points)")
+        print("  ✓ Entry 6 (HKG->BKK): Completely Empty fallback (0 points)")
 
     except Exception as e:
         db.rollback()

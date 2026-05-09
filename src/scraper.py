@@ -1,6 +1,6 @@
 import random
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -12,8 +12,8 @@ from patchright.sync_api import sync_playwright
 @dataclass
 class Flight:
     flight_number: str
-    departure_time: str
-    arrival_time: str
+    departure_at: Optional[datetime]
+    arrival_at: Optional[datetime]
     fare: float
 
 
@@ -37,19 +37,22 @@ def _parse_hkexpress_response(data: dict) -> ScrapeResult:
             success=False, error_message="API returned no valid trip data."
         )
 
-    results = []
-    for j in journeys:
-        dep, arr = j.get("departure_date_time", ""), j.get("arrival_date_time", "")
-        results.append(
+    return ScrapeResult(
+        success=True,
+        results=[
             Flight(
                 fare=float(j["display_item_amount"]),
                 flight_number=j.get("segment", [{}])[0].get("flight_number", ""),
-                departure_time=dep[11:16] if len(dep) > 15 else dep,
-                arrival_time=arr[11:16] if len(arr) > 15 else arr,
+                departure_at=datetime.fromisoformat(
+                    f"{j['departure_date_time']}{j.get('departure_timezone', '')}"
+                ),
+                arrival_at=datetime.fromisoformat(
+                    f"{j['arrival_date_time']}{j.get('arrival_timezone', '')}"
+                ),
             )
-        )
-
-    return ScrapeResult(success=True, results=results)
+            for j in journeys
+        ],
+    )
 
 
 def scrape_prices_advanced(

@@ -98,8 +98,8 @@ def scrape_now(entry_id):
                 created_at=datetime.now(timezone.utc),
                 fare=result.fare,
                 flight_number=result.flight_number,
-                departure_time=result.departure_time,
-                arrival_time=result.arrival_time,
+                departure_at=result.departure_at,
+                arrival_at=result.arrival_at,
                 scrape_status="success" if results.success else "error",
                 error_message=results.error_message,
             )

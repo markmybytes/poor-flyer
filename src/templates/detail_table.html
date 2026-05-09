@@ -62,8 +62,18 @@
                     <tr
                         class="{% if is_error %}bg-gray-50{% elif is_all_time_high %}bg-red-50{% elif is_all_time_low %}bg-green-50{% elif is_observation_best %}bg-blue-50{% endif %}">
                         <td class="px-5 py-2.5 font-medium">{{ snap.flight_number or '—' }}</td>
-                        <td class="px-5 py-2.5">{{ snap.departure_time or '—' }}</td>
-                        <td class="px-5 py-2.5">{{ snap.arrival_time or '—' }}</td>
+                        <td class="px-5 py-2.5">
+                            {% if snap.departure_at %}
+                            {{ snap.departure_at.strftime('%H:%M') }}
+                            <span class="text-xs text-gray-400">{{ snap.departure_at.strftime('%z') }}</span>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td class="px-5 py-2.5">
+                            {% if snap.arrival_at %}
+                            {{ snap.arrival_at.strftime('%H:%M') }}
+                            <span class="text-xs text-gray-400">{{ snap.arrival_at.strftime('%z') }}</span>
+                            {% else %}—{% endif %}
+                        </td>
                         <td
                             class="px-5 py-2.5 text-right font-semibold {% if is_error %}text-gray-600{% elif is_all_time_high %}text-red-700{% elif is_all_time_low %}text-green-700{% elif is_observation_best %}text-blue-700{% else %}text-gray-900{% endif %}">
                             {% if snap.scrape_status == 'success' and snap.fare %}
