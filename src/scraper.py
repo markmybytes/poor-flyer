@@ -1,26 +1,20 @@
+import random
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 from typing import Optional
-from urllib.parse import urlparse
 
 import httpx
 from fake_useragent import UserAgent
 from patchright.sync_api import sync_playwright
 
-HKEXPRESS_URL = "https://www.hkexpress.com/"
-
-HKEXPRESS_API_URL = (
-    "https://api.hkexpress.com/w/flt-booking-query/public/v1/availability/search"
-)
-
 
 @dataclass
 class Flight:
-    flight_number: Optional[str] = None
-    departure_time: Optional[str] = None
-    arrival_time: Optional[str] = None
-    fare: Optional[float] = None
+    flight_number: str
+    departure_time: str
+    arrival_time: str
+    fare: float
 
 
 @dataclass
@@ -30,53 +24,125 @@ class ScrapeResult:
     results: list[Flight] = field(default_factory=list)
 
 
-def _get_cookie() -> dict:
-    with sync_playwright() as playwright:
-        browser_context = playwright.chromium.launch_persistent_context(
-            user_data_dir=Path("patchright_profile").absolute(),
-            channel="chromium",
-            headless=True,
-            no_viewport=True,
-            args=["--disable-blink-features=AutomationControlled"],
+def _parse_hkexpress_response(data: dict) -> ScrapeResult:
+    journeys = [
+        j
+        for trip in data.get("trip", [])
+        for j in trip.get("journey", [])
+        if j.get("display_item_amount")
+    ]
+
+    if not journeys:
+        return ScrapeResult(
+            success=False, error_message="API returned no valid trip data."
         )
 
-        try:
-            page = browser_context.new_page()
-
-            page.goto("https://www.hkexpress.com/zh-HK", timeout=60 * 1000)
-            page.locator("#__next").wait_for(state="attached", timeout=60 * 1000)
-            page.goto(HKEXPRESS_URL)
-            page.locator("#hkexpress").wait_for(state="attached", timeout=60 * 1000)
-
-            cookie_list = browser_context.cookies()
-        finally:
-            browser_context.close()
-
-    def domain_matches(hostname: str, cookie_domain: str) -> bool:
-        clean_domain = (cookie_domain or "").lstrip(".")
-        if not clean_domain:
-            return False
-        return hostname == clean_domain or hostname.endswith(f".{clean_domain}")
-
-    return {
-        cookie.get("name"): cookie.get("value")
-        for cookie in cookie_list
-        if cookie.get("name")
-        and domain_matches(
-            urlparse(HKEXPRESS_URL).hostname or "", cookie.get("domain") or ""
+    results = []
+    for j in journeys:
+        dep, arr = j.get("departure_date_time", ""), j.get("arrival_date_time", "")
+        results.append(
+            Flight(
+                fare=float(j["display_item_amount"]),
+                flight_number=j.get("segment", [{}])[0].get("flight_number", ""),
+                departure_time=dep[11:16] if len(dep) > 15 else dep,
+                arrival_time=arr[11:16] if len(arr) > 15 else arr,
+            )
         )
-    }
+
+    return ScrapeResult(success=True, results=results)
+
+
+def scrape_prices_advanced(
+    origin: str, destination: str, flight_date: date
+) -> ScrapeResult:
+    try:
+        with sync_playwright() as p:
+            ctx = p.chromium.launch_persistent_context(
+                user_data_dir=Path("patchright_profile").absolute(),
+                channel="chrome",
+                headless=False,
+                no_viewport=True,
+                args=["--disable-blink-features=AutomationControlled"],
+            )
+            try:
+                page = ctx.new_page()
+                page.goto("https://www.hkexpress.com/zh-HK", timeout=60000)
+                page.locator("#__next").wait_for(state="attached", timeout=60000)
+
+                for _ in range(random.randint(3, 7)):
+                    page.mouse.move(
+                        random.randint(0, 800),
+                        random.randint(0, 600),
+                        steps=random.randint(5, 15),
+                    )
+                    page.mouse.wheel(0, random.randint(-100, 100))
+                    page.wait_for_timeout(random.randint(1500, 3000))
+
+                ch = page.evaluate("""
+                        () => navigator.userAgentData ? {
+                            brands: navigator.userAgentData.brands.map(b => `"${b.brand}";v="${b.version}"`).join(', '),
+                            mobile: navigator.userAgentData.mobile ? "?1" : "?0",
+                            platform: `"${navigator.userAgentData.platform}"`
+                        } : {}
+                    """)
+
+                resp = page.request.post(
+                    "https://api.hkexpress.com/w/flt-booking-query/public/v1/availability/search",
+                    headers={
+                        "Accept": "*/*",
+                        "Accept-Language": "zh-TW,zh;q=0.9",
+                        "Content-Type": "application/json",
+                        "Origin": "https://mybooking.hkexpress.com",
+                        "Referer": "https://mybooking.hkexpress.com/",
+                        "User-Agent": page.evaluate("navigator.userAgent"),
+                        "sec-ch-ua": ch.get("brands", ""),
+                        "sec-ch-ua-mobile": ch.get("mobile", ""),
+                        "sec-ch-ua-platform": ch.get("platform", ""),
+                        "Sec-Fetch-Dest": "empty",
+                        "Sec-Fetch-Mode": "cors",
+                        "Sec-Fetch-Site": "same-site",
+                    },
+                    data={
+                        "application_code": "IBE",
+                        "currency_code": "HKD",
+                        "promotion_code": "",
+                        "flights": [
+                            {
+                                "origin": origin,
+                                "destination": destination,
+                                "begin_date": flight_date.isoformat(),
+                            }
+                        ],
+                        "passengers": {
+                            "adult_count": 1,
+                            "infant_count": 0,
+                            "children_count": 0,
+                        },
+                    },
+                )
+
+                if not resp.ok:
+                    return ScrapeResult(
+                        success=False,
+                        error_message=f"HTTP {resp.status}: {resp.text()[:200]}",
+                    )
+                return _parse_hkexpress_response(resp.json())
+
+            finally:
+                ctx.close()
+    except Exception as exc:
+        return ScrapeResult(success=False, error_message=f"Playwright Error: {exc}")
 
 
 def scrape_prices(origin: str, destination: str, flight_date: date) -> ScrapeResult:
-    """Scrapes the lowest fare for a given route and date."""
-
     try:
         with httpx.Client(timeout=30) as client:
-            response = client.post(
-                HKEXPRESS_API_URL,
+            resp = client.post(
+                "https://api.hkexpress.com/flt-booking-query/public/v1/availability/search",
                 json={
                     "application_code": "IBE",
+                    "currency_code": "HKD",
+                    "promotion_code": "",
                     "flights": [
                         {
                             "origin": origin,
@@ -84,15 +150,12 @@ def scrape_prices(origin: str, destination: str, flight_date: date) -> ScrapeRes
                             "begin_date": flight_date.isoformat(),
                         }
                     ],
-                    "currency_code": "HKD",
-                    "promotion_code": "",
                     "passengers": {
                         "adult_count": 1,
                         "infant_count": 0,
                         "children_count": 0,
                     },
                 },
-                cookies=_get_cookie(),
                 headers={
                     "accept": "*/*",
                     "accept-language": "zh-TW,zh;q=0.9",
@@ -108,45 +171,12 @@ def scrape_prices(origin: str, destination: str, flight_date: date) -> ScrapeRes
                 },
             )
 
-        if response.status_code != 200:
+        if resp.status_code != 200:
             return ScrapeResult(
                 success=False,
-                error_message=f"HTTP {response.status_code}: {response.text[:200]}",
+                error_message=f"HTTP {resp.status_code}: {resp.text[:200]}",
             )
-
-        trips = response.json().get("trip", [])
-
-        if not trips:
-            return ScrapeResult(
-                success=False, error_message="API returned no trip data."
-            )
-
-        valid_journeys = [
-            journey
-            for journey in trips[0].get("journey", [])
-            if journey.get("display_item_amount") is not None
-        ]
-
-        if not valid_journeys:
-            return ScrapeResult(success=False, error_message="No valid journeys found.")
-
-        results: list[Flight] = []
-        for journey in valid_journeys:
-            segments = journey.get("segment", [])
-            departure = journey.get("departure_date_time", "")
-            arrival = journey.get("arrival_date_time", "")
-
-            results.append(
-                Flight(
-                    fare=float(journey["display_item_amount"]),
-                    flight_number=segments[0]["flight_number"] if segments else "",
-                    departure_time=(
-                        departure[11:16] if len(departure) > 15 else departure
-                    ),
-                    arrival_time=arrival[11:16] if len(arrival) > 15 else arrival,
-                )
-            )
-        return ScrapeResult(success=True, results=results)
+        return _parse_hkexpress_response(resp.json())
 
     except Exception as exc:
-        return ScrapeResult(success=False, error_message=f"Error occurred: {exc}")
+        return ScrapeResult(success=False, error_message=f"HTTPX Error: {exc}")
