@@ -3,9 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev:backend": "flask run --debug",
-    "dev:frontend": "vite build --mode=development --watch",
-    "dev": "run-p dev:*",
+    "dev": "vite",
+    "watch": "vite build --mode development --watch",
     "build": "run-p type-check \"build-only {@}\" --",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",

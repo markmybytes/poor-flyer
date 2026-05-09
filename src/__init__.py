@@ -4,6 +4,7 @@ import os
 from flask import Flask
 from flask_inertia import Inertia
 
+from src.cli import register_commands
 from src.database import init_db
 from src.routes.api import api_bp
 from src.routes.pages import pages_bp
@@ -18,15 +19,15 @@ def create_app():
         template_folder=os.path.join(base_dir, "src", "templates"),
         static_folder=os.path.join(base_dir, "src", "static"),
     )
-
     app.config["INERTIA_TEMPLATE"] = "base.html"
 
     init_db()
-
     Inertia(app)
 
     app.register_blueprint(pages_bp)
     app.register_blueprint(api_bp)
+
+    register_commands(app)
 
     start_scheduler()
     atexit.register(stop_scheduler)
