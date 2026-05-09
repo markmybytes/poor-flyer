@@ -9,6 +9,7 @@ description = "Flight price tracker with daily scraping"
 requires-python = ">=3.12"
 dependencies = [
     "flask",
+    "flask-inertia",
     "sqlalchemy",
     "httpx",
     "apscheduler",

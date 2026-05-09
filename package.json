@@ -1,0 +1,42 @@
+{
+  "$schema": "https://www.schemastore.org/package.json",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev:backend": "flask run --debug",
+    "dev:frontend": "vite build --mode=development --watch",
+    "dev": "run-p dev:*",
+    "build": "run-p type-check \"build-only {@}\" --",
+    "build-only": "vite build",
+    "type-check": "vue-tsc --build",
+    "format": "prettier --write 'src/frontend/{css,js}/**/*.{css,ts,js,vue}'",
+    "lint": "prettier --check 'src/frontend/{css,js}/**/*.{css,ts,js,vue}' && eslint ./src/frontend "
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/node": "^25.5.0",
+    "@vitejs/plugin-vue": "^6.0.5",
+    "@vue/eslint-config-typescript": "^14.7.0",
+    "@vue/tsconfig": "^0.9.0",
+    "eslint": "^10.0.3",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-vue": "^10.8.0",
+    "globals": "^17.4.0",
+    "npm-run-all2": "^8.0.4",
+    "prettier": "^3.8.1",
+    "prettier-plugin-tailwindcss": "^0.7.2",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.0.7",
+    "vue-tsc": "^3.2.5"
+  },
+  "dependencies": {
+    "@iconify/vue": "^5.0.0",
+    "@inertiajs/vue3": "^2.3.18",
+    "chart.js": "^4.5.1",
+    "vue": "^3.5.30"
+  },
+  "volta": {
+    "node": "24.15.0"
+  }
+}

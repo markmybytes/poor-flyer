@@ -1,6 +1,8 @@
-from flask import Flask
 import atexit
 import os
+
+from flask import Flask
+from flask_inertia import Inertia
 
 from src.database import init_db
 from src.routes.api import api_bp
@@ -10,12 +12,18 @@ from src.scheduler import start_scheduler, stop_scheduler
 
 def create_app():
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    template_dir = os.path.join(base_dir, "src", "templates")
-    static_dir = os.path.join(base_dir, "src", "static")
 
-    app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
+    app = Flask(
+        __name__,
+        template_folder=os.path.join(base_dir, "src", "templates"),
+        static_folder=os.path.join(base_dir, "src", "static"),
+    )
+
+    app.config["INERTIA_TEMPLATE"] = "base.html"
 
     init_db()
+
+    Inertia(app)
 
     app.register_blueprint(pages_bp)
     app.register_blueprint(api_bp)

@@ -10,6 +10,7 @@ dependencies = [
     { name = "apscheduler" },
     { name = "fake-useragent" },
     { name = "flask" },
+    { name = "flask-inertia" },
     { name = "gunicorn" },
     { name = "httpx" },
     { name = "patchright" },
@@ -29,6 +30,7 @@ requires-dist = [
     { name = "black", marker = "extra == 'dev'" },
     { name = "fake-useragent", specifier = ">=2.2.0" },
     { name = "flask" },
+    { name = "flask-inertia" },
     { name = "gunicorn" },
     { name = "httpx" },
     { name = "patchright", specifier = ">=1.59.1" },
@@ -158,6 +160,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/26/00/35d85dcce6c57fdc871f3867d465d780f302a175ea360f62533f12b27e2b/flask-3.1.3.tar.gz", hash = "sha256:0ef0e52b8a9cd932855379197dd8f94047b359ca0a78695144304cb45f87c9eb", size = 759004, upload-time = "2026-02-19T05:00:57.678Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7f/9c/34f6962f9b9e9c71f6e5ed806e0d0ff03c9d1b0b2340088a0cf4bce09b18/flask-3.1.3-py3-none-any.whl", hash = "sha256:f4bcbefc124291925f1a26446da31a5178f9483862233b23c0c96a20701f670c", size = 103424, upload-time = "2026-02-19T05:00:56.027Z" },
+]
+
+[[package]]
+name = "flask-inertia"
+version = "0.10"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "flask" },
+    { name = "jsmin" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/48/15/7b09d5ad1fb866bacfd01cff9b5ea2240e997c706ffdab488e1602787320/flask_inertia-0.10.tar.gz", hash = "sha256:89f7131269d266152ca3e33d5d06c4112a1e130c1c350fde180d42b047d23476", size = 21021, upload-time = "2025-06-24T14:34:16.871Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/29/d2/004c8a4ccfd4da18bef8c63b904ef1d9586d101c5423e480730fd9ec5a46/flask_inertia-0.10-py2.py3-none-any.whl", hash = "sha256:c4ff0233f45fd8c8990ad7a55b014e07f3d24c524c78fed75ebf703776de8164", size = 18428, upload-time = "2025-06-24T14:34:14.959Z" },
 ]
 
 [[package]]
@@ -294,6 +309,12 @@ sdist = { url = "https://files.pythonhosted.org/packages/df/bf/f7da0350254c0ed7c
 wheels = [
     { url = "https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl", hash = "sha256:85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67", size = 134899, upload-time = "2025-03-05T20:05:00.369Z" },
 ]
+
+[[package]]
+name = "jsmin"
+version = "3.0.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/5e/73/e01e4c5e11ad0494f4407a3f623ad4d87714909f50b17a06ed121034ff6e/jsmin-3.0.1.tar.gz", hash = "sha256:c0959a121ef94542e807a674142606f7e90214a2b3d1eb17300244bbb5cc2bfc", size = 13925, upload-time = "2022-01-16T20:35:59.13Z" }
 
 [[package]]
 name = "markupsafe"

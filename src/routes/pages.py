@@ -1,18 +1,59 @@
 from collections import defaultdict
 from datetime import date
 
-from flask import Blueprint, redirect, render_template, url_for
+from flask import Blueprint, redirect, url_for
+from flask_inertia import render_inertia
 
 from src.database import SessionLocal, TrackingEntry
-from src.rule37 import compute_37_best
+from src.rule37 import DeadlineRule37, compute_37_best
 
 pages_bp = Blueprint("pages", __name__)
 
 
+def _serialize_entry(e: TrackingEntry, today: date | None = None) -> dict:
+    data = {
+        "id": e.id,
+        "origin": e.origin,
+        "destination": e.destination,
+        "flight_date": e.flight_date.isoformat(),
+        "deadline": e.deadline.isoformat() if e.deadline else None,
+        "is_active": e.is_active,
+        "past_departure": e.flight_date < today if today else False,
+    }
+    return data
+
+
+def _serialize_rule37(r: DeadlineRule37 | None) -> dict | None:
+    if r is None:
+        return None
+    return {
+        "phase": r.phase.value,
+        "cutoff_date": r.cutoff_date.isoformat(),
+        "history_best_val": r.history_best_val,
+        "latest_val": r.latest_val,
+        "all_time_high": r.all_time_high,
+        "all_time_low": r.all_time_low,
+    }
+
+
+def _serialize_snapshot(s) -> dict:
+    return {
+        "id": s.id,
+        "flight_number": s.flight_number,
+        "departure_at": s.departure_at.isoformat() if s.departure_at else None,
+        "arrival_at": s.arrival_at.isoformat() if s.arrival_at else None,
+        "fare": float(s.fare) if s.fare is not None else None,
+        "scrape_status": s.scrape_status,
+        "error_message": s.error_message,
+    }
+
+
 @pages_bp.route("/")
 def list_entries():
+    print("Rendering list page")
     with SessionLocal() as db:
-        today, entries_data = date.today(), []
+        today = date.today()
+        entries_data = []
         for e in db.query(TrackingEntry).order_by(TrackingEntry.flight_date).all():
             valid = [
                 s for s in e.price_snapshots if s.scrape_status == "success" and s.fare
@@ -22,30 +63,32 @@ def list_entries():
             c_date = (
                 e.created_at.date() if hasattr(e.created_at, "date") else e.created_at
             )
+            rule37 = (
+                compute_37_best(c_date, today, e.deadline, vals) if e.deadline else None
+            )
 
             entries_data.append(
                 {
-                    "entry": e,
-                    "rule37_status": compute_37_best(c_date, today, e.deadline, vals)
-                    if e.deadline
-                    else None,
+                    "entry": _serialize_entry(e, today),
+                    "rule37_status": _serialize_rule37(rule37),
                     "min_fare": min(fares, default=None),
                     "max_fare": max(fares, default=None),
                     "latest_fare": vals.get(max(vals, default=None)),
-                    "last_scraped": max(
-                        e.price_snapshots, key=lambda s: s.created_at
-                    ).created_at
-                    if e.price_snapshots
-                    else None,
-                    "past_departure": e.flight_date < today,
+                    "last_scraped": (
+                        max(
+                            e.price_snapshots, key=lambda s: s.created_at
+                        ).created_at.isoformat()
+                        if e.price_snapshots
+                        else None
+                    ),
                 }
             )
-        return render_template("list.html", entries=entries_data, today=today)
+        return render_inertia("List", props={"entries": entries_data})
 
 
 @pages_bp.route("/create")
 def create():
-    return render_template("create.html")
+    return render_inertia("Create")
 
 
 @pages_bp.route("/list")
@@ -56,12 +99,12 @@ def list_redirect():
 @pages_bp.route("/detail/<entry_id>")
 def detail_entry(entry_id):
     with SessionLocal() as db:
-        # Fetch entry with walrus operator, aborting early if missing
         if not (
             e := db.query(TrackingEntry).filter(TrackingEntry.id == entry_id).first()
         ):
             return redirect(url_for("pages.list_entries"))
 
+        today = date.today()
         valid = [
             s for s in e.price_snapshots if s.scrape_status == "success" and s.fare
         ]
@@ -73,7 +116,6 @@ def detail_entry(entry_id):
         for s in e.price_snapshots:
             by_date[s.created_at.date()].append(s)
 
-        # Unrolled back to a standard loop for scope safety and runtime stability
         daily = []
         for d, ss in sorted(by_date.items(), reverse=True):
             low = min(
@@ -83,21 +125,24 @@ def detail_entry(entry_id):
             )
             daily.append(
                 {
-                    "date": d,
+                    "date": d.isoformat(),
                     "lowest_fare": float(low.fare) if low else None,
-                    "lowest_snapshot": low,
-                    "snapshots": sorted(ss, key=lambda x: x.created_at, reverse=True),
+                    "lowest_snapshot": (
+                        {"flight_number": low.flight_number, "fare": float(low.fare)}
+                        if low
+                        else None
+                    ),
+                    "snapshots": [
+                        _serialize_snapshot(s)
+                        for s in sorted(ss, key=lambda x: x.created_at, reverse=True)
+                    ],
                 }
             )
 
-        # Compute rule37 status with ATH/ATL
         rule37_data = (
-            compute_37_best(c_date, date.today(), e.deadline, vals)
-            if e.deadline
-            else None
+            compute_37_best(c_date, today, e.deadline, vals) if e.deadline else None
         )
 
-        # Use rule37 values or fallback to basic computation
         all_time_high = (
             rule37_data.all_time_high
             if rule37_data
@@ -109,12 +154,14 @@ def detail_entry(entry_id):
             else (min(fares, default=None) if fares else None)
         )
 
-        return render_template(
-            "detail.html",
-            entry=e,
-            daily_groups=daily,
-            today=date.today(),
-            rule37_status=rule37_data,
-            all_time_low=all_time_low,
-            all_time_high=all_time_high,
+        return render_inertia(
+            "Detail",
+            props={
+                "entry": _serialize_entry(e, today),
+                "daily_groups": daily,
+                "today": today.isoformat(),
+                "rule37_status": _serialize_rule37(rule37_data),
+                "all_time_low": all_time_low,
+                "all_time_high": all_time_high,
+            },
         )
