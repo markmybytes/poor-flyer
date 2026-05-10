@@ -46,37 +46,63 @@ const expandedGroups = ref(new Set<number>())
 const chartCanvas = useTemplateRef<HTMLCanvasElement>('chartCanvas')
 let chart: Chart | null = null
 
-const fmtFare = (f: number | null) => (f !== null ? `$${Math.round(f)}` : '—')
-const fmtTime = (iso: string | null) =>
-  iso
-    ? new Date(iso).toLocaleTimeString('zh-HK', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      })
-    : '—'
-const fmtTz = (iso: string | null) => (iso ? (iso.match(/([+-]\d{2}:\d{2}|Z)$/) || [''])[0] : '')
+function fmtFare(f: number | null) {
+  return f !== null ? `$${Math.round(f)}` : '—'
+}
 
-const toggleGroup = (i: number) =>
-  expandedGroups.value.has(i) ? expandedGroups.value.delete(i) : expandedGroups.value.add(i)
-const deleteEntry = () =>
-  confirm('刪除此項和所有數據?') && router.post(`/entries/${props.entry.id}/delete`)
+function fmtTime(iso: string | null) {
+  if (!iso) return '—'
 
-const initChart = () => {
+  return new Date(iso).toLocaleTimeString('zh-HK', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+}
+
+function fmtTz(iso: string | null) {
+  if (!iso) return ''
+  const m = iso.match(/([+-]\d{2}:\d{2}|Z)$/) || ['']
+  return m[0]
+}
+
+function toggleGroup(i: number) {
+  if (expandedGroups.value.has(i)) {
+    expandedGroups.value.delete(i)
+  } else {
+    expandedGroups.value.add(i)
+  }
+}
+
+function deleteEntry() {
+  if (confirm('刪除此項和所有數據?')) {
+    router.post(`/entries/${props.entry.id}/delete`)
+  }
+}
+
+function initChart() {
   if (!chartCanvas.value || !props.dailyGroups?.length) return
   const data = props.dailyGroups
-    .filter((g) => g.lowestFare !== null)
-    .map((g) => ({ date: g.date, fare: g.lowestFare! }))
+    .filter(function (g) {
+      return g.lowestFare !== null
+    })
+    .map(function (g) {
+      return { date: g.date, fare: g.lowestFare! }
+    })
     .reverse()
 
   chart = new Chart(chartCanvas.value, {
     type: 'line',
     data: {
-      labels: data.map((d) => d.date),
+      labels: data.map(function (d) {
+        return d.date
+      }),
       datasets: [
         {
           label: '票價 (港幣)',
-          data: data.map((d) => d.fare),
+          data: data.map(function (d) {
+            return d.fare
+          }),
           borderColor: '#2563eb',
           backgroundColor: 'rgba(37, 99, 235, 0.05)',
           tension: 0.3,
@@ -93,19 +119,22 @@ const initChart = () => {
   })
 }
 
-const switchTab = async (t: 'table' | 'graph') => {
+function switchTab(t: 'table' | 'graph') {
   activeTab.value = t
   if (t === 'graph' && !chart) {
-    await nextTick()
     nextTick(() => {
       initChart()
     })
   }
 }
 
-onMounted(() => activeTab.value === 'graph' && initChart())
+onMounted(() => {
+  if (activeTab.value === 'graph') initChart()
+})
 
-onUnmounted(() => chart?.destroy())
+onUnmounted(() => {
+  if (chart) chart.destroy()
+})
 </script>
 
 <template>
