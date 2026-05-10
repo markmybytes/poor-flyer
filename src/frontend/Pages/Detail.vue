@@ -123,8 +123,9 @@ onUnmounted(() => chart?.destroy())
             <span
               v-if="entry.pastDeparture"
               class="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500"
-              >已過期</span
             >
+              已過期
+            </span>
           </p>
 
           <p v-if="entry.deadline" class="mt-1 text-sm text-gray-600">
@@ -172,36 +173,37 @@ onUnmounted(() => chart?.destroy())
             'text-amber-700': rule37Status.phase === 'OBSERVING',
             'text-gray-700': rule37Status.phase === 'WAITING',
           }"
-          >{{ rule37Status.cutoffDate?.replace(/-/g, '/') }}</strong
         >
+          {{ rule37Status.cutoffDate?.replace(/-/g, '/') }}
+        </strong>
 
-        <span v-if="rule37Status.phase === 'OBSERVING'" class="ml-1 text-xs text-gray-400"
-          >({{
+        <span v-if="rule37Status.phase === 'OBSERVING'" class="ml-1 text-xs text-gray-400">
+          ({{
             Math.ceil(
               (new Date(rule37Status.cutoffDate).getTime() - new Date(today).getTime()) / 86400000,
             )
-          }}天後)</span
-        >
+          }}天後)
+        </span>
       </p>
 
       <div class="mb-2 flex items-center gap-2">
-        <template v-if="rule37Status.phase === 'BUY_SIGNAL'"
-          ><span class="text-2xl">🟢</span>
+        <template v-if="rule37Status.phase === 'BUY_SIGNAL'">
+          <span class="text-2xl">🟢</span>
 
-          <span class="text-xl font-bold text-green-600">購買信號</span></template
-        >
+          <span class="text-xl font-bold text-green-600">購買信號</span>
+        </template>
 
-        <template v-else-if="rule37Status.phase === 'OBSERVING'"
-          ><span class="text-2xl">🟡</span>
+        <template v-else-if="rule37Status.phase === 'OBSERVING'">
+          <span class="text-2xl">🟡</span>
 
-          <span class="text-xl font-bold text-amber-600">觀察中</span></template
-        >
+          <span class="text-xl font-bold text-amber-600">觀察中</span>
+        </template>
 
-        <template v-else
-          ><span class="text-2xl">⚪</span>
+        <template v-else>
+          <span class="text-2xl">⚪</span>
 
-          <span class="text-xl font-bold text-gray-600">等待中</span></template
-        >
+          <span class="text-xl font-bold text-gray-600">等待中</span>
+        </template>
       </div>
 
       <p v-if="rule37Status.phase !== 'OBSERVING'" class="text-sm text-gray-600">
@@ -271,13 +273,13 @@ onUnmounted(() => chart?.destroy())
                   </p>
 
                   <p class="text-xs text-gray-500">
-                    <template v-if="group.lowestSnapshot"
-                      >最低：<span class="font-semibold">{{ fmtFare(group.lowestFare) }}</span>
+                    <template v-if="group.lowestSnapshot">
+                      最低：<span class="font-semibold">{{ fmtFare(group.lowestFare) }}</span>
 
                       <template v-if="group.lowestSnapshot.flightNumber">
                         · {{ group.lowestSnapshot.flightNumber }}</template
-                      ></template
-                    >
+                      >
+                    </template>
 
                     <span v-else class="text-red-500">無價格數據（僅錯誤）</span>
                   </p>
@@ -352,9 +354,9 @@ onUnmounted(() => chart?.destroy())
                     <td class="px-5 py-2.5 text-right font-semibold">
                       <template v-if="snap.scrapeStatus === 'success' && snap.fare !== null">
                         {{ fmtFare(snap.fare) }}
-                        <span v-if="snap.fare === allTimeHigh" class="ml-1 text-xs"
-                          >[歷史高位]</span
-                        >
+                        <span v-if="snap.fare === allTimeHigh" class="ml-1 text-xs">
+                          [歷史高位]
+                        </span>
 
                         <span v-if="snap.fare === allTimeLow" class="ml-1 text-xs">[歷史低位]</span>
 
@@ -365,8 +367,9 @@ onUnmounted(() => chart?.destroy())
                             snap.departureAt?.slice(0, 10) >= rule37Status.cutoffDate
                           "
                           class="ml-1 text-xs"
-                          >[37%最佳]</span
                         >
+                          [37%最佳]
+                        </span>
                       </template>
 
                       <span v-else class="text-red-500">錯誤</span>

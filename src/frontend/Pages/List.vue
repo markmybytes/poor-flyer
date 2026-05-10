@@ -34,9 +34,9 @@ defineProps<{
     <div class="mb-8 flex items-center justify-between">
       <h2 class="text-3xl font-bold">追蹤的航班</h2>
 
-      <Link href="/create" class="rounded-lg bg-blue-600 px-5 py-2 font-medium text-white"
-        >+ 追蹤航班</Link
-      >
+      <Link href="/create" class="rounded-lg bg-blue-600 px-5 py-2 font-medium text-white">
+        + 追蹤航班
+      </Link>
     </div>
 
     <div v-if="entries.length" class="space-y-3">
@@ -57,18 +57,20 @@ defineProps<{
             <span
               v-if="item.entry.pastDeparture"
               class="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-500"
-              >已過</span
             >
+              已過
+            </span>
 
             <span
               v-else-if="!item.entry.isActive"
               class="rounded-full bg-amber-100 px-2 py-1 text-xs text-amber-700"
-              >已暫停</span
             >
+              已暫停
+            </span>
 
-            <span v-else class="rounded-full bg-green-100 px-2 py-1 text-xs text-green-700"
-              >活躍</span
-            >
+            <span v-else class="rounded-full bg-green-100 px-2 py-1 text-xs text-green-700">
+              活躍
+            </span>
           </div>
         </div>
 
@@ -133,8 +135,9 @@ defineProps<{
             <Link
               :href="`/detail/${item.entry.id}`"
               class="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white"
-              >查看</Link
             >
+              查看
+            </Link>
 
             <button
               type="button"
@@ -154,8 +157,9 @@ defineProps<{
       <Link
         href="/create"
         class="inline-block rounded-lg bg-blue-600 px-8 py-2.5 font-medium text-white"
-        >追蹤您的第一個航班</Link
       >
+        追蹤您的第一個航班
+      </Link>
     </div>
   </AppLayout>
 </template>
