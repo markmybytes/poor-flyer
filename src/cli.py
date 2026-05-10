@@ -8,11 +8,14 @@ from flask.cli import with_appcontext
 @click.command(name="dev")
 @with_appcontext
 def dev():
-    """Run Vite watch and Flask server simultaneously."""
+    """Run Vite dev server and Flask server simultaneously.
+
+    Simplified: assume Vite will use port 5173 and pass that to Flask.
+    """
     click.echo(click.style("🚀 Starting development environment...", fg="cyan"))
 
     vitep = subprocess.Popen(
-        ["npm", "run", "watch"],
+        ["npm", "run", "dev"],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,

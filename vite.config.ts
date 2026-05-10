@@ -34,4 +34,9 @@ export default defineConfig({
       '@': fileURLToPath(new URL('src/frontend', import.meta.url)),
     },
   },
+  server: {
+    // flask assume the vite dev server is running on port 5173`
+    strictPort: true,
+    port: 5173,
+  },
 })

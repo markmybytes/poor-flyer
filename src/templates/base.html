@@ -3,16 +3,28 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0" />
+
     <title>My app</title>
+
     <script lang="javascript">
       // prettier-ignore
       {{ inertia.include_router() }}
     </script>
+
+    {% if config.DEBUG %}
+    <script type="module" src="http://localhost:5173/@vite/client"></script>
+    {% else %}
     <link rel="stylesheet" href="{{ url_for('static', filename='dist/app.css') }}" />
+    {% endif %}
   </head>
   <body>
     <!-- prettier-ignore -->
     <div id="app" data-page='{{ page | tojson }}'></div>
+
+    {% if config.DEBUG %}
+    <script type="module" src="http://localhost:5173/src/frontend/main.ts"></script>
+    {% else %}
     <script type="module" src="{{ url_for('static', filename='dist/app.js') }}" defer></script>
+    {% endif %}
   </body>
 </html>
