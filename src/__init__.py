@@ -4,7 +4,7 @@ import os
 from flask import Flask
 from flask_inertia import Inertia
 
-from src.cli import register_commands
+from src.cli import dev
 from src.database import init_db
 from src.routes.api import api_bp
 from src.routes.pages import pages_bp
@@ -27,7 +27,7 @@ def create_app():
     app.register_blueprint(pages_bp)
     app.register_blueprint(api_bp)
 
-    register_commands(app)
+    app.cli.add_command(dev)
 
     start_scheduler()
     atexit.register(stop_scheduler)
