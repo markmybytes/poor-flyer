@@ -1,88 +1,139 @@
 <script setup lang="ts">
-import AppLayout from '@/Layouts/AppLayout.vue';
-import { Link, useForm } from '@inertiajs/vue3';
+import AppLayout from '@/Layouts/AppLayout.vue'
+import { Link, useForm } from '@inertiajs/vue3'
+import { VueDatePicker } from '@vuepic/vue-datepicker'
+import '@vuepic/vue-datepicker/dist/main.css'
+import { zhHK } from 'date-fns/locale'
 
 const form = useForm({ origin: '', destination: '', flight_date: '', deadline: '' })
 </script>
 
 <template>
   <AppLayout>
-    <div class="mx-auto max-w-2xl rounded-xl border bg-white p-8 shadow-sm">
-      <h2 class="mb-6 text-3xl font-bold">追蹤航班</h2>
+    <div class="mx-auto max-w-2xl">
+      <div class="mb-8">
+        <Link
+          href="/"
+          class="text-sm font-medium text-gray-500 transition-colors hover:text-gray-900"
+          >← 返回列表</Link
+        >
+      </div>
 
-      <form class="space-y-6" @submit.prevent="form.post('/entries')">
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">出發地</label>
+      <div class="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
+        <div class="border-b border-gray-100 bg-gray-50/50 px-8 py-6">
+          <h2 class="text-2xl font-black tracking-tight text-gray-900">追蹤新航班</h2>
 
-            <input
-              v-model="form.origin"
-              type="text"
-              maxlength="3"
-              placeholder="e.g. HKG"
-              class="w-full rounded-lg border px-4 py-2 uppercase focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              required
-            />
-          </div>
-
-          <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">目的地</label>
-
-            <input
-              v-model="form.destination"
-              type="text"
-              maxlength="3"
-              placeholder="e.g. NRT"
-              class="w-full rounded-lg border px-4 py-2 uppercase focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              required
-            />
-          </div>
+          <p class="mt-1 text-sm font-medium text-gray-500">
+            輸入航班資訊，我們將每日為您自動監控最低票價。
+          </p>
         </div>
 
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">航班日期</label>
+        <form class="p-8" @submit.prevent="form.post('/entries')">
+          <div class="mb-6 grid grid-cols-2 gap-6">
+            <div>
+              <label class="mb-2 block text-sm font-bold tracking-wide text-gray-700"
+                >出發地機場代碼</label
+              >
 
-            <input
-              v-model="form.flight_date"
-              type="date"
-              class="w-full rounded-lg border px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              required
-            />
+              <input
+                v-model="form.origin"
+                type="text"
+                maxlength="3"
+                placeholder="例如: HKG"
+                class="w-full rounded-xl border border-gray-300 bg-gray-50/50 px-4 py-3 font-semibold text-gray-900 uppercase transition-all placeholder:font-normal focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:outline-none"
+                required
+              />
+            </div>
+
+            <div>
+              <label class="mb-2 block text-sm font-bold tracking-wide text-gray-700"
+                >目的地機場代碼</label
+              >
+
+              <input
+                v-model="form.destination"
+                type="text"
+                maxlength="3"
+                placeholder="例如: NRT"
+                class="w-full rounded-xl border border-gray-300 bg-gray-50/50 px-4 py-3 font-semibold text-gray-900 uppercase transition-all placeholder:font-normal focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:outline-none"
+                required
+              />
+            </div>
           </div>
 
-          <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">
-              期限<span class="font-normal text-gray-400">(選填)</span>
-            </label>
+          <div class="mb-8 grid grid-cols-2 gap-6">
+            <div>
+              <label class="mb-2 block text-sm font-bold tracking-wide text-gray-700"
+                >目標出發日期</label
+              >
 
-            <input
-              v-model="form.deadline"
-              type="date"
-              class="w-full rounded-lg border px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            />
+              <VueDatePicker
+                v-model="form.flight_date"
+                :enable-time-picker="false"
+                :locale="zhHK"
+                auto-apply
+                model-type="yyyy-MM-dd"
+                teleport="body"
+              >
+                <template #trigger>
+                  <input
+                    type="text"
+                    :value="form.flight_date"
+                    placeholder="選擇日期"
+                    class="w-full cursor-pointer rounded-xl border border-gray-300 bg-gray-50/50 px-4 py-3 font-medium text-gray-900 transition-all focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:outline-none"
+                    readonly
+                    required
+                  />
+                </template>
+              </VueDatePicker>
+            </div>
 
-            <p class="mt-1 text-xs text-gray-400">37%關鍵日期由今日至期限計算</p>
+            <div>
+              <label class="mb-2 block text-sm font-bold tracking-wide text-gray-700">
+                最遲購票期限 <span class="font-medium text-gray-400">(選填)</span>
+              </label>
+
+              <VueDatePicker
+                v-model="form.deadline"
+                :enable-time-picker="false"
+                :locale="zhHK"
+                auto-apply
+                model-type="yyyy-MM-dd"
+                teleport="body"
+              >
+                <template #trigger>
+                  <input
+                    type="text"
+                    :value="form.deadline"
+                    placeholder="選擇日期"
+                    class="w-full cursor-pointer rounded-xl border border-gray-300 bg-gray-50/50 px-4 py-3 font-medium text-gray-900 transition-all focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:outline-none"
+                    readonly
+                  />
+                </template>
+              </VueDatePicker>
+
+              <p class="mt-2 text-xs font-medium text-gray-400">系統將依此計算 37% 最佳購買時機</p>
+            </div>
           </div>
-        </div>
 
-        <div class="flex gap-4 pt-2">
-          <button
-            type="submit"
-            class="flex-1 rounded-lg bg-blue-600 py-2.5 font-medium text-white"
-            :disabled="form.processing"
-          >
-            開始追蹤
-          </button>
+          <div class="flex gap-4 border-t border-gray-100 pt-4">
+            <Link
+              href="/"
+              class="flex-1 rounded-xl bg-gray-100 py-3.5 text-center text-sm font-bold text-gray-600 transition-colors hover:bg-gray-200"
+            >
+              取消返回
+            </Link>
 
-          <Link
-            href="/"
-            class="flex-1 rounded-lg bg-gray-100 py-2.5 text-center font-medium text-gray-700"
-          >
-            取消
-          </Link>
-        </div>
-      </form>
+            <button
+              type="submit"
+              class="flex-2 rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-blue-500 hover:shadow-md disabled:opacity-50"
+              :disabled="form.processing"
+            >
+              {{ form.processing ? '設定中...' : '開始自動追蹤' }}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   </AppLayout>
 </template>
