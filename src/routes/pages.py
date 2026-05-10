@@ -5,52 +5,13 @@ from flask import Blueprint, redirect, url_for
 from flask_inertia import render_inertia
 
 from src.database import SessionLocal, TrackingEntry
-from src.services.rule37 import DeadlineRule37, compute_37_best
+from src.services.rule37 import compute_37_best
 
 pages_bp = Blueprint("pages", __name__)
 
 
-def _serialize_entry(e: TrackingEntry, today: date | None = None) -> dict:
-    data = {
-        "id": e.id,
-        "origin": e.origin,
-        "destination": e.destination,
-        "flight_date": e.flight_date.isoformat(),
-        "deadline": e.deadline.isoformat() if e.deadline else None,
-        "is_active": e.is_active,
-        "past_departure": e.flight_date < today if today else False,
-    }
-    return data
-
-
-def _serialize_rule37(r: DeadlineRule37 | None) -> dict | None:
-    if r is None:
-        return None
-    return {
-        "phase": r.phase.value,
-        "cutoff_date": r.cutoff_date.isoformat(),
-        "history_best_val": r.history_best_val,
-        "latest_val": r.latest_val,
-        "all_time_high": r.all_time_high,
-        "all_time_low": r.all_time_low,
-    }
-
-
-def _serialize_snapshot(s) -> dict:
-    return {
-        "id": s.id,
-        "flight_number": s.flight_number,
-        "departure_at": s.departure_at.isoformat() if s.departure_at else None,
-        "arrival_at": s.arrival_at.isoformat() if s.arrival_at else None,
-        "fare": float(s.fare) if s.fare is not None else None,
-        "scrape_status": s.scrape_status,
-        "error_message": s.error_message,
-    }
-
-
 @pages_bp.route("/")
 def list_entries():
-    print("Rendering list page")
     with SessionLocal() as db:
         today = date.today()
         entries_data = []
@@ -63,24 +24,39 @@ def list_entries():
             c_date = (
                 e.created_at.date() if hasattr(e.created_at, "date") else e.created_at
             )
-            rule37 = (
+            r37 = (
                 compute_37_best(c_date, today, e.deadline, vals) if e.deadline else None
             )
 
             entries_data.append(
                 {
-                    "entry": _serialize_entry(e, today),
-                    "rule37_status": _serialize_rule37(rule37),
-                    "min_fare": min(fares, default=None),
-                    "max_fare": max(fares, default=None),
-                    "latest_fare": vals.get(max(vals, default=None)),
-                    "last_scraped": (
-                        max(
-                            e.price_snapshots, key=lambda s: s.created_at
-                        ).created_at.isoformat()
-                        if e.price_snapshots
-                        else None
-                    ),
+                    "entry": {
+                        "id": e.id,
+                        "origin": e.origin,
+                        "destination": e.destination,
+                        "flightDate": e.flight_date.isoformat(),
+                        "deadline": e.deadline.isoformat() if e.deadline else None,
+                        "isActive": e.is_active,
+                        "pastDeparture": e.flight_date < today,
+                    },
+                    "rule37Status": {
+                        "phase": r37.phase.value,
+                        "cutoffDate": r37.cutoff_date.isoformat(),
+                        "historyBestVal": r37.history_best_val,
+                        "latestVal": r37.latest_val,
+                        "allTimeHigh": r37.all_time_high,
+                        "allTimeLow": r37.all_time_low,
+                    }
+                    if r37
+                    else None,
+                    "minFare": min(fares, default=None),
+                    "maxFare": max(fares, default=None),
+                    "latestFare": vals.get(max(vals, default=None)),
+                    "lastScraped": max(
+                        e.price_snapshots, key=lambda s: s.created_at
+                    ).created_at.isoformat()
+                    if e.price_snapshots
+                    else None,
                 }
             )
         return render_inertia("List", props={"entries": entries_data})
@@ -126,42 +102,63 @@ def detail_entry(entry_id):
             daily.append(
                 {
                     "date": d.isoformat(),
-                    "lowest_fare": float(low.fare) if low else None,
-                    "lowest_snapshot": (
-                        {"flight_number": low.flight_number, "fare": float(low.fare)}
-                        if low
-                        else None
-                    ),
+                    "lowestFare": float(low.fare) if low else None,
+                    "lowestSnapshot": {
+                        "flightNumber": low.flight_number,
+                        "fare": float(low.fare),
+                    }
+                    if low
+                    else None,
                     "snapshots": [
-                        _serialize_snapshot(s)
+                        {
+                            "id": s.id,
+                            "flightNumber": s.flight_number,
+                            "departureAt": s.departure_at.isoformat()
+                            if s.departure_at
+                            else None,
+                            "arrivalAt": s.arrival_at.isoformat()
+                            if s.arrival_at
+                            else None,
+                            "fare": float(s.fare) if s.fare is not None else None,
+                            "scrapeStatus": s.scrape_status,
+                            "errorMessage": s.error_message,
+                        }
                         for s in sorted(ss, key=lambda x: x.created_at, reverse=True)
                     ],
                 }
             )
 
-        rule37_data = (
-            compute_37_best(c_date, today, e.deadline, vals) if e.deadline else None
-        )
-
-        all_time_high = (
-            rule37_data.all_time_high
-            if rule37_data
-            else (max(fares, default=None) if fares else None)
-        )
-        all_time_low = (
-            rule37_data.all_time_low
-            if rule37_data
-            else (min(fares, default=None) if fares else None)
-        )
+        r37 = compute_37_best(c_date, today, e.deadline, vals) if e.deadline else None
 
         return render_inertia(
             "Detail",
             props={
-                "entry": _serialize_entry(e, today),
-                "daily_groups": daily,
+                "entry": {
+                    "id": e.id,
+                    "origin": e.origin,
+                    "destination": e.destination,
+                    "flightDate": e.flight_date.isoformat(),
+                    "deadline": e.deadline.isoformat() if e.deadline else None,
+                    "isActive": e.is_active,
+                    "pastDeparture": e.flight_date < today,
+                },
+                "dailyGroups": daily,
                 "today": today.isoformat(),
-                "rule37_status": _serialize_rule37(rule37_data),
-                "all_time_low": all_time_low,
-                "all_time_high": all_time_high,
+                "rule37Status": {
+                    "phase": r37.phase.value,
+                    "cutoffDate": r37.cutoff_date.isoformat(),
+                    "historyBestVal": r37.history_best_val,
+                    "latestVal": r37.latest_val,
+                    "allTimeHigh": r37.all_time_high,
+                    "allTimeLow": r37.all_time_low,
+                }
+                if r37
+                else None,
+                "allTimeLow": r37.all_time_low
+                if r37
+                else (min(fares, default=None) if fares else None),
+                "allTimeHigh": r37.all_time_high
+                if r37
+                else (max(fares, default=None) if fares else None),
             },
         )
