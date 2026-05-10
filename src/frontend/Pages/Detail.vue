@@ -1,17 +1,8 @@
 <script setup lang="ts">
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
-import {
-  CategoryScale,
-  Chart,
-  Legend,
-  LinearScale,
-  LineController,
-  LineElement,
-  PointElement,
-  Tooltip,
-} from 'chart.js';
-import { onMounted, onUnmounted, ref, useTemplateRef } from 'vue';
+import Chart from 'chart.js/auto';
+import { nextTick, onMounted, onUnmounted, ref, useTemplateRef } from 'vue';
 
 const props = defineProps<{
   entry: {
@@ -50,16 +41,6 @@ const props = defineProps<{
   allTimeHigh: number | null
 }>()
 
-Chart.register(
-  LineController,
-  LineElement,
-  PointElement,
-  LinearScale,
-  CategoryScale,
-  Legend,
-  Tooltip,
-)
-
 const activeTab = ref<'table' | 'graph'>('table')
 const expandedGroups = ref(new Set<number>())
 const chartCanvas = useTemplateRef<HTMLCanvasElement>('chartCanvas')
@@ -82,11 +63,12 @@ const deleteEntry = () =>
   confirm('刪除此項和所有數據?') && router.post(`/entries/${props.entry.id}/delete`)
 
 const initChart = () => {
-  if (!chartCanvas.value || !props.dailyGroups.length) return
+  if (!chartCanvas.value || !props.dailyGroups?.length) return
   const data = props.dailyGroups
     .filter((g) => g.lowestFare !== null)
     .map((g) => ({ date: g.date, fare: g.lowestFare! }))
     .reverse()
+
   chart = new Chart(chartCanvas.value, {
     type: 'line',
     data: {
@@ -111,13 +93,19 @@ const initChart = () => {
   })
 }
 
-onMounted(() => activeTab.value === 'graph' && initChart())
-onUnmounted(() => chart?.destroy())
-
-const switchTab = (t: 'table' | 'graph') => {
+const switchTab = async (t: 'table' | 'graph') => {
   activeTab.value = t
-  if (t === 'graph' && !chart) setTimeout(initChart, 0)
+  if (t === 'graph' && !chart) {
+    await nextTick()
+    nextTick(() => {
+      initChart()
+    })
+  }
 }
+
+onMounted(() => activeTab.value === 'graph' && initChart())
+
+onUnmounted(() => chart?.destroy())
 </script>
 
 <template>
@@ -130,7 +118,7 @@ const switchTab = (t: 'table' | 'graph') => {
           <h2 class="mb-1 text-3xl font-bold">{{ entry.origin }} → {{ entry.destination }}</h2>
 
           <p class="text-sm text-gray-600">
-            航班 <strong>{{ entry.flightDate.replace(/-/g, '/') }}</strong>
+            航班 <strong>{{ entry.flightDate?.replace(/-/g, '/') }}</strong>
 
             <span
               v-if="entry.pastDeparture"
@@ -140,7 +128,7 @@ const switchTab = (t: 'table' | 'graph') => {
           </p>
 
           <p v-if="entry.deadline" class="mt-1 text-sm text-gray-600">
-            限期：<strong>{{ entry.deadline.replace(/-/g, '/') }}</strong>
+            限期：<strong>{{ entry.deadline?.replace(/-/g, '/') }}</strong>
           </p>
         </div>
 
@@ -184,7 +172,7 @@ const switchTab = (t: 'table' | 'graph') => {
             'text-amber-700': rule37Status.phase === 'OBSERVING',
             'text-gray-700': rule37Status.phase === 'WAITING',
           }"
-          >{{ rule37Status.cutoffDate.replace(/-/g, '/') }}</strong
+          >{{ rule37Status.cutoffDate?.replace(/-/g, '/') }}</strong
         >
 
         <span v-if="rule37Status.phase === 'OBSERVING'" class="ml-1 text-xs text-gray-400"
@@ -198,22 +186,19 @@ const switchTab = (t: 'table' | 'graph') => {
 
       <div class="mb-2 flex items-center gap-2">
         <template v-if="rule37Status.phase === 'BUY_SIGNAL'"
-          ><span class="text-2xl">🟢</span
-          >
+          ><span class="text-2xl">🟢</span>
 
           <span class="text-xl font-bold text-green-600">購買信號</span></template
         >
 
         <template v-else-if="rule37Status.phase === 'OBSERVING'"
-          ><span class="text-2xl">🟡</span
-          >
+          ><span class="text-2xl">🟡</span>
 
           <span class="text-xl font-bold text-amber-600">觀察中</span></template
         >
 
         <template v-else
-          ><span class="text-2xl">⚪</span
-          >
+          ><span class="text-2xl">⚪</span>
 
           <span class="text-xl font-bold text-gray-600">等待中</span></template
         >
@@ -256,7 +241,7 @@ const switchTab = (t: 'table' | 'graph') => {
       </div>
 
       <div v-show="activeTab === 'table'" class="p-5">
-        <template v-if="dailyGroups.length">
+        <template v-if="dailyGroups?.length">
           <div
             v-for="(group, index) in dailyGroups"
             :key="group.date"
@@ -280,15 +265,14 @@ const switchTab = (t: 'table' | 'graph') => {
 
                 <div>
                   <p class="font-semibold text-gray-900">
-                    {{ group.date.replace(/-/g, '/') }} ({{
+                    {{ group.date?.replace(/-/g, '/') }} ({{
                       ['日', '一', '二', '三', '四', '五', '六'][new Date(group.date).getDay()]
                     }})
                   </p>
 
                   <p class="text-xs text-gray-500">
                     <template v-if="group.lowestSnapshot"
-                      >最低：<span class="font-semibold">{{ fmtFare(group.lowestFare) }}</span
-                      >
+                      >最低：<span class="font-semibold">{{ fmtFare(group.lowestFare) }}</span>
 
                       <template v-if="group.lowestSnapshot.flightNumber">
                         · {{ group.lowestSnapshot.flightNumber }}</template
@@ -310,7 +294,7 @@ const switchTab = (t: 'table' | 'graph') => {
               class="border-y border-blue-200 bg-blue-50 px-5 py-2"
             >
               <p class="text-xs font-semibold text-blue-700">
-                ◆ {{ rule37Status.cutoffDate.replace(/-/g, '/') }} - 37%觀察期 ◆
+                ◆ {{ rule37Status.cutoffDate?.replace(/-/g, '/') }} - 37%觀察期 ◆
               </p>
             </div>
 
@@ -394,14 +378,12 @@ const switchTab = (t: 'table' | 'graph') => {
           </div>
 
           <p class="mt-4 px-1 text-xs text-gray-300">
-            <span class="mr-2 inline-block h-3 w-3 rounded border border-red-300 bg-red-100"></span
-            >
-歷史高位 &ensp;
+            <span class="mr-2 inline-block h-3 w-3 rounded border border-red-300 bg-red-100"></span>
+            歷史高位 &ensp;
             <span
               class="mr-2 inline-block h-3 w-3 rounded border border-green-300 bg-green-100"
-            ></span
-            >
-歷史低位 &ensp;
+            ></span>
+            歷史低位 &ensp;
             <span
               class="mr-2 inline-block h-3 w-3 rounded border border-blue-300 bg-blue-100"
             ></span
@@ -413,7 +395,7 @@ const switchTab = (t: 'table' | 'graph') => {
       </div>
 
       <div v-show="activeTab === 'graph'" class="p-5">
-        <template v-if="dailyGroups.length">
+        <template v-if="dailyGroups?.length">
           <canvas ref="chartCanvas" height="80"></canvas>
 
           <p class="mt-3 text-xs text-gray-300">每日最低價格</p>
