@@ -4,6 +4,11 @@
         "ms-python.python",
         "njpwerner.autodocstring",
         "matangover.mypy",
-        "charliermarsh.ruff"
+        "charliermarsh.ruff",
+        "ms-vscode.vscode-typescript-next",
+        "vue.volar",
+        "bradlc.vscode-tailwindcss",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode"
     ]
 }
