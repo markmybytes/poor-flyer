@@ -16,7 +16,10 @@ def dev():
     hot_file = Path(current_app.config["VITE_HOT_FILE"])
     hot_file.unlink(missing_ok=True)
 
-    vitep = subprocess.Popen(["npm", "run", "dev"])
+    vitep = subprocess.Popen(
+        ["npm", "run", "dev"],
+        stdin=subprocess.DEVNULL,  # block Vite from touching stdin to protect the terminal
+    )
 
     try:
         subprocess.run(["flask", "run", "--debug"], check=True)
@@ -25,7 +28,11 @@ def dev():
     except subprocess.CalledProcessError as e:
         click.echo(click.style(f"Error starting Flask: {e}", fg="red"))
     finally:
-        vitep.terminate()
-        vitep.wait()
+        try:
+            vitep.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            vitep.terminate()  # forcefully terminate if it gets stuck
+            vitep.wait()
+
         hot_file.unlink(missing_ok=True)
         sys.exit(0)
