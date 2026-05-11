@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import AppLayout from '@/Layouts/AppLayout.vue';
-import { fmtDate, fmtFare } from '@/utils';
-import { Link, router } from '@inertiajs/vue3';
+import AppLayout from '@/Layouts/AppLayout.vue'
+import { fmtDate, fmtFare } from '@/utils'
+import { Link, router } from '@inertiajs/vue3'
+import { ref } from 'vue'
 
 defineProps<{
   entries: {
@@ -28,6 +29,26 @@ defineProps<{
     lastScraped: string | null
   }[]
 }>()
+
+const loading = ref({ loading: null as string | null })
+
+function toggleEntry(entryId: string, currentlyActive: boolean) {
+  loading.value.loading = entryId
+
+  fetch(`/api/entries/${entryId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ is_active: !currentlyActive }),
+  })
+    .then((res) => {
+      if (res.ok) {
+        router.reload()
+      }
+    })
+    .finally(() => {
+      loading.value.loading = null
+    })
+}
 </script>
 
 <template>
@@ -176,7 +197,8 @@ defineProps<{
           <button
             type="button"
             class="rounded-xl px-4 py-2 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-100"
-            @click="router.post(`/entries/${item.entry.id}/toggle`)"
+            :disabled="loading.loading === item.entry.id"
+            @click="toggleEntry(item.entry.id, item.entry.isActive)"
           >
             {{ item.entry.isActive ? '暫停監測' : '恢復監測' }}
           </button>

@@ -1,11 +1,50 @@
 <script setup lang="ts">
 import AppLayout from '@/Layouts/AppLayout.vue'
-import { Link, useForm } from '@inertiajs/vue3'
+import { Link, router } from '@inertiajs/vue3'
 import { VueDatePicker } from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
 import { zhHK } from 'date-fns/locale'
+import { ref } from 'vue'
 
-const form = useForm({ origin: '', destination: '', flight_date: '', deadline: '' })
+const form = ref({
+  origin: '',
+  destination: '',
+  flight_date: '',
+  deadline: '',
+  loading: false,
+  error: '',
+})
+
+async function handleSubmit() {
+  form.value.error = ''
+  form.value.loading = true
+
+  try {
+    const res = await fetch('/api/entries', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        origin: form.value.origin.toUpperCase(),
+        destination: form.value.destination.toUpperCase(),
+        flight_date: form.value.flight_date,
+        deadline: form.value.deadline || null,
+      }),
+    })
+
+    if (!res.ok) {
+      const data = await res.json()
+      form.value.error = data.message || 'Error creating entry'
+      return
+    }
+
+    const data = await res.json()
+    router.visit(`/detail/${data.data.id}`)
+  } catch (err) {
+    form.value.error = err instanceof Error ? err.message : '未知錯誤'
+  } finally {
+    form.value.loading = false
+  }
+}
 </script>
 
 <template>
@@ -28,7 +67,11 @@ const form = useForm({ origin: '', destination: '', flight_date: '', deadline: '
           </p>
         </div>
 
-        <form class="p-8" @submit.prevent="form.post('/entries')">
+        <form class="p-8" @submit.prevent="handleSubmit">
+          <div v-if="form.error" class="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+            <p class="text-sm font-medium text-red-700">{{ form.error }}</p>
+          </div>
+
           <div class="mb-6 grid grid-cols-2 gap-6">
             <div>
               <label class="mb-2 block text-sm font-bold tracking-wide text-gray-700"
@@ -42,6 +85,7 @@ const form = useForm({ origin: '', destination: '', flight_date: '', deadline: '
                 placeholder="例如: HKG"
                 class="w-full rounded-xl border border-gray-300 bg-gray-50/50 px-4 py-3 font-semibold text-gray-900 uppercase transition-all placeholder:font-normal focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:outline-none"
                 required
+                :disabled="form.loading"
               />
             </div>
 
@@ -57,6 +101,7 @@ const form = useForm({ origin: '', destination: '', flight_date: '', deadline: '
                 placeholder="例如: NRT"
                 class="w-full rounded-xl border border-gray-300 bg-gray-50/50 px-4 py-3 font-semibold text-gray-900 uppercase transition-all placeholder:font-normal focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:outline-none"
                 required
+                :disabled="form.loading"
               />
             </div>
           </div>
@@ -83,6 +128,7 @@ const form = useForm({ origin: '', destination: '', flight_date: '', deadline: '
                     class="w-full cursor-pointer rounded-xl border border-gray-300 bg-gray-50/50 px-4 py-3 font-medium text-gray-900 transition-all focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:outline-none"
                     readonly
                     required
+                    :disabled="form.loading"
                   />
                 </template>
               </VueDatePicker>
@@ -108,6 +154,7 @@ const form = useForm({ origin: '', destination: '', flight_date: '', deadline: '
                     placeholder="選擇日期"
                     class="w-full cursor-pointer rounded-xl border border-gray-300 bg-gray-50/50 px-4 py-3 font-medium text-gray-900 transition-all focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:outline-none"
                     readonly
+                    :disabled="form.loading"
                   />
                 </template>
               </VueDatePicker>
@@ -127,9 +174,9 @@ const form = useForm({ origin: '', destination: '', flight_date: '', deadline: '
             <button
               type="submit"
               class="flex-2 rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-blue-500 hover:shadow-md disabled:opacity-50"
-              :disabled="form.processing"
+              :disabled="form.loading"
             >
-              {{ form.processing ? '設定中...' : '開始自動追蹤' }}
+              {{ form.loading ? '設定中...' : '開始自動追蹤' }}
             </button>
           </div>
         </form>

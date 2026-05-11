@@ -42,10 +42,56 @@ const props = defineProps<{
   allTimeHigh: number | null
 }>()
 
+const chartCanvas = useTemplateRef<HTMLCanvasElement>('chartCanvas')
 const activeTab = ref<'table' | 'graph'>('table')
 const expandedGroups = ref(new Set<number>())
-const chartCanvas = useTemplateRef<HTMLCanvasElement>('chartCanvas')
+const loading = ref({ loading: null as 'toggle' | 'scrape' | 'delete' | null })
+
 let chart: Chart | null = null
+
+function toggleEntry() {
+  loading.value.loading = 'toggle'
+  fetch(`/api/entries/${props.entry.id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ is_active: !props.entry.isActive }),
+  })
+    .then((res) => {
+      if (res.ok) {
+        router.reload()
+      }
+    })
+    .finally(() => {
+      loading.value.loading = null
+    })
+}
+
+function scrapeEntry() {
+  loading.value.loading = 'scrape'
+  fetch(`/api/entries/${props.entry.id}/scrape`, { method: 'POST' })
+    .then((res) => {
+      if (res.ok) {
+        router.reload()
+      }
+    })
+    .finally(() => {
+      loading.value.loading = null
+    })
+}
+
+function deleteEntry() {
+  if (!confirm('確認刪除此航班追蹤？')) return
+  loading.value.loading = 'delete'
+  fetch(`/api/entries/${props.entry.id}`, { method: 'DELETE' })
+    .then((res) => {
+      if (res.ok) {
+        router.visit('/')
+      }
+    })
+    .finally(() => {
+      loading.value.loading = null
+    })
+}
 
 function initChart() {
   if (!chartCanvas.value || !props.dailyGroups?.length) return
@@ -103,7 +149,9 @@ function initChart() {
 
 function switchTab(t: 'table' | 'graph') {
   activeTab.value = t
-  if (t === 'graph' && !chart) nextTick(() => initChart())
+  if (t === 'graph' && !chart) {
+    nextTick(() => initChart())
+  }
 }
 
 onMounted(() => activeTab.value === 'graph' && initChart())
@@ -112,9 +160,12 @@ onUnmounted(() => chart?.destroy())
 <template>
   <AppLayout>
     <div class="mb-6">
-      <Link href="/" class="text-sm font-medium text-gray-500 transition-colors hover:text-gray-900"
-        >← 返回列表</Link
+      <Link
+        href="/"
+        class="text-sm font-medium text-gray-500 transition-colors hover:text-gray-900"
       >
+        ← 返回列表
+      </Link>
     </div>
 
     <div
@@ -151,7 +202,8 @@ onUnmounted(() => chart?.destroy())
       <div class="flex shrink-0 gap-3">
         <button
           class="rounded-xl bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200"
-          @click="router.post(`/entries/${entry.id}/toggle`)"
+          :disabled="loading.loading === 'toggle'"
+          @click="toggleEntry"
         >
           {{ entry.isActive ? '停用監測' : '啟用監測' }}
         </button>
@@ -159,14 +211,16 @@ onUnmounted(() => chart?.destroy())
         <button
           v-if="entry.flightDate >= today"
           class="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-500 hover:shadow"
-          @click="router.post(`/entries/${entry.id}/scrape`)"
+          :disabled="loading.loading === 'scrape'"
+          @click="scrapeEntry"
         >
           擷取最新價格
         </button>
 
         <button
           class="rounded-xl bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100"
-          @click="router.post(`/entries/${entry.id}/delete`)"
+          :disabled="loading.loading === 'delete'"
+          @click="deleteEntry"
         >
           刪除
         </button>
@@ -205,14 +259,15 @@ onUnmounted(() => chart?.destroy())
 
             <span
               class="ml-2 rounded-full bg-amber-200/50 px-2.5 py-0.5 text-sm font-medium text-amber-800"
-              >{{
+            >
+              {{
                 Math.ceil(
                   (new Date(rule37Status.cutoffDate).getTime() - new Date(today).getTime()) /
                     86400000,
                 )
               }}
-              天後結束</span
-            >
+              天後結束
+            </span>
           </template>
 
           <template v-else>
@@ -420,8 +475,9 @@ onUnmounted(() => chart?.destroy())
                               <span
                                 v-if="snap.fare === allTimeLow"
                                 class="rounded bg-green-100 px-1.5 py-0.5 text-[10px] leading-none font-bold text-green-700"
-                                >歷史低位</span
                               >
+                                歷史低位
+                              </span>
 
                               <span
                                 v-if="
@@ -430,8 +486,9 @@ onUnmounted(() => chart?.destroy())
                                   snap.departureAt?.slice(0, 10) >= rule37Status.cutoffDate
                                 "
                                 class="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] leading-none font-bold text-blue-700"
-                                >最佳選擇</span
                               >
+                                最佳選擇
+                              </span>
                             </div>
 
                             <span>{{ fmtFare(snap.fare) }}</span>

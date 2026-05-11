@@ -1,12 +1,12 @@
 import uuid
 from datetime import date, datetime, timezone
 
-from flask import Blueprint, jsonify, redirect, request, url_for
+from flask import Blueprint, jsonify, request
 
 from src.database import PriceSnapshot, SessionLocal, TrackingEntry
 from src.services.scraper import scrape_prices
 
-api_bp = Blueprint("api", __name__)
+api_bp = Blueprint("api", __name__, url_prefix="/api")
 
 
 @api_bp.route("/entries", methods=["POST"])
@@ -31,46 +31,83 @@ def create_entry():
 
         db.add(entry)
         db.commit()
-        return redirect(url_for("pages.list_entries"))
+        return jsonify(
+            {
+                "success": True,
+                "message": "Entry created",
+                "data": entry,
+            }
+        )
     except Exception as e:
         db.rollback()
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"success": False, "message": str(e)}), 400
     finally:
         db.close()
 
 
-@api_bp.route("/entries/<entry_id>/toggle", methods=["POST"])
-def toggle_entry(entry_id):
+@api_bp.route("/entries/<entry_id>", methods=["GET"])
+def get_entry(entry_id):
     db = SessionLocal()
     try:
         entry = db.query(TrackingEntry).filter(TrackingEntry.id == entry_id).first()
         if not entry:
-            return jsonify({"error": "Entry not found"}), 404
+            return jsonify({"success": False, "message": "Entry not found"}), 404
 
-        entry.is_active = not entry.is_active
-        db.commit()
-        return redirect(url_for("pages.list_entries"))
+        return jsonify(
+            {
+                "success": True,
+                "message": "Entry retrieved",
+                "data": entry,
+            }
+        )
     except Exception as e:
-        db.rollback()
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"success": False, "message": str(e)}), 400
     finally:
         db.close()
 
 
-@api_bp.route("/entries/<entry_id>/delete", methods=["POST"])
+@api_bp.route("/entries/<entry_id>", methods=["PATCH"])
+def update_entry(entry_id):
+    db = SessionLocal()
+    try:
+        entry = db.query(TrackingEntry).filter(TrackingEntry.id == entry_id).first()
+        if not entry:
+            return jsonify({"success": False, "message": "Entry not found"}), 404
+
+        data = request.get_json(silent=True) or request.form.to_dict()
+
+        if "is_active" in data:
+            entry.is_active = data["is_active"]
+
+        db.commit()
+        return jsonify(
+            {
+                "success": True,
+                "message": "Entry updated",
+                "data": entry,
+            }
+        )
+    except Exception as e:
+        db.rollback()
+        return jsonify({"success": False, "message": str(e)}), 400
+    finally:
+        db.close()
+
+
+@api_bp.route("/entries/<entry_id>", methods=["DELETE"])
 def delete_entry(entry_id):
     db = SessionLocal()
     try:
         entry = db.query(TrackingEntry).filter(TrackingEntry.id == entry_id).first()
         if not entry:
-            return jsonify({"error": "Entry not found"}), 404
+            return jsonify({"success": False, "message": "Entry not found"}), 404
 
         db.delete(entry)
         db.commit()
-        return redirect(url_for("pages.list_entries"))
+        return jsonify({"success": True, "message": "Entry deleted", "data": None})
     except Exception as e:
         db.rollback()
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"success": False, "message": str(e)}), 400
     finally:
         db.close()
 
@@ -81,10 +118,12 @@ def scrape_now(entry_id):
     try:
         entry = db.query(TrackingEntry).filter(TrackingEntry.id == entry_id).first()
         if not entry:
-            return jsonify({"error": "Entry not found"}), 404
+            return jsonify({"success": False, "message": "Entry not found"}), 404
 
         if entry.flight_date < date.today():
-            return jsonify({"error": "Cannot scrape: flight date has passed"}), 400
+            return jsonify(
+                {"success": False, "message": "Cannot scrape: flight date has passed"}
+            ), 400
 
         results = scrape_prices(
             origin=entry.origin,
@@ -106,9 +145,16 @@ def scrape_now(entry_id):
 
             db.add(snapshot)
             db.commit()
-        return redirect(url_for("pages.detail_entry", entry_id=entry_id))
+
+        return jsonify(
+            {
+                "success": True,
+                "message": "Scrape completed",
+                "data": entry,
+            }
+        )
     except Exception as e:
         db.rollback()
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"success": False, "message": str(e)}), 400
     finally:
         db.close()
