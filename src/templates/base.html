@@ -11,18 +11,17 @@
       {{ inertia.include_router() }}
     </script>
 
-    {% if config.DEBUG %}
-    <script type="module" src="http://localhost:5173/@vite/client"></script>
+    {% if vite_dev_url %}
+    <script type="module" src="{{ vite_dev_url }}/@vite/client"></script>
     {% else %}
     <link rel="stylesheet" href="{{ url_for('static', filename='dist/app.css') }}" />
     {% endif %}
   </head>
   <body>
-    <!-- prettier-ignore -->
     <div id="app" data-page='{{ page | tojson }}'></div>
 
-    {% if config.DEBUG %}
-    <script type="module" src="http://localhost:5173/src/frontend/main.ts"></script>
+    {% if vite_dev_url %}
+    <script type="module" src="{{ vite_dev_url }}/src/frontend/main.ts"></script>
     {% else %}
     <script type="module" src="{{ url_for('static', filename='dist/app.js') }}" defer></script>
     {% endif %}

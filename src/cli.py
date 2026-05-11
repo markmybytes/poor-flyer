@@ -1,25 +1,22 @@
 import subprocess
 import sys
+from pathlib import Path
 
 import click
+from flask import current_app
 from flask.cli import with_appcontext
 
 
 @click.command(name="dev")
 @with_appcontext
 def dev():
-    """Run Vite dev server and Flask server simultaneously.
-
-    Simplified: assume Vite will use port 5173 and pass that to Flask.
-    """
+    """Run Vite dev server and Flask server simultaneously."""
     click.echo(click.style("🚀 Starting development environment...", fg="cyan"))
 
-    vitep = subprocess.Popen(
-        ["npm", "run", "dev"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-    )
+    hot_file = Path(current_app.config["VITE_HOT_FILE"])
+    hot_file.unlink(missing_ok=True)
+
+    vitep = subprocess.Popen(["npm", "run", "dev"])
 
     try:
         subprocess.run(["flask", "run", "--debug"], check=True)
@@ -29,4 +26,6 @@ def dev():
         click.echo(click.style(f"Error starting Flask: {e}", fg="red"))
     finally:
         vitep.terminate()
+        vitep.wait()
+        hot_file.unlink(missing_ok=True)
         sys.exit(0)
