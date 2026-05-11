@@ -9,7 +9,7 @@ from src.database import init_db
 from src.routes.api import api_bp
 from src.routes.pages import pages_bp
 from src.services.scheduler import start_scheduler, stop_scheduler
-from src.utils.json import SQLAlchemyJSONProvider
+from src.utils.json import CamelCaseJSONProvider
 
 
 def _inject_vite_url():
@@ -34,7 +34,7 @@ def create_app():
     app.config["INERTIA_TEMPLATE"] = "base.html"
     app.config["VITE_HOT_FILE"] = os.path.join(app.static_folder, "dist", "hot")
 
-    app.json = SQLAlchemyJSONProvider(app)
+    app.json = CamelCaseJSONProvider(app)
 
     init_db()
     Inertia(app)

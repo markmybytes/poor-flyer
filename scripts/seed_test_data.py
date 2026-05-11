@@ -8,19 +8,15 @@ from decimal import Decimal
 
 sys.path.insert(0, str(__file__).rsplit("\\", 2)[0])
 
-from src.database import PriceSnapshot, SessionLocal, TrackingEntry, init_db
+from src.database import Base, Flight, FlightFareSnapshot, SessionLocal, engine
 
 
 def add_test_data():
-    init_db()
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
     db = SessionLocal()
 
     try:
-        # Clear existing data safely
-        db.query(PriceSnapshot).delete()
-        db.query(TrackingEntry).delete()
-        db.commit()
-
         utc = timezone.utc
         now = datetime.now(utc)
         today = now.date()
@@ -31,8 +27,8 @@ def add_test_data():
                 days=30
             )  # Future flight times relative to snapshot
             db.add(
-                PriceSnapshot(
-                    entry_id=entry.id,
+                FlightFareSnapshot(
+                    flight_id=entry.id,
                     created_at=dt,
                     fare=Decimal(str(fare)) if fare and status == "success" else None,
                     flight_number=f"CX{random.randint(100, 999)}"
@@ -56,7 +52,7 @@ def add_test_data():
         # ---------------------------------------------------------
         # Created 30 days ago, Deadline is 10 days from now.
         # Total window = 40 days. 37% Cutoff = ~15 days ago.
-        e1 = TrackingEntry(
+        e1 = Flight(
             origin="HKG",
             destination="LHR",
             flight_date=today + timedelta(days=30),
@@ -97,7 +93,7 @@ def add_test_data():
         # Scenario 2: Rule 37 OBSERVING
         # ---------------------------------------------------------
         # Created 10 days ago, deadline far in the future.
-        e2 = TrackingEntry(
+        e2 = Flight(
             origin="HKG",
             destination="NRT",
             flight_date=today + timedelta(days=60),
@@ -117,7 +113,7 @@ def add_test_data():
         # Scenario 3: Rule 37 WAITING
         # ---------------------------------------------------------
         # Cutoff has passed. Best price during observing was $5500. Current is $5800.
-        e3 = TrackingEntry(
+        e3 = Flight(
             origin="HKG",
             destination="JFK",
             flight_date=today + timedelta(days=40),
@@ -146,7 +142,7 @@ def add_test_data():
         # Scenario 4: Expired & Inactive
         # ---------------------------------------------------------
         # Flight departed 5 days ago. Created 40 days ago.
-        e4 = TrackingEntry(
+        e4 = Flight(
             origin="HKG",
             destination="TPE",
             flight_date=today - timedelta(days=5),
@@ -165,7 +161,7 @@ def add_test_data():
         # ---------------------------------------------------------
         # Scenario 5: No Deadline Set
         # ---------------------------------------------------------
-        e5 = TrackingEntry(
+        e5 = Flight(
             origin="HKG",
             destination="SIN",
             flight_date=today + timedelta(days=20),
@@ -184,7 +180,7 @@ def add_test_data():
         # ---------------------------------------------------------
         # Scenario 6: Completely Empty
         # ---------------------------------------------------------
-        e6 = TrackingEntry(
+        e6 = Flight(
             origin="HKG",
             destination="BKK",
             flight_date=today + timedelta(days=10),

@@ -4,7 +4,7 @@ from datetime import date
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from src.database import PriceSnapshot, SessionLocal, TrackingEntry
+from src.database import Flight, FlightFareSnapshot, SessionLocal
 from src.services.scraper import scrape_prices
 
 logger = logging.getLogger(__name__)
@@ -17,10 +17,10 @@ def daily_scrape_job():
     try:
         today = date.today()
         entries = (
-            db.query(TrackingEntry)
+            db.query(Flight)
             .filter(
-                TrackingEntry.is_active,
-                TrackingEntry.flight_date >= today,
+                Flight.is_active,
+                Flight.flight_date >= today,
             )
             .all()
         )
@@ -33,9 +33,9 @@ def daily_scrape_job():
             )
 
             for result in results.results:
-                snapshot = PriceSnapshot(
+                snapshot = FlightFareSnapshot(
                     id=str(uuid.uuid4()),
-                    entry_id=entry.id,
+                    flight_id=entry.id,
                     fare=result.fare,
                     flight_number=result.flight_number,
                     departure_at=result.departure_at,

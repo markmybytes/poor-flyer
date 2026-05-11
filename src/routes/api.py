@@ -3,7 +3,7 @@ from datetime import date, datetime, timezone
 
 from flask import Blueprint, jsonify, request
 
-from src.database import PriceSnapshot, SessionLocal, TrackingEntry
+from src.database import Flight, FlightFareSnapshot, SessionLocal
 from src.services.scraper import scrape_prices
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
@@ -20,7 +20,7 @@ def create_entry():
             datetime.strptime(deadline_str, "%Y-%m-%d").date() if deadline_str else None
         )
 
-        entry = TrackingEntry(
+        entry = Flight(
             id=str(uuid.uuid4()),
             origin=data.get("origin").upper(),
             destination=data.get("destination").upper(),
@@ -49,7 +49,7 @@ def create_entry():
 def get_entry(entry_id):
     db = SessionLocal()
     try:
-        entry = db.query(TrackingEntry).filter(TrackingEntry.id == entry_id).first()
+        entry = db.query(Flight).filter(Flight.id == entry_id).first()
         if not entry:
             return jsonify({"success": False, "message": "Entry not found"}), 404
 
@@ -70,7 +70,7 @@ def get_entry(entry_id):
 def update_entry(entry_id):
     db = SessionLocal()
     try:
-        entry = db.query(TrackingEntry).filter(TrackingEntry.id == entry_id).first()
+        entry = db.query(Flight).filter(Flight.id == entry_id).first()
         if not entry:
             return jsonify({"success": False, "message": "Entry not found"}), 404
 
@@ -98,7 +98,7 @@ def update_entry(entry_id):
 def delete_entry(entry_id):
     db = SessionLocal()
     try:
-        entry = db.query(TrackingEntry).filter(TrackingEntry.id == entry_id).first()
+        entry = db.query(Flight).filter(Flight.id == entry_id).first()
         if not entry:
             return jsonify({"success": False, "message": "Entry not found"}), 404
 
@@ -116,7 +116,7 @@ def delete_entry(entry_id):
 def scrape_now(entry_id):
     db = SessionLocal()
     try:
-        entry = db.query(TrackingEntry).filter(TrackingEntry.id == entry_id).first()
+        entry = db.query(Flight).filter(Flight.id == entry_id).first()
         if not entry:
             return jsonify({"success": False, "message": "Entry not found"}), 404
 
@@ -132,8 +132,8 @@ def scrape_now(entry_id):
         )
 
         for result in results.results:
-            snapshot = PriceSnapshot(
-                entry_id=entry_id,
+            snapshot = FlightFareSnapshot(
+                flight_id=entry_id,
                 created_at=datetime.now(timezone.utc),
                 fare=result.fare,
                 flight_number=result.flight_number,

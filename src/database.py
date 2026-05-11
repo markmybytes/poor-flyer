@@ -24,8 +24,8 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
-class TrackingEntry(Base):
-    __tablename__ = "tracking_entries"
+class Flight(Base):
+    __tablename__ = "flights"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     origin = Column(String, nullable=False)
@@ -35,17 +35,17 @@ class TrackingEntry(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    price_snapshots = relationship(
-        "PriceSnapshot", cascade="all, delete-orphan", back_populates="tracking_entry"
+    fare_snapshots = relationship(
+        "FlightFareSnapshot", cascade="all, delete-orphan", back_populates="flight"
     )
 
 
-class PriceSnapshot(Base):
-    __tablename__ = "price_snapshots"
+class FlightFareSnapshot(Base):
+    __tablename__ = "flight_fare_snapshots"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    entry_id = Column(
-        String, ForeignKey("tracking_entries.id", ondelete="CASCADE"), nullable=False
+    flight_id = Column(
+        String, ForeignKey("flights.id", ondelete="CASCADE"), nullable=False
     )
     fare = Column(Numeric(10, 2), nullable=True)
     flight_number = Column(String, nullable=True)
@@ -58,7 +58,7 @@ class PriceSnapshot(Base):
         DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
     )
 
-    tracking_entry = relationship("TrackingEntry", back_populates="price_snapshots")
+    flight = relationship("Flight", back_populates="fare_snapshots")
 
 
 def init_db():

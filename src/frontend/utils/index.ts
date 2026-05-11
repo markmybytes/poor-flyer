@@ -1,3 +1,5 @@
+import type { FareSnapshot } from '@/types'
+
 export function fmtFare(fare: number | null) {
   return fare !== null ? `$${Math.round(fare)}` : '—'
 }
@@ -18,4 +20,16 @@ export function fmtTime(iso: string | null) {
 
 export function fmtTz(iso: string | null) {
   return iso ? (iso.match(/([+-]\d{2}:\d{2}|Z)$/) || [''])[0] : ''
+}
+
+export function getFlightStats(snapshots: FareSnapshot[]) {
+  const validFares = (snapshots || [])
+    .filter((s) => s.scrapeStatus === 'success' && s.fare != null)
+    .map((s) => s.fare as number)
+
+  return {
+    latest: validFares.length ? validFares[validFares.length - 1] : null,
+    lowest: validFares.length ? Math.min(...validFares) : null,
+    highest: validFares.length ? Math.max(...validFares) : null,
+  }
 }
