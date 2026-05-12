@@ -20,7 +20,6 @@ let chart: Chart | null = null
 const today = new Date().toISOString().split('T')[0]
 
 const flightStats = computed(() => getFlightStats(props.flight.fareSnapshots))
-const pastDeparture = computed(() => props.flight.flightDate < today)
 
 const dailyGroups = computed(() => {
   const byDate = new Map<string, FareSnapshot[]>()
@@ -183,10 +182,11 @@ onUnmounted(() => chart?.destroy())
           <span>{{ flight.destination }}</span>
 
           <span
-            v-if="pastDeparture"
+            v-if="props.flight.flightDate < today"
             class="ml-2 rounded-full bg-gray-100 px-3 py-1 align-middle text-xs font-semibold tracking-normal text-gray-500"
-            >已過期</span
           >
+            已過期
+          </span>
         </div>
 
         <p class="text-sm font-medium text-gray-600">
@@ -206,11 +206,10 @@ onUnmounted(() => chart?.destroy())
           :disabled="loading.loading === 'toggle'"
           @click="toggleEntry"
         >
-          {{ flight.isActive ? '停用監測' : '啟用監測' }}
+          {{ flight.isActive ? '停止追蹤' : '開啟追蹤' }}
         </button>
 
         <button
-          v-if="!pastDeparture"
           class="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-500 hover:shadow disabled:opacity-50"
           :disabled="loading.loading === 'scrape'"
           @click="scrapeEntry"

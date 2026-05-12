@@ -2,30 +2,9 @@
 import AppLayout from '@/Layouts/AppLayout.vue'
 import type { Flight } from '@/types'
 import { fmtDate, fmtFare, getFlightStats } from '@/utils'
-import { Link, router } from '@inertiajs/vue3'
-import { ref } from 'vue'
+import { Link } from '@inertiajs/vue3'
 
 defineProps<{ flights: Flight[] }>()
-
-const loading = ref<string | null>(null)
-
-function toggleEntryStatus(flight: Flight) {
-  loading.value = flight.id
-  fetch(`/api/entries/${flight.id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ is_active: !flight.isActive }),
-  })
-    .then((res) => {
-      if (res.ok) {
-        loading.value = null
-      }
-    })
-    .finally(() => {
-      loading.value = null
-      router.reload()
-    })
-}
 </script>
 
 <template>
@@ -68,22 +47,18 @@ function toggleEntryStatus(flight: Flight) {
 
           <div class="shrink-0">
             <span
-              v-if="flight.flightDate < new Date().toISOString().split('T')[0]"
-              class="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-500"
-              >已過期</span
-            >
-
-            <span
-              v-else-if="!flight.isActive"
+              v-if="!flight.isActive"
               class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700"
-              >已暫停</span
             >
+              已暫停
+            </span>
 
             <span
               v-else
               class="rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700 ring-1 ring-green-600/20 ring-inset"
-              >活躍監測中</span
             >
+              追蹤中
+            </span>
           </div>
         </div>
 
@@ -177,15 +152,6 @@ function toggleEntryStatus(flight: Flight) {
         </div>
 
         <div class="mt-6 flex items-center justify-end gap-3 border-t border-gray-100 pt-5">
-          <button
-            type="button"
-            class="rounded-xl px-4 py-2 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-50"
-            :disabled="loading === flight.id"
-            @click="toggleEntryStatus(flight)"
-          >
-            {{ flight.isActive ? '暫停監測' : '恢復監測' }}
-          </button>
-
           <Link
             :href="`/detail/${flight.id}`"
             class="rounded-xl bg-gray-900 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-gray-800 hover:shadow"
