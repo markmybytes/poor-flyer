@@ -54,17 +54,16 @@ async function handleSubmit() {
         <Link
           href="/"
           class="text-sm font-medium text-gray-500 transition-colors hover:text-gray-900"
-          >← 返回列表</Link
         >
+          ← 返回列表
+        </Link>
       </div>
 
       <div class="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
         <div class="border-b border-gray-100 bg-gray-50/50 px-8 py-6">
           <h2 class="text-2xl font-black tracking-tight text-gray-900">追蹤新航班</h2>
 
-          <p class="mt-1 text-sm font-medium text-gray-500">
-            輸入航班資訊，我們將每日為您自動追蹤最低票價。
-          </p>
+          <p class="mt-1 text-sm font-medium text-gray-500">輸入航班資訊，追蹤每日票價。</p>
         </div>
 
         <form class="p-8" @submit.prevent="handleSubmit">
@@ -74,9 +73,9 @@ async function handleSubmit() {
 
           <div class="mb-6 grid grid-cols-2 gap-6">
             <div>
-              <label class="mb-2 block text-sm font-bold tracking-wide text-gray-700"
-                >出發地機場代碼</label
-              >
+              <label class="mb-2 block text-sm font-bold tracking-wide text-gray-700">
+                出發地機場代碼
+              </label>
 
               <input
                 v-model="form.origin"
@@ -90,9 +89,9 @@ async function handleSubmit() {
             </div>
 
             <div>
-              <label class="mb-2 block text-sm font-bold tracking-wide text-gray-700"
-                >目的地機場代碼</label
-              >
+              <label class="mb-2 block text-sm font-bold tracking-wide text-gray-700">
+                目的地機場代碼
+              </label>
 
               <input
                 v-model="form.destination"
@@ -108,9 +107,9 @@ async function handleSubmit() {
 
           <div class="mb-8 grid grid-cols-2 gap-6">
             <div>
-              <label class="mb-2 block text-sm font-bold tracking-wide text-gray-700"
-                >目標出發日期</label
-              >
+              <label class="mb-2 block text-sm font-bold tracking-wide text-gray-700">
+                目標出發日期
+              </label>
 
               <VueDatePicker
                 v-model="form.flight_date"
@@ -136,7 +135,7 @@ async function handleSubmit() {
 
             <div>
               <label class="mb-2 block text-sm font-bold tracking-wide text-gray-700">
-                最遲購票期限 <span class="font-medium text-gray-400">(選填)</span>
+                購票限期 <span class="font-medium text-gray-400">（選填）</span>
               </label>
 
               <VueDatePicker
@@ -159,7 +158,7 @@ async function handleSubmit() {
                 </template>
               </VueDatePicker>
 
-              <p class="mt-2 text-xs font-medium text-gray-400">系統將依此計算 37% 最佳購買時機</p>
+              <p class="mt-2 text-xs font-medium text-gray-400">系統將依此計算最佳購買時機</p>
             </div>
           </div>
 
@@ -176,7 +175,7 @@ async function handleSubmit() {
               class="flex-2 rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-blue-500 hover:shadow-md disabled:opacity-50"
               :disabled="form.loading"
             >
-              {{ form.loading ? '設定中...' : '開始自動追蹤' }}
+              {{ form.loading ? '設定中...' : '開始追蹤' }}
             </button>
           </div>
         </form>
