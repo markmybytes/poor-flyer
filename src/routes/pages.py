@@ -12,7 +12,7 @@ from src.services.rule37 import compute_37_best
 pages_bp = Blueprint("pages", __name__)
 
 
-def _get_r37_analysis(flight: Flight) -> dict:
+def _get_r37_analysis(flight: Flight) -> dict | None:
     """Helper to compute Rule 37 analysis from a flight's snapshots."""
     if not flight.deadline:
         return None
@@ -28,7 +28,7 @@ def _get_r37_analysis(flight: Flight) -> dict:
         },
     )
 
-    return {**asdict(r37), "phase": r37.phase.value} if r37 else None
+    return {**asdict(r37), "phase": r37.phase.value}
 
 
 @pages_bp.route("/")

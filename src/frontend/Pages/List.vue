@@ -92,7 +92,7 @@ defineProps<{ flights: Flight[] }>()
 
         <div class="mt-auto h-18">
           <div
-            v-if="flight.rule37Analysis"
+            v-if="flight.rule37Analysis && flight.rule37Analysis.latestVal !== null"
             class="flex h-full items-center justify-between rounded-xl border p-3.5"
             :class="{
               'border-green-200 bg-green-50': flight.rule37Analysis.phase === 'BUY_SIGNAL',
@@ -139,6 +139,13 @@ defineProps<{ flights: Flight[] }>()
 
               <p class="text-sm font-bold text-gray-700">{{ fmtDate(flight.deadline) }}</p>
             </div>
+          </div>
+
+          <div
+            v-else-if="flight.rule37Analysis"
+            class="flex h-full items-center justify-center rounded-xl border border-dashed border-gray-300 bg-gray-50 p-3.5"
+          >
+            <span class="text-sm font-medium text-gray-500">收集數據中</span>
           </div>
 
           <div

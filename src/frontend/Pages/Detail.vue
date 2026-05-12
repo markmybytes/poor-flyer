@@ -230,7 +230,7 @@ onUnmounted(() => chart?.destroy())
     <div
       class="mb-8 h-30 rounded-2xl border p-6"
       :class="[
-        flight.rule37Analysis
+        flight.rule37Analysis.latestVal
           ? [
               'shadow-sm',
               {
@@ -243,7 +243,7 @@ onUnmounted(() => chart?.destroy())
       ]"
     >
       <div
-        v-if="flight.rule37Analysis"
+        v-if="flight.rule37Analysis && flight.rule37Analysis.latestVal !== null"
         class="flex h-full flex-col items-center justify-between gap-6 md:flex-row"
       >
         <div class="flex-1">
@@ -322,6 +322,13 @@ onUnmounted(() => chart?.destroy())
         </div>
       </div>
 
+      <div
+        v-else-if="flight.rule37Analysis"
+        class="flex h-full items-center justify-center bg-gray-50 p-6"
+      >
+        <p class="text-sm font-medium text-gray-500">未有數據，未能計算 37% 法則指標。</p>
+      </div>
+
       <div v-else class="flex h-full items-center justify-center bg-gray-50 p-6">
         <p class="text-sm font-medium text-gray-500">未設定購買限期，無法計算 37% 最佳則指標。</p>
       </div>
@@ -366,7 +373,7 @@ onUnmounted(() => chart?.destroy())
               :class="{
                 'bg-green-100/30': group.lowestSnapshot?.fare === flightStats.lowest,
                 'bg-blue-100/30':
-                  flight.rule37Analysis &&
+                  flight.rule37Analysis?.phase &&
                   group.date >= flight.rule37Analysis.cutoffDate &&
                   group.lowestSnapshot?.fare === flight.rule37Analysis.historyBestVal,
               }"
@@ -416,7 +423,7 @@ onUnmounted(() => chart?.destroy())
             </button>
 
             <div
-              v-if="flight.rule37Analysis && group.date === flight.rule37Analysis.cutoffDate"
+              v-if="flight.rule37Analysis?.phase && group.date === flight.rule37Analysis.cutoffDate"
               class="border-y border-amber-100 bg-amber-50 px-5 py-1.5 text-center"
             >
               <p class="text-[11px] font-bold tracking-widest text-amber-700">▴ 37% 法則決策期 ▴</p>
@@ -492,7 +499,7 @@ onUnmounted(() => chart?.destroy())
 
                               <span
                                 v-if="
-                                  flight.rule37Analysis &&
+                                  flight.rule37Analysis?.phase &&
                                   snap.fare === flight.rule37Analysis.historyBestVal &&
                                   (snap.departureAt?.slice(0, 10) ?? '') >=
                                     flight.rule37Analysis.cutoffDate
