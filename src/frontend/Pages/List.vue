@@ -68,7 +68,7 @@ defineProps<{ flights: Flight[] }>()
           <div class="flex-1">
             <p class="mb-1 text-xs font-bold tracking-widest text-gray-400 uppercase">最新價格</p>
 
-            <p class="text-3xl font-black text-blue-600">
+            <p class="text-3xl font-black">
               {{ fmtFare(getFlightStats(flight.fareSnapshots || []).latest) }}
             </p>
           </div>
@@ -96,8 +96,8 @@ defineProps<{ flights: Flight[] }>()
             class="flex items-center justify-between rounded-xl border p-3.5"
             :class="{
               'border-green-200 bg-green-50': flight.rule37Analysis.phase === 'BUY_SIGNAL',
-              'border-amber-200 bg-amber-50': flight.rule37Analysis.phase === 'OBSERVING',
-              'border-gray-200 bg-white': flight.rule37Analysis.phase === 'WAITING',
+              'border-gray-200 bg-gray-50': flight.rule37Analysis.phase === 'OBSERVING',
+              'border-sky-200 bg-sky-50': flight.rule37Analysis.phase === 'WAITING',
             }"
           >
             <div>
@@ -119,19 +119,17 @@ defineProps<{ flights: Flight[] }>()
                 </template>
 
                 <template v-else-if="flight.rule37Analysis.phase === 'OBSERVING'">
-                  <span class="h-2.5 w-2.5 rounded-full bg-amber-500"></span>
+                  <span class="h-2.5 w-2.5 rounded-full bg-gray-400"></span>
 
-                  <span class="text-sm font-bold text-amber-700"
-                    >觀察期 (門檻: {{ fmtFare(flight.rule37Analysis.historyBestVal) }})</span
-                  >
+                  <span class="text-sm font-bold text-gray-700"> 觀察期 </span>
                 </template>
 
                 <template v-else>
-                  <span class="h-2.5 w-2.5 rounded-full bg-gray-400"></span>
+                  <span class="h-2.5 w-2.5 rounded-full bg-sky-500"></span>
 
-                  <span class="text-sm font-bold text-gray-600"
-                    >等待觀察期 ({{ fmtDate(flight.rule37Analysis.cutoffDate) }})</span
-                  >
+                  <span class="text-sm font-bold text-sky-600">
+                    等待中（門檻: {{ fmtFare(flight.rule37Analysis.historyBestVal) }}）
+                  </span>
                 </template>
               </div>
             </div>

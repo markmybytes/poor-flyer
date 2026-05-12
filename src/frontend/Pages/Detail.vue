@@ -181,12 +181,12 @@ onUnmounted(() => chart?.destroy())
 
           <span>{{ flight.destination }}</span>
 
-          <span
+          <!-- <span
             v-if="props.flight.flightDate < today"
             class="ml-2 rounded-full bg-gray-100 px-3 py-1 align-middle text-xs font-semibold tracking-normal text-gray-500"
           >
             已過期
-          </span>
+          </span> -->
         </div>
 
         <p class="text-sm font-medium text-gray-600">
@@ -232,8 +232,8 @@ onUnmounted(() => chart?.destroy())
       class="mb-8 flex flex-col items-center justify-between gap-6 rounded-2xl border p-6 shadow-sm md:flex-row"
       :class="{
         'border-green-200 bg-green-50': flight.rule37Analysis.phase === 'BUY_SIGNAL',
-        'border-amber-200 bg-amber-50': flight.rule37Analysis.phase === 'OBSERVING',
-        'border-gray-200 bg-white': flight.rule37Analysis.phase === 'WAITING',
+        'border-gray-200 bg-gray-50': flight.rule37Analysis.phase === 'OBSERVING',
+        'border-sky-200 bg-sky-50': flight.rule37Analysis.phase === 'WAITING',
       }"
     >
       <div class="flex-1">
@@ -253,9 +253,9 @@ onUnmounted(() => chart?.destroy())
           </template>
 
           <template v-else-if="flight.rule37Analysis.phase === 'OBSERVING'">
-            <span class="h-3 w-3 rounded-full bg-amber-500"></span>
+            <span class="h-3 w-3 rounded-full bg-gray-400"></span>
 
-            <span class="text-2xl font-black text-amber-700">觀察期</span>
+            <span class="text-2xl font-black text-gray-700">觀察期</span>
 
             <span
               class="ml-2 rounded-full bg-amber-200/50 px-2.5 py-0.5 text-sm font-medium text-amber-800"
@@ -272,14 +272,14 @@ onUnmounted(() => chart?.destroy())
           </template>
 
           <template v-else>
-            <span class="h-3 w-3 rounded-full bg-gray-400"></span>
+            <span class="h-3 w-3 rounded-full bg-sky-500"></span>
 
-            <span class="text-2xl font-black text-gray-700">等待中</span>
+            <span class="text-2xl font-black text-sky-600">等待中</span>
           </template>
         </div>
 
         <p class="mt-1.5 text-sm font-medium text-gray-600">
-          決策轉換期：<strong class="text-gray-900">{{
+          決策期開始：<strong class="text-gray-900">{{
             fmtDate(flight.rule37Analysis.cutoffDate)
           }}</strong>
 
