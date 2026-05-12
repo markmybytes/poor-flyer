@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import AppLayout from '@/Layouts/AppLayout.vue'
-import type { FareSnapshot, Flight, Rule37Analysis } from '@/types'
+import type { FareSnapshot, Flight } from '@/types'
 import { fmtDate, fmtFare, fmtTime, fmtTz, getFlightStats } from '@/utils'
 import { Link, router } from '@inertiajs/vue3'
 import Chart from 'chart.js/auto'
@@ -8,8 +8,6 @@ import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch 
 
 const props = defineProps<{
   flight: Flight
-  fareSnapshots: FareSnapshot[]
-  rule37Analysis: Rule37Analysis | null
 }>()
 
 const chartCanvas = useTemplateRef<HTMLCanvasElement>('chartCanvas')
@@ -21,12 +19,12 @@ let chart: Chart | null = null
 
 const today = new Date().toISOString().split('T')[0]
 
-const flightStats = computed(() => getFlightStats(props.fareSnapshots))
+const flightStats = computed(() => getFlightStats(props.flight.fareSnapshots))
 const pastDeparture = computed(() => props.flight.flightDate < today)
 
 const dailyGroups = computed(() => {
   const byDate = new Map<string, FareSnapshot[]>()
-  for (const s of props.fareSnapshots) {
+  for (const s of props.flight.fareSnapshots) {
     const d = s.createdAt.split('T')[0]
     if (!byDate.has(d)) byDate.set(d, [])
     byDate.get(d)!.push(s)
@@ -231,19 +229,19 @@ onUnmounted(() => chart?.destroy())
     </div>
 
     <div
-      v-if="rule37Analysis"
+      v-if="flight.rule37Analysis"
       class="mb-8 flex flex-col items-center justify-between gap-6 rounded-2xl border p-6 shadow-sm md:flex-row"
       :class="{
-        'border-green-200 bg-green-50': rule37Analysis.phase === 'BUY_SIGNAL',
-        'border-amber-200 bg-amber-50': rule37Analysis.phase === 'OBSERVING',
-        'border-gray-200 bg-white': rule37Analysis.phase === 'WAITING',
+        'border-green-200 bg-green-50': flight.rule37Analysis.phase === 'BUY_SIGNAL',
+        'border-amber-200 bg-amber-50': flight.rule37Analysis.phase === 'OBSERVING',
+        'border-gray-200 bg-white': flight.rule37Analysis.phase === 'WAITING',
       }"
     >
       <div class="flex-1">
         <p class="mb-1 text-xs font-bold tracking-widest text-gray-400 uppercase">37% 法則指標</p>
 
         <div class="flex items-center gap-3">
-          <template v-if="rule37Analysis.phase === 'BUY_SIGNAL'">
+          <template v-if="flight.rule37Analysis.phase === 'BUY_SIGNAL'">
             <span class="relative flex h-3 w-3">
               <span
                 class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"
@@ -255,7 +253,7 @@ onUnmounted(() => chart?.destroy())
             <span class="text-2xl font-black text-green-700">購買信號 (最佳時機)</span>
           </template>
 
-          <template v-else-if="rule37Analysis.phase === 'OBSERVING'">
+          <template v-else-if="flight.rule37Analysis.phase === 'OBSERVING'">
             <span class="h-3 w-3 rounded-full bg-amber-500"></span>
 
             <span class="text-2xl font-black text-amber-700">觀察期</span>
@@ -265,7 +263,8 @@ onUnmounted(() => chart?.destroy())
             >
               {{
                 Math.ceil(
-                  (new Date(rule37Analysis.cutoffDate).getTime() - new Date(today).getTime()) /
+                  (new Date(flight.rule37Analysis.cutoffDate).getTime() -
+                    new Date(today).getTime()) /
                     86400000,
                 )
               }}
@@ -282,13 +281,13 @@ onUnmounted(() => chart?.destroy())
 
         <p class="mt-1.5 text-sm font-medium text-gray-600">
           決策轉換期：<strong class="text-gray-900">{{
-            fmtDate(rule37Analysis.cutoffDate)
+            fmtDate(flight.rule37Analysis.cutoffDate)
           }}</strong>
 
           <span class="mx-2 text-gray-300">|</span>
 
           門檻價格：<strong class="text-gray-900">{{
-            fmtFare(rule37Analysis.historyBestVal)
+            fmtFare(flight.rule37Analysis.historyBestVal)
           }}</strong>
         </p>
       </div>
@@ -299,13 +298,17 @@ onUnmounted(() => chart?.destroy())
         <div>
           <p class="text-xs font-bold tracking-widest text-gray-400 uppercase">最新價格</p>
 
-          <p class="text-xl font-bold text-gray-900">{{ fmtFare(rule37Analysis.latestVal) }}</p>
+          <p class="text-xl font-bold text-gray-900">
+            {{ fmtFare(flight.rule37Analysis.latestVal) }}
+          </p>
         </div>
 
         <div>
           <p class="text-xs font-bold tracking-widest text-gray-400 uppercase">歷史最低</p>
 
-          <p class="text-xl font-bold text-green-600">{{ fmtFare(rule37Analysis.allTimeLow) }}</p>
+          <p class="text-xl font-bold text-green-600">
+            {{ fmtFare(flight.rule37Analysis.allTimeLow) }}
+          </p>
         </div>
       </div>
     </div>
@@ -358,9 +361,9 @@ onUnmounted(() => chart?.destroy())
               :class="{
                 'bg-green-100/30': group.lowestSnapshot?.fare === flightStats.lowest,
                 'bg-blue-100/30':
-                  rule37Analysis &&
-                  group.date >= rule37Analysis.cutoffDate &&
-                  group.lowestSnapshot?.fare === rule37Analysis.historyBestVal,
+                  flight.rule37Analysis &&
+                  group.date >= flight.rule37Analysis.cutoffDate &&
+                  group.lowestSnapshot?.fare === flight.rule37Analysis.historyBestVal,
               }"
               @click="
                 expandedGroups.has(index) ? expandedGroups.delete(index) : expandedGroups.add(index)
@@ -408,7 +411,7 @@ onUnmounted(() => chart?.destroy())
             </button>
 
             <div
-              v-if="rule37Analysis && group.date === rule37Analysis.cutoffDate"
+              v-if="flight.rule37Analysis && group.date === flight.rule37Analysis.cutoffDate"
               class="border-y border-amber-100 bg-amber-50 px-5 py-1.5 text-center"
             >
               <p class="text-[11px] font-bold tracking-widest text-amber-700">
@@ -485,10 +488,10 @@ onUnmounted(() => chart?.destroy())
 
                               <span
                                 v-if="
-                                  rule37Analysis &&
-                                  snap.fare === rule37Analysis.historyBestVal &&
+                                  flight.rule37Analysis &&
+                                  snap.fare === flight.rule37Analysis.historyBestVal &&
                                   (snap.departureAt?.slice(0, 10) ?? '') >=
-                                    rule37Analysis.cutoffDate
+                                    flight.rule37Analysis.cutoffDate
                                 "
                                 class="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] leading-none font-bold text-blue-700"
                                 >最佳選擇</span

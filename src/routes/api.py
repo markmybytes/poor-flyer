@@ -2,6 +2,7 @@ import uuid
 from datetime import date, datetime, timezone
 
 from flask import Blueprint, jsonify, request
+from sqlalchemy import select
 
 from src.database import Flight, FlightFareSnapshot, SessionLocal
 from src.services.scraper import scrape_prices
@@ -49,7 +50,10 @@ def create_entry():
 def get_entry(entry_id):
     db = SessionLocal()
     try:
-        entry = db.query(Flight).filter(Flight.id == entry_id).first()
+        entry = db.execute(
+            select(Flight).where(Flight.id == entry_id)
+        ).scalar_one_or_none()
+
         if not entry:
             return jsonify({"success": False, "message": "Entry not found"}), 404
 
@@ -70,7 +74,10 @@ def get_entry(entry_id):
 def update_entry(entry_id):
     db = SessionLocal()
     try:
-        entry = db.query(Flight).filter(Flight.id == entry_id).first()
+        entry = db.execute(
+            select(Flight).where(Flight.id == entry_id)
+        ).scalar_one_or_none()
+
         if not entry:
             return jsonify({"success": False, "message": "Entry not found"}), 404
 
@@ -98,7 +105,10 @@ def update_entry(entry_id):
 def delete_entry(entry_id):
     db = SessionLocal()
     try:
-        entry = db.query(Flight).filter(Flight.id == entry_id).first()
+        entry = db.execute(
+            select(Flight).where(Flight.id == entry_id)
+        ).scalar_one_or_none()
+
         if not entry:
             return jsonify({"success": False, "message": "Entry not found"}), 404
 
@@ -116,7 +126,10 @@ def delete_entry(entry_id):
 def scrape_now(entry_id):
     db = SessionLocal()
     try:
-        entry = db.query(Flight).filter(Flight.id == entry_id).first()
+        entry = db.execute(
+            select(Flight).where(Flight.id == entry_id)
+        ).scalar_one_or_none()
+
         if not entry:
             return jsonify({"success": False, "message": "Entry not found"}), 404
 

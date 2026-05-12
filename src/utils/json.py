@@ -2,6 +2,7 @@ from dataclasses import asdict, is_dataclass
 from datetime import date, datetime
 
 from flask.json.provider import DefaultJSONProvider
+from sqlalchemy import inspect
 
 
 def to_camel(snake_str):
@@ -11,10 +12,21 @@ def to_camel(snake_str):
 
 
 def model_to_dict(model):
-    """Convert SQLAlchemy model instance to dict."""
-    if hasattr(model, "__table__"):
-        return {c.name: getattr(model, c.name) for c in model.__table__.columns}
-    return model
+    """Convert SQLAlchemy model instance to dict, including loaded relationships."""
+    if not hasattr(model, "__table__"):
+        return model
+
+    # Grab all standard columns
+    result = {c.name: getattr(model, c.name) for c in model.__table__.columns}
+
+    # Grab eagerly loaded relationships
+    inspected = inspect(model)
+    for relation in inspected.mapper.relationships:
+        # Only include the relationship if it has already been loaded
+        if relation.key not in inspected.unloaded:
+            result[relation.key] = getattr(model, relation.key)
+
+    return result
 
 
 def camelize(obj):
@@ -25,7 +37,7 @@ def camelize(obj):
         return [camelize(i) for i in obj]
     if is_dataclass(obj):
         return camelize(asdict(obj))
-    # Handle SQLAlchemy models (check for __table__ attribute)
+    # Handle SQLAlchemy models
     if hasattr(obj, "__table__"):
         return camelize(model_to_dict(obj))
     return obj
@@ -33,14 +45,11 @@ def camelize(obj):
 
 class CamelCaseJSONProvider(DefaultJSONProvider):
     def dumps(self, obj, **kwargs):
-        # Automatically transform everything before it's turned into a JSON string
         return super().dumps(camelize(obj), **kwargs)
 
     def default(self, obj):
-        # Handle types that JSON doesn't naturally understand
         if isinstance(obj, (datetime, date)):
             return obj.isoformat()
-        # Handle SQLAlchemy models
         if hasattr(obj, "__table__"):
             return camelize(model_to_dict(obj))
         return super().default(obj)
