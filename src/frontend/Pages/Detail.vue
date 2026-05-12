@@ -419,9 +419,7 @@ onUnmounted(() => chart?.destroy())
               v-if="flight.rule37Analysis && group.date === flight.rule37Analysis.cutoffDate"
               class="border-y border-amber-100 bg-amber-50 px-5 py-1.5 text-center"
             >
-              <p class="text-[11px] font-bold tracking-widest text-amber-700">
-                ◆ 37% 法則決策期開始 ◆
-              </p>
+              <p class="text-[11px] font-bold tracking-widest text-amber-700">▴ 37% 法則決策期 ▴</p>
             </div>
 
             <div
