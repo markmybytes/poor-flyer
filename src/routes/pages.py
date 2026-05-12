@@ -17,14 +17,16 @@ def _get_r37_analysis(flight: Flight) -> dict:
     if not flight.deadline:
         return None
 
-    valid_fares = {
-        s.created_at.date(): float(s.fare)
-        for s in flight.fare_snapshots
-        if s.scrape_status == "success" and s.fare
-    }
-
-    c_date = getattr(flight.created_at, "date", lambda: flight.created_at)()
-    r37 = compute_37_best(c_date, date.today(), flight.deadline, valid_fares)
+    r37 = compute_37_best(
+        getattr(flight.created_at, "date", lambda: flight.created_at)(),
+        date.today(),
+        flight.deadline,
+        {
+            s.created_at.date(): float(s.fare)
+            for s in flight.fare_snapshots
+            if s.scrape_status == "success" and s.fare
+        },
+    )
 
     return {**asdict(r37), "phase": r37.phase.value} if r37 else None
 
