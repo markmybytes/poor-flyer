@@ -1,26 +1,22 @@
 {
-  "files.eol": "\n",
   "editor.codeActionsOnSave": {
     "source.fixAll": "explicit",
     "source.organizeImports": "explicit"
   },
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.formatOnSave": true,
-  "[python]": {
-    "editor.defaultFormatter": "charliermarsh.ruff",
-    "editor.codeActionsOnSave": {
-      "source.organizeImports": "always"
-    }
-  },
-  "python.analysis.importFormat": "relative",
-  "autoDocstring.docstringFormat": "google",
-  "mypy.runUsingActiveInterpreter": true,
-  "files.associations": {
-    "*.css": "tailwindcss"
-  },
   "editor.quickSuggestions": {
     "strings": "on"
   },
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff"
+  },
+  "files.eol": "\n",
+  "files.associations": {
+    "*.css": "tailwindcss"
+  },
+  "autoDocstring.docstringFormat": "google",
+  "mypy.runUsingActiveInterpreter": true,
   "tailwindCSS.classAttributes": ["class", "ui"],
   "tailwindCSS.experimental.classRegex": [["ui:\\s*{([^)]*)\\s*}", "(?:'|\"|`)([^']*)(?:'|\"|`)"]]
 }
