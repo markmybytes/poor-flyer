@@ -190,13 +190,13 @@ onUnmounted(() => chart?.destroy())
         </div>
 
         <p class="text-sm font-medium text-gray-600">
-          航班日期：<strong class="text-gray-900">{{ fmtDate(flight.flightDate) }}</strong>
+          出發日期：<strong class="text-gray-900">{{ fmtDate(flight.flightDate) }}</strong>
 
           <span v-if="flight.deadline" class="ml-4 text-gray-400">|</span>
 
-          <span v-if="flight.deadline" class="ml-4"
-            >限期：<strong class="text-gray-900">{{ fmtDate(flight.deadline) }}</strong></span
-          >
+          <span v-if="flight.deadline" class="ml-4">
+            限期：<strong class="text-gray-900">{{ fmtDate(flight.deadline) }}</strong>
+          </span>
         </p>
       </div>
 
@@ -228,97 +228,103 @@ onUnmounted(() => chart?.destroy())
     </div>
 
     <div
-      v-if="flight.rule37Analysis"
-      class="mb-8 flex flex-col items-center justify-between gap-6 rounded-2xl border p-6 shadow-sm md:flex-row"
-      :class="{
-        'border-green-200 bg-green-50': flight.rule37Analysis.phase === 'BUY_SIGNAL',
-        'border-gray-200 bg-gray-50': flight.rule37Analysis.phase === 'OBSERVING',
-        'border-sky-200 bg-sky-50': flight.rule37Analysis.phase === 'WAITING',
-      }"
+      class="mb-8 h-30 rounded-2xl border p-6"
+      :class="[
+        flight.rule37Analysis
+          ? [
+              'shadow-sm',
+              {
+                'border-green-200 bg-green-50': flight.rule37Analysis.phase === 'BUY_SIGNAL',
+                'border-gray-200 bg-gray-50': flight.rule37Analysis.phase === 'OBSERVING',
+                'border-sky-200 bg-sky-50': flight.rule37Analysis.phase === 'WAITING',
+              },
+            ]
+          : 'border-dashed border-gray-300',
+      ]"
     >
-      <div class="flex-1">
-        <p class="mb-1 text-xs font-bold tracking-widest text-gray-400 uppercase">37% 法則指標</p>
-
-        <div class="flex items-center gap-3">
-          <template v-if="flight.rule37Analysis.phase === 'BUY_SIGNAL'">
-            <span class="relative flex h-3 w-3">
-              <span
-                class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"
-              ></span>
-
-              <span class="relative inline-flex h-3 w-3 rounded-full bg-green-500"></span>
-            </span>
-
-            <span class="text-2xl font-black text-green-700">購買信號 (最佳時機)</span>
-          </template>
-
-          <template v-else-if="flight.rule37Analysis.phase === 'OBSERVING'">
-            <span class="h-3 w-3 rounded-full bg-gray-400"></span>
-
-            <span class="text-2xl font-black text-gray-700">觀察期</span>
-
-            <span
-              class="ml-2 rounded-full bg-amber-200/50 px-2.5 py-0.5 text-sm font-medium text-amber-800"
-            >
-              {{
-                Math.ceil(
-                  (new Date(flight.rule37Analysis.cutoffDate).getTime() -
-                    new Date(today).getTime()) /
-                    86400000,
-                )
-              }}
-              天後結束
-            </span>
-          </template>
-
-          <template v-else>
-            <span class="h-3 w-3 rounded-full bg-sky-500"></span>
-
-            <span class="text-2xl font-black text-sky-600">等待中</span>
-          </template>
-        </div>
-
-        <p class="mt-1.5 text-sm font-medium text-gray-600">
-          決策期開始：<strong class="text-gray-900">{{
-            fmtDate(flight.rule37Analysis.cutoffDate)
-          }}</strong>
-
-          <span class="mx-2 text-gray-300">|</span>
-
-          門檻價格：<strong class="text-gray-900">{{
-            fmtFare(flight.rule37Analysis.historyBestVal)
-          }}</strong>
-        </p>
-      </div>
-
       <div
-        class="grid grid-cols-2 gap-x-8 gap-y-2 border-t border-gray-200/60 pt-4 pl-0 text-right md:border-t-0 md:border-l md:pt-0 md:pl-6"
+        v-if="flight.rule37Analysis"
+        class="flex h-full flex-col items-center justify-between gap-6 md:flex-row"
       >
-        <div>
-          <p class="text-xs font-bold tracking-widest text-gray-400 uppercase">最新價格</p>
+        <div class="flex-1">
+          <p class="mb-1 text-xs font-bold tracking-widest text-gray-400 uppercase">37% 法則指標</p>
 
-          <p class="text-xl font-bold text-gray-900">
-            {{ fmtFare(flight.rule37Analysis.latestVal) }}
+          <div class="flex items-center gap-3">
+            <template v-if="flight.rule37Analysis.phase === 'BUY_SIGNAL'">
+              <span class="relative flex h-3 w-3">
+                <span
+                  class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"
+                ></span>
+
+                <span class="relative inline-flex h-3 w-3 rounded-full bg-green-500"></span>
+              </span>
+
+              <span class="text-2xl font-black text-green-700">購買信號 (最佳時機)</span>
+            </template>
+
+            <template v-else-if="flight.rule37Analysis.phase === 'OBSERVING'">
+              <span class="h-3 w-3 rounded-full bg-gray-400"></span>
+
+              <span class="text-2xl font-black text-gray-700">觀察期</span>
+
+              <span
+                class="ml-2 rounded-full bg-amber-200/50 px-2.5 py-0.5 text-sm font-medium text-amber-800"
+              >
+                {{
+                  Math.ceil(
+                    (new Date(flight.rule37Analysis.cutoffDate).getTime() -
+                      new Date(today).getTime()) /
+                      86400000,
+                  )
+                }}
+                天後結束
+              </span>
+            </template>
+
+            <template v-else>
+              <span class="h-3 w-3 rounded-full bg-sky-500"></span>
+
+              <span class="text-2xl font-black text-sky-600">等待中</span>
+            </template>
+          </div>
+
+          <p class="mt-1.5 text-sm font-medium text-gray-600">
+            決策期開始：<strong class="text-gray-900">{{
+              fmtDate(flight.rule37Analysis.cutoffDate)
+            }}</strong>
+
+            <span class="mx-2 text-gray-300">|</span>
+
+            門檻：<strong class="text-gray-900">{{
+              fmtFare(flight.rule37Analysis.historyBestVal)
+            }}</strong>
           </p>
         </div>
 
-        <div>
-          <p class="text-xs font-bold tracking-widest text-gray-400 uppercase">歷史最低</p>
+        <div
+          class="grid grid-cols-2 gap-x-8 gap-y-2 border-t border-gray-200/60 pt-4 pl-0 text-right md:border-t-0 md:border-l md:pt-0 md:pl-6"
+        >
+          <div>
+            <p class="text-xs font-bold tracking-widest text-gray-400 uppercase">最新票價</p>
 
-          <p class="text-xl font-bold text-green-600">
-            {{ fmtFare(flight.rule37Analysis.allTimeLow) }}
-          </p>
+            <p class="text-xl font-bold text-gray-900">
+              {{ fmtFare(flight.rule37Analysis.latestVal) }}
+            </p>
+          </div>
+
+          <div>
+            <p class="text-xs font-bold tracking-widest text-gray-400 uppercase">歷史最低</p>
+
+            <p class="text-xl font-bold text-green-600">
+              {{ fmtFare(flight.rule37Analysis.allTimeLow) }}
+            </p>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div
-      v-else
-      class="mb-8 rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center"
-    >
-      <p class="text-sm font-medium text-gray-500">
-        未設定購買限期，無法計算 37% 最佳購買法則指標。
-      </p>
+      <div v-else class="flex h-full items-center justify-center bg-gray-50 p-6">
+        <p class="text-sm font-medium text-gray-500">未設定購買限期，無法計算 37% 最佳則指標。</p>
+      </div>
     </div>
 
     <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
@@ -379,22 +385,22 @@ onUnmounted(() => chart?.destroy())
                 <div>
                   <p class="leading-tight font-bold text-gray-900">
                     {{ fmtDate(group.date) }}
-                    <span class="ml-1 text-xs font-medium text-gray-500"
-                      >({{
+                    <span class="ml-1 text-xs font-medium text-gray-500">
+                      （{{
                         ['日', '一', '二', '三', '四', '五', '六'][new Date(group.date).getDay()]
-                      }})</span
-                    >
+                      }}）
+                    </span>
                   </p>
 
                   <p class="text-xs font-medium text-gray-500">
                     <template v-if="group.lowestSnapshot">
-                      當日最低：<span class="font-bold text-gray-700"
-                        >{{ fmtFare(group.lowestFare) }}
+                      當日最低：<span class="font-bold text-gray-700">
+                        {{ fmtFare(group.lowestFare) }}
                       </span>
 
-                      <template v-if="group.lowestSnapshot.flightNumber"
-                        >· {{ group.lowestSnapshot.flightNumber }}</template
-                      >
+                      <template v-if="group.lowestSnapshot.flightNumber">
+                        · {{ group.lowestSnapshot.flightNumber }}
+                      </template>
                     </template>
 
                     <span v-else class="text-red-500">無有效價格數據</span>
@@ -482,8 +488,9 @@ onUnmounted(() => chart?.destroy())
                               <span
                                 v-if="snap.fare === flightStats.lowest"
                                 class="rounded bg-green-100 px-1.5 py-0.5 text-[10px] leading-none font-bold text-green-700"
-                                >歷史低位</span
                               >
+                                歷史低位
+                              </span>
 
                               <span
                                 v-if="
@@ -493,8 +500,9 @@ onUnmounted(() => chart?.destroy())
                                     flight.rule37Analysis.cutoffDate
                                 "
                                 class="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] leading-none font-bold text-blue-700"
-                                >最佳選擇</span
                               >
+                                最佳選擇
+                              </span>
                             </div>
 
                             <span>{{ fmtFare(snap.fare) }}</span>
@@ -512,7 +520,7 @@ onUnmounted(() => chart?.destroy())
         </template>
 
         <div v-else class="py-20 text-center">
-          <p class="font-medium text-gray-400">暫無價格快照數據。</p>
+          <p class="font-medium text-gray-400">暫無價格數據。</p>
         </div>
       </div>
 

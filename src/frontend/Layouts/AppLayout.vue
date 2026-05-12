@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3'
 </script>
 
 <template>
@@ -15,12 +15,12 @@ import { Link } from '@inertiajs/vue3';
           <span>價格追蹤器</span>
         </Link>
 
-        <Link
+        <!-- <Link
           href="/create"
           class="rounded-xl bg-gray-900 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-gray-800 hover:shadow"
         >
-          + 新增追蹤
-        </Link>
+          + 建立追蹤
+        </Link> -->
       </div>
     </nav>
 

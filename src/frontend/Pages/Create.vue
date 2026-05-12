@@ -63,7 +63,7 @@ async function handleSubmit() {
           <h2 class="text-2xl font-black tracking-tight text-gray-900">追蹤新航班</h2>
 
           <p class="mt-1 text-sm font-medium text-gray-500">
-            輸入航班資訊，我們將每日為您自動監控最低票價。
+            輸入航班資訊，我們將每日為您自動追蹤最低票價。
           </p>
         </div>
 

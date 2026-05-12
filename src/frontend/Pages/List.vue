@@ -13,14 +13,14 @@ defineProps<{ flights: Flight[] }>()
       <div>
         <h2 class="text-3xl font-extrabold tracking-tight text-gray-900">追蹤清單</h2>
 
-        <p class="mt-2 text-sm font-medium text-gray-500">管理並監控您的航班價格變化</p>
+        <p class="mt-2 text-sm font-medium text-gray-500">管理並追蹤您的航班價格變化</p>
       </div>
 
       <Link
         href="/create"
         class="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-500 hover:shadow-md"
       >
-        + 新增追蹤
+        + 建立追蹤
       </Link>
     </div>
 
@@ -41,7 +41,7 @@ defineProps<{ flights: Flight[] }>()
             </div>
 
             <p class="mt-1.5 text-sm font-medium text-gray-600">
-              出發日：{{ fmtDate(flight.flightDate) }}
+              出發日期：{{ fmtDate(flight.flightDate) }}
             </p>
           </div>
 
@@ -66,7 +66,7 @@ defineProps<{ flights: Flight[] }>()
           class="mb-6 flex items-end gap-6 rounded-xl border border-gray-100/50 bg-gray-50/80 p-4"
         >
           <div class="flex-1">
-            <p class="mb-1 text-xs font-bold tracking-widest text-gray-400 uppercase">最新價格</p>
+            <p class="mb-1 text-xs font-bold tracking-widest text-gray-400 uppercase">最新票價</p>
 
             <p class="text-3xl font-black">
               {{ fmtFare(getFlightStats(flight.fareSnapshots || []).latest) }}
@@ -90,10 +90,10 @@ defineProps<{ flights: Flight[] }>()
           </div>
         </div>
 
-        <div class="mt-auto">
+        <div class="mt-auto h-18">
           <div
             v-if="flight.rule37Analysis"
-            class="flex items-center justify-between rounded-xl border p-3.5"
+            class="flex h-full items-center justify-between rounded-xl border p-3.5"
             :class="{
               'border-green-200 bg-green-50': flight.rule37Analysis.phase === 'BUY_SIGNAL',
               'border-gray-200 bg-gray-50': flight.rule37Analysis.phase === 'OBSERVING',
@@ -115,13 +115,13 @@ defineProps<{ flights: Flight[] }>()
                     <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500"></span>
                   </span>
 
-                  <span class="text-sm font-bold text-green-700">購買信號 (最佳時機)</span>
+                  <span class="text-sm font-bold text-green-700">購買信號（最佳時機）</span>
                 </template>
 
                 <template v-else-if="flight.rule37Analysis.phase === 'OBSERVING'">
                   <span class="h-2.5 w-2.5 rounded-full bg-gray-400"></span>
 
-                  <span class="text-sm font-bold text-gray-700"> 觀察期 </span>
+                  <span class="text-sm font-bold text-gray-700">觀察期</span>
                 </template>
 
                 <template v-else>
@@ -143,7 +143,7 @@ defineProps<{ flights: Flight[] }>()
 
           <div
             v-else
-            class="flex items-center justify-center rounded-xl border border-dashed border-gray-300 bg-gray-50 p-3.5"
+            class="flex h-full items-center justify-center rounded-xl border border-dashed border-gray-300 bg-gray-50 p-3.5"
           >
             <span class="text-sm font-medium text-gray-500">未設定購買限期，無法計算 37% 法則</span>
           </div>
@@ -173,14 +173,14 @@ defineProps<{ flights: Flight[] }>()
       <h3 class="mb-2 text-xl font-bold text-gray-900">尚未追蹤任何航班</h3>
 
       <p class="mb-8 max-w-sm text-sm leading-relaxed text-gray-500">
-        加入您想關注的出發地與目的地，我們將為您不間斷監控價格，並在最佳時機提示您購買。
+        加入您想關注的出發地與目的地，我們將為您不間斷追蹤價格，並在最佳時機提示您購買。
       </p>
 
       <Link
         href="/create"
         class="rounded-xl bg-blue-600 px-8 py-3 font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-blue-500 hover:shadow-md"
       >
-        新增您的第一個追蹤
+        建立您的第一個追蹤
       </Link>
     </div>
   </AppLayout>
