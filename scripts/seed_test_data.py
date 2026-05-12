@@ -4,7 +4,6 @@
 import random
 import sys
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 
 sys.path.insert(0, str(__file__).rsplit("\\", 2)[0])
 
@@ -30,7 +29,7 @@ def add_test_data():
                 FlightFareSnapshot(
                     flight_id=entry.id,
                     created_at=dt,
-                    fare=Decimal(str(fare)) if fare and status == "success" else None,
+                    fare=float(fare) if fare and status == "success" else None,
                     flight_number=f"CX{random.randint(100, 999)}"
                     if status == "success"
                     else None,

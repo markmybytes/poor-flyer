@@ -1,15 +1,14 @@
 import os
 import uuid
 from datetime import date, datetime, timezone
-from decimal import Decimal
 from typing import List, Optional
 
 from sqlalchemy import (
     Boolean,
     Date,
     DateTime,
+    Float,
     ForeignKey,
-    Numeric,
     String,
     create_engine,
 )
@@ -64,7 +63,7 @@ class FlightFareSnapshot(Base):
         String, ForeignKey("flights.id", ondelete="CASCADE"), nullable=False
     )
 
-    fare: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 2), nullable=True)
+    fare: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     flight_number: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     departure_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
