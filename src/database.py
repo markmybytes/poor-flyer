@@ -1,10 +1,11 @@
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from decimal import Decimal
+from typing import List, Optional
 
 from sqlalchemy import (
     Boolean,
-    Column,
     Date,
     DateTime,
     ForeignKey,
@@ -12,8 +13,13 @@ from sqlalchemy import (
     String,
     create_engine,
 )
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    Mapped,
+    mapped_column,
+    relationship,
+    sessionmaker,
+)
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/db.sqlite")
 engine = create_engine(
@@ -21,21 +27,29 @@ engine = create_engine(
     connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {},
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+
+
+class Base(DeclarativeBase):
+    pass
 
 
 class Flight(Base):
     __tablename__ = "flights"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    origin = Column(String, nullable=False)
-    destination = Column(String, nullable=False)
-    flight_date = Column(Date, nullable=False)
-    deadline = Column(Date, nullable=True)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    origin: Mapped[str] = mapped_column(String, nullable=False)
+    destination: Mapped[str] = mapped_column(String, nullable=False)
+    flight_date: Mapped[date] = mapped_column(Date, nullable=False)
+    deadline: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    fare_snapshots = relationship(
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+    fare_snapshots: Mapped[List["FlightFareSnapshot"]] = relationship(
         "FlightFareSnapshot", cascade="all, delete-orphan", back_populates="flight"
     )
 
@@ -43,22 +57,31 @@ class Flight(Base):
 class FlightFareSnapshot(Base):
     __tablename__ = "flight_fare_snapshots"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    flight_id = Column(
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    flight_id: Mapped[str] = mapped_column(
         String, ForeignKey("flights.id", ondelete="CASCADE"), nullable=False
     )
-    fare = Column(Numeric(10, 2), nullable=True)
-    flight_number = Column(String, nullable=True)
-    departure_at = Column(DateTime(timezone=True), nullable=True)
-    arrival_at = Column(DateTime(timezone=True), nullable=True)
-    scrape_status = Column(String, nullable=False)
-    error_message = Column(String, nullable=True)
 
-    created_at = Column(
-        DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
+    fare: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 2), nullable=True)
+    flight_number: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    departure_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    arrival_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    scrape_status: Mapped[str] = mapped_column(String, nullable=False)
+    error_message: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
     )
 
-    flight = relationship("Flight", back_populates="fare_snapshots")
+    flight: Mapped["Flight"] = relationship("Flight", back_populates="fare_snapshots")
 
 
 def init_db():
