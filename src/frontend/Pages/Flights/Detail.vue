@@ -15,6 +15,7 @@ const chartCanvas = useTemplateRef<HTMLCanvasElement>('chartCanvas')
 const activeTab = ref<'table' | 'graph'>('table')
 const expandedGroups = ref(new Set<number>())
 const loading = ref({ loading: null as 'toggle' | 'scrape' | 'delete' | null })
+const detailPanel = ref<'analysis' | 'summary'>(props.flight.deadline ? 'analysis' : 'summary')
 
 let chart: Chart | null = null
 
@@ -248,86 +249,142 @@ onUnmounted(() => chart?.destroy())
     <div
       class="tracker-panel mb-8 rounded-lg border px-6 py-6"
       :class="{
-        'bg-success/10': flight.rule37Analysis?.phase === 'BUY_SIGNAL',
-        'bg-info/10': flight.rule37Analysis?.phase === 'WAITING',
-        'bg-neutral/10': flight.rule37Analysis?.phase === 'OBSERVING',
-        'border-dashed bg-neutral/5': !flight.rule37Analysis?.latestVal,
+        'bg-success/10':
+          detailPanel === 'analysis' && flight.rule37Analysis?.phase === 'BUY_SIGNAL',
+        'bg-info/10': detailPanel === 'analysis' && flight.rule37Analysis?.phase === 'WAITING',
+        'bg-neutral/10': detailPanel === 'analysis' && flight.rule37Analysis?.phase === 'OBSERVING',
       }"
     >
-      <div
-        v-if="flight.rule37Analysis && flight.rule37Analysis.latestVal !== null"
-        class="space-y-4"
-      >
-        <p class="text-xs font-bold tracking-widest uppercase opacity-60">購買時機分析</p>
+      <div class="join mb-5">
+        <button
+          class="btn join-item btn-xs"
+          :class="detailPanel === 'analysis' ? 'btn-neutral' : 'opacity-50 btn-ghost'"
+          @click="detailPanel = 'analysis'"
+        >
+          購買時機分析
+        </button>
 
-        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div class="flex items-center gap-3">
-            <template v-if="flight.rule37Analysis.phase === 'BUY_SIGNAL'">
-              <span class="status status-lg status-success"></span>
+        <button
+          class="btn join-item btn-xs"
+          :class="detailPanel === 'summary' ? 'btn-neutral' : 'opacity-50 btn-ghost'"
+          @click="detailPanel = 'summary'"
+        >
+          價格摘要
+        </button>
+      </div>
 
-              <span class="text-lg font-bold text-success">購買信號 (最佳時機)</span>
-            </template>
+      <div class="grid">
+        <!-- Analysis panel -->
+        <div
+          class="col-start-1 row-start-1 transition-opacity duration-150"
+          :class="detailPanel !== 'analysis' ? 'pointer-events-none invisible' : ''"
+        >
+          <div
+            v-if="flight.rule37Analysis && flight.rule37Analysis.latestVal !== null"
+            class="space-y-4"
+          >
+            <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div class="flex items-center gap-3">
+                <template v-if="flight.rule37Analysis.phase === 'BUY_SIGNAL'">
+                  <span class="status status-lg status-success"></span>
 
-            <template v-else-if="flight.rule37Analysis.phase === 'OBSERVING'">
-              <span class="status status-lg status-neutral"></span>
+                  <span class="text-lg font-bold text-success">購買信號 (最佳時機)</span>
+                </template>
 
-              <span class="text-lg font-bold text-neutral">觀察期</span>
+                <template v-else-if="flight.rule37Analysis.phase === 'OBSERVING'">
+                  <span class="status status-lg status-neutral"></span>
 
-              <span class="badge px-2 py-1 text-xs font-medium badge-warning">
-                {{
-                  Math.ceil(
-                    (new Date(flight.rule37Analysis.cutoffDate).getTime() -
-                      new Date(today).getTime()) /
-                      86400000,
-                  )
-                }}
-                天後結束
-              </span>
-            </template>
+                  <span class="text-lg font-bold text-neutral">觀察期</span>
 
-            <template v-else>
-              <span class="status status-lg status-info"></span>
+                  <span class="badge px-2 py-1 text-xs font-medium badge-warning">
+                    {{
+                      Math.ceil(
+                        (new Date(flight.rule37Analysis.cutoffDate).getTime() -
+                          new Date(today).getTime()) /
+                          86400000,
+                      )
+                    }}
+                    天後結束
+                  </span>
+                </template>
 
-              <span class="text-lg font-bold text-info">等待中</span>
-            </template>
+                <template v-else>
+                  <span class="status status-lg status-info"></span>
+
+                  <span class="text-lg font-bold text-info">等待中</span>
+                </template>
+              </div>
+
+              <div class="space-y-1 text-xs text-base-content/70">
+                <p>
+                  <span class="font-medium">決策期開始：</span>
+                  {{ fmtDate(flight.rule37Analysis.cutoffDate) }}
+                </p>
+
+                <p>
+                  <span class="font-medium">門檻：</span>
+                  {{ fmtFare(flight.rule37Analysis.historyBestVal) }}
+                </p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div class="rounded-lg bg-base-100/60 px-4 py-3">
+                <p class="text-xs font-bold tracking-widest uppercase opacity-55">最新票價</p>
+
+                <p class="mt-1 text-base font-bold">
+                  {{ fmtFare(flight.rule37Analysis.latestVal) }}
+                </p>
+              </div>
+
+              <div class="rounded-lg bg-base-100/60 px-4 py-3">
+                <p class="text-xs font-bold tracking-widest uppercase opacity-55">歷史最低</p>
+
+                <p class="mt-1 text-base font-bold text-success">
+                  {{ fmtFare(flight.rule37Analysis.allTimeLow) }}
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div class="space-y-1 text-xs text-base-content/70">
-            <p>
-              <span class="font-medium">決策期開始：</span>
-              {{ fmtDate(flight.rule37Analysis.cutoffDate) }}
+          <div v-else-if="flight.rule37Analysis" class="py-4 text-center">
+            <p class="text-sm font-medium text-base-content/60">
+              數據不足，尚無法分析最佳購買時機。
             </p>
+          </div>
 
-            <p>
-              <span class="font-medium">門檻：</span>
-              {{ fmtFare(flight.rule37Analysis.historyBestVal) }}
+          <div v-else class="py-4 text-center">
+            <p class="text-sm font-medium text-base-content/60">
+              未設定購票限期，無法分析購買時機。
             </p>
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
-          <div class="rounded-lg bg-base-100/60 px-4 py-3">
-            <p class="text-xs font-bold tracking-widest uppercase opacity-55">最新票價</p>
+        <!-- Summary panel -->
+        <div
+          class="col-start-1 row-start-1 transition-opacity duration-150"
+          :class="detailPanel !== 'summary' ? 'pointer-events-none invisible' : ''"
+        >
+          <div class="stats w-full stats-vertical rounded-lg bg-base-200/60 lg:stats-horizontal">
+            <div class="stat px-5 py-4">
+              <div class="stat-title text-base-content/55">最新票價</div>
 
-            <p class="mt-1 text-base font-bold">{{ fmtFare(flight.rule37Analysis.latestVal) }}</p>
-          </div>
+              <div class="stat-value text-2xl text-primary">{{ fmtFare(flightStats.latest) }}</div>
+            </div>
 
-          <div class="rounded-lg bg-base-100/60 px-4 py-3">
-            <p class="text-xs font-bold tracking-widest uppercase opacity-55">歷史最低</p>
+            <div class="stat px-5 py-4">
+              <div class="stat-title text-base-content/55">歷史最低</div>
 
-            <p class="mt-1 text-base font-bold text-success">
-              {{ fmtFare(flight.rule37Analysis.allTimeLow) }}
-            </p>
+              <div class="stat-value text-2xl text-success">{{ fmtFare(flightStats.lowest) }}</div>
+            </div>
+
+            <div class="stat px-5 py-4">
+              <div class="stat-title text-base-content/55">歷史最高</div>
+
+              <div class="stat-value text-2xl text-error">{{ fmtFare(flightStats.highest) }}</div>
+            </div>
           </div>
         </div>
-      </div>
-
-      <div v-else-if="flight.rule37Analysis" class="text-center">
-        <p class="text-sm font-medium text-base-content/60">數據不足，尚無法分析最佳購買時機。</p>
-      </div>
-
-      <div v-else class="text-center">
-        <p class="text-sm font-medium text-base-content/60">未設定購票限期，無法分析購買時機。</p>
       </div>
     </div>
 
