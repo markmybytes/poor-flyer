@@ -3,9 +3,9 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "airline-price-scraper"
+name = "hk-poor-flyer"
 version = "0.1.0"
-description = "Flight price tracker with daily scraping"
+description = "PoorFlyer - Flight price tracker with daily scraping"
 requires-python = ">=3.12"
 dependencies = [
     "apscheduler>=3.11.2",

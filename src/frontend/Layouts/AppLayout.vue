@@ -17,9 +17,11 @@ import { Link } from '@inertiajs/vue3'
             </div>
 
             <div class="hidden text-left sm:block">
-              <div class="text-lg font-black tracking-tight text-base-content">價格追蹤器</div>
+              <div class="text-lg font-black tracking-tight text-base-content">PoorFlyer</div>
 
-              <div class="text-xs font-medium text-base-content/60">Daily fare intelligence</div>
+              <div class="text-xs font-medium text-base-content/60">
+                追蹤每日機票價格 選擇最佳時機購票
+              </div>
             </div>
           </Link>
         </div>

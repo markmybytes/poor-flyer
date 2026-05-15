@@ -67,7 +67,7 @@ def test_email():
         success = send_html_email(
             get_smtp_config(),
             recipient,
-            'UO Price Tracker - Test Email',
+            'PoorFlyer - Test Email',
             render_template('email/test_email.html'),
         )
 
