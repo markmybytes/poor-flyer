@@ -9,8 +9,9 @@ const props = defineProps<{
       port?: string | number
       user?: string
       password?: string
-      senderEmail?: string
-      requireAuth?: string
+      sender_email?: string
+      require_auth?: string
+      protocol?: string
     }
     email?: {
       recipients?: string
@@ -24,8 +25,9 @@ const form = reactive({
     port: Number(props.settings.smtp?.port ?? 587),
     user: props.settings.smtp?.user ?? '',
     password: '',
-    senderEmail: props.settings.smtp?.senderEmail ?? '',
-    requireAuth: props.settings.smtp?.requireAuth !== 'false',
+    sender_email: props.settings.smtp?.sender_email ?? '',
+    require_auth: props.settings.smtp?.require_auth !== 'false',
+    protocol: props.settings.smtp?.protocol ?? 'STARTTLS',
   },
   email: {
     recipients: props.settings.email?.recipients ?? '',
@@ -55,8 +57,9 @@ async function saveSettings() {
           host: form.smtp.host,
           port: form.smtp.port,
           user: form.smtp.user,
-          sender_email: form.smtp.senderEmail,
-          require_auth: form.smtp.requireAuth,
+          sender_email: form.smtp.sender_email,
+          require_auth: form.smtp.require_auth,
+          protocol: form.smtp.protocol,
           ...(form.smtp.password && { password: form.smtp.password }),
         },
         email: { recipients: form.email.recipients },
@@ -168,7 +171,7 @@ async function sendTestEmail() {
             </label>
 
             <input
-              v-model="form.smtp.senderEmail"
+              v-model="form.smtp.sender_email"
               type="email"
               placeholder="noreply@example.com"
               class="w-full rounded-xl border border-gray-300 bg-gray-50/50 px-4 py-3 font-medium text-gray-900 transition-all placeholder:font-normal focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:outline-none"
@@ -177,11 +180,26 @@ async function sendTestEmail() {
             <p class="mt-1.5 text-xs font-medium text-gray-400">留空則使用登入用戶名作為發件人</p>
           </div>
 
+          <div>
+            <label class="mb-2 block text-sm font-bold tracking-wide text-gray-700"
+              >SMTP 協議</label
+            >
+
+            <select
+              v-model="form.smtp.protocol"
+              class="w-full rounded-xl border border-gray-300 bg-gray-50/50 px-4 py-3 font-medium text-gray-900 transition-all focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:outline-none"
+            >
+              <option value="STARTTLS">STARTTLS</option>
+
+              <option value="SMTP_SSL">SMTP_SSL</option>
+            </select>
+          </div>
+
           <label
             class="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-3 transition-colors hover:border-blue-200 hover:bg-blue-50/30"
           >
             <div class="relative shrink-0">
-              <input v-model="form.smtp.requireAuth" type="checkbox" class="peer sr-only" />
+              <input v-model="form.smtp.require_auth" type="checkbox" class="peer sr-only" />
 
               <div
                 class="h-5 w-9 rounded-full bg-gray-300 transition-colors peer-checked:bg-blue-600"
@@ -202,7 +220,7 @@ async function sendTestEmail() {
           <div
             :class="[
               'space-y-5 rounded-xl border border-gray-300 p-4 transition-all',
-              form.smtp.requireAuth
+              form.smtp.require_auth
                 ? 'bg-gray-50/50 opacity-100'
                 : 'pointer-events-none bg-gray-100/50 opacity-60',
             ]"
@@ -216,7 +234,7 @@ async function sendTestEmail() {
                 v-model="form.smtp.user"
                 type="email"
                 placeholder="user@example.com"
-                :disabled="!form.smtp.requireAuth"
+                :disabled="!form.smtp.require_auth"
                 class="w-full rounded-xl border border-gray-300 bg-gray-50/50 px-4 py-3 font-medium text-gray-900 transition-all placeholder:font-normal focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:outline-none disabled:bg-gray-100 disabled:text-gray-500"
               />
             </div>
@@ -228,7 +246,7 @@ async function sendTestEmail() {
                 v-model="form.smtp.password"
                 type="password"
                 :placeholder="props.settings.smtp?.password ? '不更改請留空' : '輸入密碼'"
-                :disabled="!form.smtp.requireAuth"
+                :disabled="!form.smtp.require_auth"
                 class="w-full rounded-xl border border-gray-300 bg-gray-50/50 px-4 py-3 font-medium text-gray-900 transition-all placeholder:font-normal focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:outline-none disabled:bg-gray-100 disabled:text-gray-500"
               />
             </div>

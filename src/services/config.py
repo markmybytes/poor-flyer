@@ -70,29 +70,42 @@ class ConfigManager:
         Updates an existing key or creates a new one.
         Crucially invalidates the cache to prevent serving stale data.
         """
+        cls.set_many(namespace, {key: value})
+
+    @classmethod
+    def set_many(cls, namespace: str, settings: dict[str, str]) -> None:
+        """
+        Bulk update multiple settings in a single transaction.
+        More efficient than calling set() multiple times.
+        """
+        if not settings:
+            return
+
         db = SessionLocal()
         try:
-            config = (
-                db.query(Config).filter(Config.namespace == namespace, Config.key == key).first()
-            )
-            if config:
-                config.value = value
-            else:
-                config = Config(namespace=namespace, key=key, value=value)
-                db.add(config)
+            for key, value in settings.items():
+                config = (
+                    db.query(Config)
+                    .filter(Config.namespace == namespace, Config.key == key)
+                    .first()
+                )
+                if config:
+                    config.value = value
+                else:
+                    config = Config(namespace=namespace, key=key, value=value)
+                    db.add(config)
 
             db.commit()
 
-            cache_key = (namespace, key)
-            if cache_key in cls._cache:
-                del cls._cache[cache_key]
+            for key in settings.keys():
+                cache_key = (namespace, key)
+                if cache_key in cls._cache:
+                    del cls._cache[cache_key]
 
-            cls._logger.info(
-                f'Config {namespace}.{key} set to {"***" if key == "password" else value}'
-            )
+            cls._logger.info(f'Bulk updated {len(settings)} settings in {namespace}')
         except Exception as e:
             db.rollback()
-            cls._logger.error(f'Failed to set config {namespace}.{key}: {e}')
+            cls._logger.error(f'Failed to bulk update config in {namespace}: {e}')
             raise
         finally:
             db.close()

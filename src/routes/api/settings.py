@@ -25,23 +25,28 @@ def update_settings():
         data = request.get_json(silent=True) or request.form.to_dict()
 
         if smtp := data.get('smtp', {}):
-            ConfigManager.set('smtp', 'host', smtp.get('host', ''))
             port = smtp.get('port', 587)
             try:
                 port = int(port)
             except (TypeError, ValueError):
                 return jsonify({'success': False, 'message': 'SMTP port must be an integer'}), 400
-            ConfigManager.set('smtp', 'port', str(port))
-            ConfigManager.set('smtp', 'user', smtp.get('user', ''))
-            ConfigManager.set('smtp', 'sender_email', smtp.get('sender_email', ''))
-            ConfigManager.set(
-                'smtp', 'require_auth', 'true' if smtp.get('require_auth', True) else 'false'
-            )
+
+            smtp_settings = {
+                'host': smtp.get('host', ''),
+                'port': str(port),
+                'user': smtp.get('user', ''),
+                'sender_email': smtp.get('sender_email', ''),
+                'require_auth': 'true' if smtp.get('require_auth', True) else 'false',
+                'protocol': smtp.get('protocol', 'STARTTLS'),
+            }
+
             if smtp.get('password'):
-                ConfigManager.set('smtp', 'password', smtp['password'])
+                smtp_settings['password'] = smtp['password']
+
+            ConfigManager.set_many('smtp', smtp_settings)
 
         if email := data.get('email', {}):
-            ConfigManager.set('email', 'recipients', email.get('recipients', ''))
+            ConfigManager.set_many('email', {'recipients': email.get('recipients', '')})
 
         return jsonify({'success': True, 'message': 'Settings updated successfully'})
     except Exception as e:
