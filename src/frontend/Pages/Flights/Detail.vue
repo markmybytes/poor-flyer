@@ -258,7 +258,7 @@ onUnmounted(() => chart?.destroy())
         v-if="flight.rule37Analysis && flight.rule37Analysis.latestVal !== null"
         class="space-y-4"
       >
-        <p class="text-xs font-bold tracking-widest uppercase opacity-60">37% 法則指標</p>
+        <p class="text-xs font-bold tracking-widest uppercase opacity-60">購買時機分析</p>
 
         <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div class="flex items-center gap-3">
@@ -323,13 +323,11 @@ onUnmounted(() => chart?.destroy())
       </div>
 
       <div v-else-if="flight.rule37Analysis" class="text-center">
-        <p class="text-sm font-medium text-base-content/60">未有數據，未能計算 37% 法則指標。</p>
+        <p class="text-sm font-medium text-base-content/60">數據不足，尚無法分析最佳購買時機。</p>
       </div>
 
       <div v-else class="text-center">
-        <p class="text-sm font-medium text-base-content/60">
-          未設定購買限期，無法計算 37% 最佳則指標。
-        </p>
+        <p class="text-sm font-medium text-base-content/60">未設定購票限期，無法分析購買時機。</p>
       </div>
     </div>
 
@@ -417,7 +415,7 @@ onUnmounted(() => chart?.destroy())
                 class="border-y border-warning/20 bg-warning/15 px-5 py-1.5 text-center"
               >
                 <p class="text-[11px] font-bold tracking-widest text-warning-content">
-                  ▴ 37% 法則決策期 ▴
+                  ▴ 購買時機分析 · 決策期 ▴
                 </p>
               </div>
 

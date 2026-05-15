@@ -59,6 +59,43 @@ function handleSubmit() {
       </p>
     </div>
 
+    <div class="tracker-panel card mb-6 rounded-lg">
+      <div class="card-body p-6 md:p-8">
+        <h3 class="mb-3 text-base font-bold text-base-content">購買時機分析原理</h3>
+
+        <div class="space-y-3 text-sm leading-relaxed text-base-content/70">
+          <p>
+            PoorFlyer 採用<span class="font-semibold text-base-content">「37% 法則」</span
+            >來判斷購票時機。這是一個來自最優停止理論（Optimal Stopping
+            Theory）的數學策略，用於在有限時間內做出最優決策。
+          </p>
+
+          <p>運作方式：當你設定購票限期後，系統會將整段觀察期分為兩個階段——</p>
+
+          <ul class="list-inside list-disc space-y-1.5 pl-1">
+            <li>
+              <span class="font-semibold text-base-content">觀察期</span>
+
+              （前 37% 時間）：純粹收集數據，記錄出現過的最低票價作為基準。
+            </li>
+
+            <li>
+              <span class="font-semibold text-base-content">決策期</span>
+
+              （後 63% 時間）：一旦出現低於觀察期最低價的票價，即發出<span
+                class="font-medium text-success"
+                >購買信號</span
+              >。
+            </li>
+          </ul>
+
+          <p class="text-xs text-base-content/50">
+            設定購票限期為選填項目。若不設定，系統仍會持續追蹤票價歷史，但不會提供購買時機建議。
+          </p>
+        </div>
+      </div>
+    </div>
+
     <div class="tracker-panel card rounded-lg">
       <div class="card-body gap-8 p-8">
         <form class="space-y-6" @submit.prevent="handleSubmit">

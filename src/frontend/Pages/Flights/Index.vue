@@ -37,7 +37,7 @@ const summary = computed(() => {
       <h2 class="text-3xl font-extrabold tracking-tight text-base-content">追蹤清單</h2>
 
       <p class="mt-2 text-sm font-medium text-base-content/65">
-        管理航線、觀察 37% 法則決策期，並在價格落入理想區間時快速採取行動。
+        管理追蹤中的航線，掌握最佳購買時機，並在價格落入理想區間時快速採取行動。
       </p>
     </div>
 
@@ -146,7 +146,7 @@ const summary = computed(() => {
               }"
             >
               <div class="space-y-3">
-                <p class="text-xs font-bold tracking-widest uppercase opacity-60">37% 法則指標</p>
+                <p class="text-xs font-bold tracking-widest uppercase opacity-60">購買時機分析</p>
 
                 <div class="flex items-center gap-2">
                   <template v-if="flight.rule37Analysis.phase === 'BUY_SIGNAL'">
@@ -187,7 +187,7 @@ const summary = computed(() => {
 
             <div v-else class="tracker-panel rounded-lg border border-dashed px-4 py-4 text-center">
               <span class="text-sm font-medium text-base-content/60"
-                >未設定購買限期，無法計算 37% 法則</span
+                >未設定購票限期，無法分析購買時機</span
               >
             </div>
           </div>
