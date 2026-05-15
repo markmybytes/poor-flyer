@@ -29,7 +29,7 @@ def _r37(flight: Flight) -> dict | None:
 
 
 @flights_bp.route('/')
-def list_flights():
+def index():
     with SessionLocal() as db:
         flights = (
             db.execute(
@@ -63,31 +63,32 @@ def list_flights():
 
 @flights_bp.route('/create')
 def create():
-    return render_inertia('flights/Create')
+    return render_inertia('Flights/Create')
 
 
 @flights_bp.route('/<flight_id>')
-def detail(flight_id):
+def show(flight_id):
     with SessionLocal() as db:
-        f = db.execute(
+        flight = db.execute(
             select(Flight)
             .options(selectinload(Flight.fare_snapshots))
             .where(Flight.id == flight_id)
         ).scalar_one_or_none()
-    if not f:
+
+    if not flight:
         return redirect('/flights/')
     return render_inertia(
-        'flights/Detail',
+        'Flights/Detail',
         props={
             'flight': {
-                'id': f.id,
-                'origin': f.origin,
-                'destination': f.destination,
-                'flight_date': f.flight_date,
-                'deadline': f.deadline,
-                'is_active': f.is_active,
-                'fare_snapshots': f.fare_snapshots,
-                'rule37_analysis': _r37(f),
+                'id': flight.id,
+                'origin': flight.origin,
+                'destination': flight.destination,
+                'flight_date': flight.flight_date,
+                'deadline': flight.deadline,
+                'is_active': flight.is_active,
+                'fare_snapshots': flight.fare_snapshots,
+                'rule37_analysis': _r37(flight),
             }
         },
     )

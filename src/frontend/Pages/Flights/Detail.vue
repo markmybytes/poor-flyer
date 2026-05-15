@@ -68,7 +68,9 @@ function scrapeEntry() {
     headers: { 'Content-Type': 'application/json' },
   })
     .then((res) => {
-      if (res.ok) router.reload()
+      if (res.ok) {
+        router.reload()
+      }
     })
     .finally(() => {
       loading.value.loading = null
@@ -230,7 +232,7 @@ onUnmounted(() => chart?.destroy())
     <div
       class="mb-8 h-30 rounded-2xl border p-6"
       :class="[
-        flight.rule37Analysis.latestVal
+        flight.rule37Analysis?.latestVal
           ? [
               'shadow-sm',
               {
