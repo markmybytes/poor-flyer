@@ -48,7 +48,7 @@ const dailyGroups = computed(() => {
 // Explicit fetch functions for JSON API
 function toggleEntry() {
   loading.value.loading = 'toggle'
-  fetch(`/api/entries/${props.flight.id}`, {
+  fetch(`/api/flights/${props.flight.id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ is_active: !props.flight.isActive }),
@@ -63,7 +63,7 @@ function toggleEntry() {
 
 function scrapeEntry() {
   loading.value.loading = 'scrape'
-  fetch(`/api/entries/${props.flight.id}/scrape`, {
+  fetch(`/api/flights/${props.flight.id}/scrape`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
   })
@@ -78,12 +78,12 @@ function scrapeEntry() {
 function deleteEntry() {
   if (!confirm('確認刪除此航班追蹤？')) return
   loading.value.loading = 'delete'
-  fetch(`/api/entries/${props.flight.id}`, {
+  fetch(`/api/flights/${props.flight.id}`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
   })
     .then((res) => {
-      if (res.ok) router.visit('/')
+      if (res.ok) router.visit('/flights/')
     })
     .finally(() => {
       loading.value.loading = null
@@ -161,7 +161,7 @@ onUnmounted(() => chart?.destroy())
   <AppLayout>
     <div class="mb-6">
       <Link
-        href="/"
+        href="/flights/"
         class="text-sm font-medium text-gray-500 transition-colors hover:text-gray-900"
       >
         ← 返回列表

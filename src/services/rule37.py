@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from datetime import date, timedelta
 from enum import Enum
-from typing import Optional
 
 
 class Phase(Enum):
@@ -14,10 +13,10 @@ class Phase(Enum):
 class DeadlineRule37:
     cutoff_date: date
     phase: Phase
-    history_best_val: Optional[float]
-    latest_val: Optional[float]
-    all_time_high: Optional[float] = None
-    all_time_low: Optional[float] = None
+    history_best_val: float | None
+    latest_val: float | None
+    all_time_high: float | None = None
+    all_time_low: float | None = None
 
 
 def compute_37_best(

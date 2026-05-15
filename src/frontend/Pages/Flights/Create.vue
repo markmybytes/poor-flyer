@@ -20,7 +20,7 @@ async function handleSubmit() {
   form.value.loading = true
 
   try {
-    const res = await fetch('/api/entries', {
+    const res = await fetch('/api/flights', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -38,7 +38,7 @@ async function handleSubmit() {
     }
 
     const data = await res.json()
-    router.visit(`/detail/${data.data.id}`)
+    router.visit(`/flights/${data.data.id}`)
   } catch (err) {
     form.value.error = err instanceof Error ? err.message : '未知錯誤'
   } finally {
@@ -52,7 +52,7 @@ async function handleSubmit() {
     <div class="mx-auto max-w-2xl">
       <div class="mb-8">
         <Link
-          href="/"
+          href="/flights/"
           class="text-sm font-medium text-gray-500 transition-colors hover:text-gray-900"
         >
           ← 返回列表
@@ -164,7 +164,7 @@ async function handleSubmit() {
 
           <div class="flex gap-4 border-t border-gray-100 pt-4">
             <Link
-              href="/"
+              href="/flights/"
               class="flex-1 rounded-xl bg-gray-100 py-3.5 text-center text-sm font-bold text-gray-600 transition-colors hover:bg-gray-200"
             >
               取消返回

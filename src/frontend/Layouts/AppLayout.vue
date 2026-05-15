@@ -15,12 +15,23 @@ import { Link } from '@inertiajs/vue3'
           <span>價格追蹤器</span>
         </Link>
 
-        <!-- <Link
-          href="/create"
-          class="rounded-xl bg-gray-900 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-gray-800 hover:shadow"
-        >
-          + 建立追蹤
-        </Link> -->
+        <div class="flex items-center gap-1">
+          <Link
+            href="/flights/"
+            class="rounded-lg px-4 py-2 text-sm font-semibold text-gray-700 transition-all hover:bg-gray-100"
+          >
+            追蹤清單
+          </Link>
+
+          <Link
+            href="/settings/"
+            class="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-gray-700 transition-all hover:bg-gray-100"
+          >
+            <span>⚙️</span>
+
+            <span>設定</span>
+          </Link>
+        </div>
       </div>
     </nav>
 

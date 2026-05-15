@@ -17,7 +17,7 @@ defineProps<{ flights: Flight[] }>()
       </div>
 
       <Link
-        href="/create"
+        href="/flights/create"
         class="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-500 hover:shadow-md"
       >
         + 建立追蹤
@@ -158,7 +158,7 @@ defineProps<{ flights: Flight[] }>()
 
         <div class="mt-6 flex items-center justify-end gap-3 border-t border-gray-100 pt-5">
           <Link
-            :href="`/detail/${flight.id}`"
+            :href="`/flights/${flight.id}`"
             class="rounded-xl bg-gray-900 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-gray-800 hover:shadow"
           >
             查看詳情
@@ -184,7 +184,7 @@ defineProps<{ flights: Flight[] }>()
       </p>
 
       <Link
-        href="/create"
+        href="/flights/create"
         class="rounded-xl bg-blue-600 px-8 py-3 font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-blue-500 hover:shadow-md"
       >
         建立您的第一個追蹤

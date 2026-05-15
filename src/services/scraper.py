@@ -1,8 +1,7 @@
 import random
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime
 from pathlib import Path
-from typing import Optional
 
 import httpx
 from fake_useragent import UserAgent
@@ -12,15 +11,15 @@ from patchright.sync_api import sync_playwright
 @dataclass
 class Flight:
     flight_number: str
-    departure_at: Optional[datetime]
-    arrival_at: Optional[datetime]
+    departure_at: datetime | None
+    arrival_at: datetime | None
     fare: float
 
 
 @dataclass
 class ScrapeResult:
     success: bool
-    error_message: Optional[str] = None
+    error_message: str | None = None
     results: list[Flight] = field(default_factory=list)
 
 

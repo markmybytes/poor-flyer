@@ -1,7 +1,6 @@
 import os
 import uuid
-from datetime import date, datetime, timezone
-from typing import List, Optional
+from datetime import UTC, date, datetime
 
 from sqlalchemy import (
     Boolean,
@@ -10,6 +9,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     String,
+    UniqueConstraint,
     create_engine,
 )
 from sqlalchemy.orm import (
@@ -41,14 +41,15 @@ class Flight(Base):
     origin: Mapped[str] = mapped_column(String, nullable=False)
     destination: Mapped[str] = mapped_column(String, nullable=False)
     flight_date: Mapped[date] = mapped_column(Date, nullable=False)
-    deadline: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    deadline: Mapped[date | None] = mapped_column(Date, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    notification_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
 
-    fare_snapshots: Mapped[List["FlightFareSnapshot"]] = relationship(
+    fare_snapshots: Mapped[list["FlightFareSnapshot"]] = relationship(
         "FlightFareSnapshot", cascade="all, delete-orphan", back_populates="flight"
     )
 
@@ -63,24 +64,39 @@ class FlightFareSnapshot(Base):
         String, ForeignKey("flights.id", ondelete="CASCADE"), nullable=False
     )
 
-    fare: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    flight_number: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    departure_at: Mapped[Optional[datetime]] = mapped_column(
+    fare: Mapped[float | None] = mapped_column(Float, nullable=True)
+    flight_number: Mapped[str | None] = mapped_column(String, nullable=True)
+    departure_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    arrival_at: Mapped[Optional[datetime]] = mapped_column(
+    arrival_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     scrape_status: Mapped[str] = mapped_column(String, nullable=False)
-    error_message: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(String, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
     )
 
     flight: Mapped["Flight"] = relationship("Flight", back_populates="fare_snapshots")
+
+
+class Config(Base):
+    __tablename__ = "config"
+
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    namespace: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    key: Mapped[str] = mapped_column(String, nullable=False)
+    value: Mapped[str] = mapped_column(String, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("namespace", "key", name="uq_config_namespace_key"),
+    )
 
 
 def init_db():
@@ -94,3 +110,4 @@ def get_db():
         yield db
     finally:
         db.close()
+

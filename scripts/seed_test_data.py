@@ -3,7 +3,7 @@
 
 import random
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 sys.path.insert(0, str(__file__).rsplit("\\", 2)[0])
 
@@ -16,7 +16,7 @@ def add_test_data():
     db = SessionLocal()
 
     try:
-        utc = timezone.utc
+        utc = UTC
         now = datetime.now(utc)
         today = now.date()
 
