@@ -5,6 +5,9 @@ import { VueDatePicker } from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
 import { zhHK } from 'date-fns/locale'
 import { ref } from 'vue'
+import { useToast } from 'vue-toast-notification'
+
+const toast = useToast()
 
 const form = ref({
   origin: '',
@@ -12,38 +15,37 @@ const form = ref({
   flight_date: '',
   deadline: '',
   loading: false,
-  error: '',
 })
 
-async function handleSubmit() {
-  form.value.error = ''
+function handleSubmit() {
   form.value.loading = true
 
-  try {
-    const res = await fetch('/api/flights', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        origin: form.value.origin.toUpperCase(),
-        destination: form.value.destination.toUpperCase(),
-        flight_date: form.value.flight_date,
-        deadline: form.value.deadline || null,
+  fetch('/api/flights', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      origin: form.value.origin.toUpperCase(),
+      destination: form.value.destination.toUpperCase(),
+      flight_date: form.value.flight_date,
+      deadline: form.value.deadline || null,
+    }),
+  })
+    .then((res) =>
+      res.json().then((data) => {
+        if (!res.ok) {
+          toast.error(data.message || 'Error creating entry')
+          return
+        }
+        toast.success('航班追蹤已建立')
+        router.visit(`/flights/${data.data.id}`)
       }),
+    )
+    .catch((err: unknown) => {
+      toast.error(err instanceof Error ? err.message : '未知錯誤')
     })
-
-    if (!res.ok) {
-      const data = await res.json()
-      form.value.error = data.message || 'Error creating entry'
-      return
-    }
-
-    const data = await res.json()
-    router.visit(`/flights/${data.data.id}`)
-  } catch (err) {
-    form.value.error = err instanceof Error ? err.message : '未知錯誤'
-  } finally {
-    form.value.loading = false
-  }
+    .finally(() => {
+      form.value.loading = false
+    })
 }
 </script>
 
@@ -61,10 +63,6 @@ async function handleSubmit() {
       <div class="tracker-panel card rounded-lg">
         <div class="card-body gap-8 p-8">
           <form class="space-y-6" @submit.prevent="handleSubmit">
-            <div v-if="form.error" class="alert rounded-[1.25rem] alert-error">
-              <span>{{ form.error }}</span>
-            </div>
-
             <div class="grid gap-6 md:grid-cols-2">
               <fieldset class="fieldset">
                 <legend class="fieldset-legend text-sm font-bold">出發地機場代碼</legend>

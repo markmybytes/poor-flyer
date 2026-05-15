@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import AppLayout from '@/Layouts/AppLayout.vue'
 import { reactive } from 'vue'
+import { useToast } from 'vue-toast-notification'
 
 const props = defineProps<{
   settings: {
@@ -18,6 +19,8 @@ const props = defineProps<{
     }
   }
 }>()
+
+const toast = useToast()
 
 const form = reactive({
   smtp: {
@@ -38,69 +41,64 @@ const ui = reactive({
   saving: false,
   testAddress: '',
   testLoading: false,
-  message: null as { text: string; type: 'success' | 'error' } | null,
   lastSaved: null as string | null,
 })
 
-function setMessage(text: string, type: 'success' | 'error') {
-  ui.message = { text, type }
-}
-
-async function saveSettings() {
+function saveSettings() {
   ui.saving = true
-  try {
-    const res = await fetch('/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        smtp: {
-          host: form.smtp.host,
-          port: form.smtp.port,
-          user: form.smtp.user,
-          sender_email: form.smtp.sender_email,
-          require_auth: form.smtp.require_auth,
-          protocol: form.smtp.protocol,
-          ...(form.smtp.password && { password: form.smtp.password }),
-        },
-        email: { recipients: form.email.recipients },
-      }),
+  fetch('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      smtp: {
+        host: form.smtp.host,
+        port: form.smtp.port,
+        user: form.smtp.user,
+        sender_email: form.smtp.sender_email,
+        require_auth: form.smtp.require_auth,
+        protocol: form.smtp.protocol,
+        ...(form.smtp.password && { password: form.smtp.password }),
+      },
+      email: { recipients: form.email.recipients },
+    }),
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success) {
+        toast.success('設定已保存')
+        ui.lastSaved = new Date().toLocaleString('zh-HK')
+        form.smtp.password = ''
+      } else {
+        toast.error(data.message || '保存失敗')
+      }
     })
-    const data = await res.json()
-    if (data.success) {
-      setMessage('設定已保存', 'success')
-      ui.lastSaved = new Date().toLocaleString('zh-HK')
-      form.smtp.password = ''
-    } else {
-      setMessage(data.message || '保存失敗', 'error')
-    }
-  } catch {
-    setMessage('保存設定時出錯', 'error')
-  } finally {
-    ui.saving = false
-  }
+    .catch(() => toast.error('保存設定時出錯'))
+    .finally(() => {
+      ui.saving = false
+    })
 }
 
-async function sendTestEmail() {
+function sendTestEmail() {
   if (!ui.testAddress) return
   ui.testLoading = true
-  try {
-    const res = await fetch('/api/settings/test-email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ recipient: ui.testAddress }),
+  fetch('/api/settings/test-email', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ recipient: ui.testAddress }),
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success) {
+        toast.success(data.message || '測試郵件已發送')
+        ui.testAddress = ''
+      } else {
+        toast.error(data.message || '發送失敗')
+      }
     })
-    const data = await res.json()
-    if (data.success) {
-      setMessage(data.message || '測試郵件已發送', 'success')
-      ui.testAddress = ''
-    } else {
-      setMessage(data.message || '發送失敗', 'error')
-    }
-  } catch {
-    setMessage('發送測試郵件時出錯', 'error')
-  } finally {
-    ui.testLoading = false
-  }
+    .catch(() => toast.error('發送測試郵件時出錯'))
+    .finally(() => {
+      ui.testLoading = false
+    })
 }
 </script>
 
@@ -110,14 +108,6 @@ async function sendTestEmail() {
       <h2 class="text-3xl font-extrabold tracking-tight text-base-content">設定</h2>
 
       <p class="mt-2 text-sm font-medium text-base-content/65">管理您的應用程式設定</p>
-    </div>
-
-    <div
-      v-if="ui.message"
-      class="mb-6 alert rounded-lg border px-4 py-3"
-      :class="ui.message.type === 'success' ? 'alert-success' : 'alert-error'"
-    >
-      <span>{{ ui.message.text }}</span>
     </div>
 
     <div class="space-y-6">

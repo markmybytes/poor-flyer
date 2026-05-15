@@ -1,6 +1,8 @@
 import { createInertiaApp } from '@inertiajs/vue3'
 import type { App, DefineComponent } from 'vue'
 import { createApp, h } from 'vue'
+import VueToast from 'vue-toast-notification'
+import 'vue-toast-notification/dist/theme-bootstrap.css'
 
 import './css/app.css'
 
@@ -28,6 +30,7 @@ createInertiaApp({
     const app = createApp({ render: () => h(App, props) })
     app.use(plugin)
     app.use(routePlugin)
+    app.use(VueToast, { position: 'top-right' })
     app.mount(el)
   },
 })

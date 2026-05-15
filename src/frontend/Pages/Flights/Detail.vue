@@ -5,10 +5,11 @@ import { fmtDate, fmtFare, fmtTime, fmtTz, getFlightStats } from '@/utils'
 import { router } from '@inertiajs/vue3'
 import Chart from 'chart.js/auto'
 import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
+import { useToast } from 'vue-toast-notification'
 
-const props = defineProps<{
-  flight: Flight
-}>()
+const props = defineProps<{ flight: Flight }>()
+
+const toast = useToast()
 
 const chartCanvas = useTemplateRef<HTMLCanvasElement>('chartCanvas')
 const activeTab = ref<'table' | 'graph'>('table')
@@ -54,8 +55,13 @@ function toggleEntry() {
     body: JSON.stringify({ is_active: !props.flight.isActive }),
   })
     .then((res) => {
-      if (res.ok) router.reload()
+      if (res.ok) {
+        router.reload()
+      } else {
+        toast.error('操作失敗，請稍後再試')
+      }
     })
+    .catch(() => toast.error('操作失敗，請稍後再試'))
     .finally(() => {
       loading.value.loading = null
     })
@@ -70,8 +76,11 @@ function scrapeEntry() {
     .then((res) => {
       if (res.ok) {
         router.reload()
+      } else {
+        toast.error('擷取失敗，請稍後再試')
       }
     })
+    .catch(() => toast.error('擷取失敗，請稍後再試'))
     .finally(() => {
       loading.value.loading = null
     })
@@ -85,8 +94,13 @@ function deleteEntry() {
     headers: { 'Content-Type': 'application/json' },
   })
     .then((res) => {
-      if (res.ok) router.visit('/flights/')
+      if (res.ok) {
+        router.visit('/flights/')
+      } else {
+        toast.error('刪除失敗，請稍後再試')
+      }
     })
+    .catch(() => toast.error('刪除失敗，請稍後再試'))
     .finally(() => {
       loading.value.loading = null
     })
