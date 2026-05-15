@@ -9,10 +9,8 @@ import { Link } from '@inertiajs/vue3'
         <div class="navbar-start gap-3">
           <Link href="/" class="btn h-auto min-h-0 gap-3 px-2 btn-ghost hover:bg-transparent">
             <div class="placeholder avatar">
-              <div
-                class="w-10 rounded-lg bg-primary text-lg text-primary-content sm:w-11 sm:text-xl"
-              >
-                ✈
+              <div class="w-10 overflow-hidden rounded-lg sm:w-11">
+                <img src="/static/favicon.svg" alt="PoorFlyer" />
               </div>
             </div>
 
