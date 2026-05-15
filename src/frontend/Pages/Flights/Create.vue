@@ -59,106 +59,104 @@ function handleSubmit() {
       </p>
     </div>
 
-    <div class="mx-auto max-w-2xl">
-      <div class="tracker-panel card rounded-lg">
-        <div class="card-body gap-8 p-8">
-          <form class="space-y-6" @submit.prevent="handleSubmit">
-            <div class="grid gap-6 md:grid-cols-2">
-              <fieldset class="fieldset">
-                <legend class="fieldset-legend text-sm font-bold">出發地機場代碼</legend>
+    <div class="tracker-panel card rounded-lg">
+      <div class="card-body gap-8 p-8">
+        <form class="space-y-6" @submit.prevent="handleSubmit">
+          <div class="grid gap-6 md:grid-cols-2">
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend text-sm font-bold">出發地機場代碼</legend>
 
-                <input
-                  v-model="form.origin"
-                  type="text"
-                  maxlength="3"
-                  placeholder="例如: HKG"
-                  class="input-bordered input input-lg w-full uppercase"
-                  required
-                  :disabled="form.loading"
-                />
-              </fieldset>
+              <input
+                v-model="form.origin"
+                type="text"
+                maxlength="3"
+                placeholder="例如: HKG"
+                class="input-bordered input input-lg w-full uppercase"
+                required
+                :disabled="form.loading"
+              />
+            </fieldset>
 
-              <fieldset class="fieldset">
-                <legend class="fieldset-legend text-sm font-bold">目的地機場代碼</legend>
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend text-sm font-bold">目的地機場代碼</legend>
 
-                <input
-                  v-model="form.destination"
-                  type="text"
-                  maxlength="3"
-                  placeholder="例如: NRT"
-                  class="input-bordered input input-lg w-full uppercase"
-                  required
-                  :disabled="form.loading"
-                />
-              </fieldset>
-            </div>
+              <input
+                v-model="form.destination"
+                type="text"
+                maxlength="3"
+                placeholder="例如: NRT"
+                class="input-bordered input input-lg w-full uppercase"
+                required
+                :disabled="form.loading"
+              />
+            </fieldset>
+          </div>
 
-            <div class="grid gap-6 md:grid-cols-2">
-              <fieldset class="fieldset">
-                <legend class="fieldset-legend text-sm font-bold">目標出發日期</legend>
+          <div class="grid gap-6 md:grid-cols-2">
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend text-sm font-bold">目標出發日期</legend>
 
-                <VueDatePicker
-                  v-model="form.flight_date"
-                  :enable-time-picker="false"
-                  :locale="zhHK"
-                  auto-apply
-                  model-type="yyyy-MM-dd"
-                  teleport="body"
-                >
-                  <template #trigger>
-                    <input
-                      type="text"
-                      :value="form.flight_date"
-                      placeholder="選擇日期"
-                      class="input-bordered input input-lg w-full cursor-pointer"
-                      readonly
-                      required
-                      :disabled="form.loading"
-                    />
-                  </template>
-                </VueDatePicker>
-              </fieldset>
+              <VueDatePicker
+                v-model="form.flight_date"
+                :enable-time-picker="false"
+                :locale="zhHK"
+                auto-apply
+                model-type="yyyy-MM-dd"
+                teleport="body"
+              >
+                <template #trigger>
+                  <input
+                    type="text"
+                    :value="form.flight_date"
+                    placeholder="選擇日期"
+                    class="input-bordered input input-lg w-full cursor-pointer"
+                    readonly
+                    required
+                    :disabled="form.loading"
+                  />
+                </template>
+              </VueDatePicker>
+            </fieldset>
 
-              <fieldset class="fieldset">
-                <legend class="fieldset-legend text-sm font-bold">
-                  購票限期
-                  <span class="text-base-content/50">（選填）</span>
-                </legend>
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend text-sm font-bold">
+                購票限期
+                <span class="text-base-content/50">（選填）</span>
+              </legend>
 
-                <VueDatePicker
-                  v-model="form.deadline"
-                  :enable-time-picker="false"
-                  :locale="zhHK"
-                  auto-apply
-                  model-type="yyyy-MM-dd"
-                  teleport="body"
-                >
-                  <template #trigger>
-                    <input
-                      type="text"
-                      :value="form.deadline"
-                      placeholder="選擇日期"
-                      class="input-bordered input input-lg w-full cursor-pointer"
-                      readonly
-                      :disabled="form.loading"
-                    />
-                  </template>
-                </VueDatePicker>
+              <VueDatePicker
+                v-model="form.deadline"
+                :enable-time-picker="false"
+                :locale="zhHK"
+                auto-apply
+                model-type="yyyy-MM-dd"
+                teleport="body"
+              >
+                <template #trigger>
+                  <input
+                    type="text"
+                    :value="form.deadline"
+                    placeholder="選擇日期"
+                    class="input-bordered input input-lg w-full cursor-pointer"
+                    readonly
+                    :disabled="form.loading"
+                  />
+                </template>
+              </VueDatePicker>
 
-                <p class="label text-xs text-base-content/55">系統將依此計算最佳購買時機</p>
-              </fieldset>
-            </div>
+              <p class="label text-xs text-base-content/55">系統將依此計算最佳購買時機</p>
+            </fieldset>
+          </div>
 
-            <div class="flex flex-col gap-3 border-t border-base-300/70 pt-5 sm:flex-row">
-              <Link href="/flights/" class="btn flex-1 btn-ghost btn-lg">取消返回</Link>
+          <div class="flex flex-col gap-3 border-t border-base-300/70 pt-5 sm:flex-row">
+            <Link href="/flights/" class="btn flex-1 btn-ghost btn-lg">取消</Link>
 
-              <button type="submit" class="btn flex-1 btn-lg btn-primary" :disabled="form.loading">
-                <span v-if="form.loading" class="loading loading-sm loading-spinner"></span>
-                {{ form.loading ? '設定中...' : '開始追蹤' }}
-              </button>
-            </div>
-          </form>
-        </div>
+            <button type="submit" class="btn flex-1 btn-lg btn-primary" :disabled="form.loading">
+              <span v-if="form.loading" class="loading loading-sm loading-spinner"></span>
+              {{ form.loading ? '設定中...' : '開始追蹤' }}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   </AppLayout>
