@@ -11,6 +11,16 @@
       {{ inertia.include_router() }}
     </script>
 
+    <script>
+      ;(() => {
+        const storedTheme = window.localStorage.getItem('tracker-theme')
+        const theme =
+          storedTheme ||
+          (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'tracker-night' : 'tracker')
+        document.documentElement.setAttribute('data-theme', theme)
+      })()
+    </script>
+
     {% if vite_dev_url %}
     <script type="module" src="{{ vite_dev_url }}/@vite/client"></script>
     {% else %}
@@ -18,6 +28,7 @@
     {% endif %}
   </head>
   <body>
+    <!-- prettier-ignore -->
     <div id="app" data-page='{{ page | tojson }}'></div>
 
     {% if vite_dev_url %}

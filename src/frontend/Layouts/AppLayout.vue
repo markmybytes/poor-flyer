@@ -3,40 +3,63 @@ import { Link } from '@inertiajs/vue3'
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 font-sans text-gray-900 antialiased">
-    <nav class="sticky top-0 z-30 border-b border-gray-200 bg-white/80 backdrop-blur-md">
-      <div class="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-        <Link
-          href="/"
-          class="flex items-center gap-2 text-xl font-black tracking-tight text-gray-900 transition-opacity hover:opacity-80"
-        >
-          <span class="text-blue-600">✈</span>
+  <div class="tracker-shell">
+    <div class="mx-auto max-w-6xl px-4 py-2 sm:px-6 sm:py-4">
+      <nav class="tracker-panel navbar z-30 mb-8 rounded-lg px-4 py-2 sm:px-6 sm:py-4">
+        <div class="navbar-start gap-3">
+          <Link href="/" class="btn h-auto min-h-0 gap-3 px-2 btn-ghost hover:bg-transparent">
+            <div class="placeholder avatar">
+              <div
+                class="w-10 rounded-lg bg-primary text-lg text-primary-content sm:w-11 sm:text-xl"
+              >
+                ✈
+              </div>
+            </div>
 
-          <span>價格追蹤器</span>
-        </Link>
+            <div class="hidden text-left sm:block">
+              <div class="text-lg font-black tracking-tight text-base-content">價格追蹤器</div>
 
-        <div class="flex items-center gap-1">
-          <Link
-            href="/flights/"
-            class="rounded-lg px-4 py-2 text-sm font-semibold text-gray-700 transition-all hover:bg-gray-100"
-          >
-            追蹤清單
-          </Link>
-
-          <Link
-            href="/settings/"
-            class="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-gray-700 transition-all hover:bg-gray-100"
-          >
-            <span>⚙️</span>
-
-            <span>設定</span>
+              <div class="text-xs font-medium text-base-content/60">Daily fare intelligence</div>
+            </div>
           </Link>
         </div>
-      </div>
-    </nav>
 
-    <main class="mx-auto max-w-5xl px-6 py-10">
-      <slot />
-    </main>
+        <div class="navbar-end gap-2 lg:gap-4">
+          <div class="flex flex-wrap justify-end gap-2">
+            <Link
+              href="/flights/"
+              class="btn btn-sm sm:btn-md"
+              :class="
+                $page.url.startsWith('/flights')
+                  ? 'font-semibold btn-primary'
+                  : 'font-semibold btn-ghost'
+              "
+            >
+              <span class="hidden sm:inline">追蹤清單</span>
+
+              <span class="sm:hidden">清單</span>
+            </Link>
+
+            <Link
+              href="/settings/"
+              class="btn btn-sm sm:btn-md"
+              :class="
+                $page.url.startsWith('/settings')
+                  ? 'font-semibold btn-primary'
+                  : 'font-semibold btn-ghost'
+              "
+            >
+              <span class="hidden sm:inline">設定</span>
+
+              <span class="sm:hidden">設定</span>
+            </Link>
+          </div>
+        </div>
+      </nav>
+
+      <main class="mx-auto max-w-6xl pb-10">
+        <slot />
+      </main>
+    </div>
   </div>
 </template>
