@@ -4,11 +4,11 @@ from flask import Flask, current_app
 
 from src.cli import dev, run_scheduler
 from src.config import get_app_config
-from src.database import init_db
 from src.extensions import init_extensions
+from src.extensions.database import init_db
+from src.extensions.scheduler import configure_scheduler
 from src.routes.api import api_bp
 from src.routes.pages import pages_bp
-from src.services.scheduler import configure_scheduler
 from src.utils.json import CamelCaseJSONProvider
 
 

@@ -7,7 +7,7 @@ import click
 from flask import current_app
 from flask.cli import with_appcontext
 
-from src.services.scheduler import start_scheduler, stop_scheduler
+from src.extensions.scheduler import start_scheduler, stop_scheduler
 
 
 def _terminate_process(proc: subprocess.Popen, label: str) -> None:

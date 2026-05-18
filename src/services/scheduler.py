@@ -3,10 +3,9 @@ import threading
 import uuid
 from datetime import date
 
-from flask import Flask, render_template
+from flask import render_template
 
-from src.database import Flight, FlightFareSnapshot, db
-from src.extensions import scheduler
+from src.extensions.database import Flight, FlightFareSnapshot, db
 from src.services.config import ConfigManager
 from src.services.email import get_smtp_config, send_html_email
 from src.services.rule37 import Phase, compute_37_best
@@ -16,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def daily_scrape_job():
+    """Daily job to scrape flight prices and send notifications if buy signal triggered."""
     try:
         today = date.today()
         flights = (
@@ -90,33 +90,3 @@ def daily_scrape_job():
         db.session.rollback()
     finally:
         db.session.remove()
-
-
-def configure_scheduler(app: Flask) -> None:
-    if scheduler.get_job('daily_scrape') is not None:
-        return
-
-    scheduler.add_job(
-        id='daily_scrape',
-        func=daily_scrape_job,
-        trigger='cron',
-        hour=app.config['SCHEDULER_SCRAPE_CRON_HOUR'],
-        minute=app.config['SCHEDULER_SCRAPE_CRON_MINUTE'],
-        jitter=app.config['SCHEDULER_SCRAPE_JITTER_SECONDS'],
-        name='Daily flight price scrape',
-        coalesce=True,
-        max_instances=1,
-        timezone=app.config['SCHEDULER_TIMEZONE'],
-    )
-
-
-def start_scheduler() -> None:
-    if not scheduler.running:
-        scheduler.start()
-        logger.info('Scheduler started')
-
-
-def stop_scheduler() -> None:
-    if scheduler.running:
-        scheduler.shutdown(wait=False)
-        logger.info('Scheduler stopped')

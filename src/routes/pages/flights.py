@@ -6,7 +6,7 @@ from flask_inertia import render_inertia
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from src.database import Flight, db
+from src.extensions.database import Flight, db
 from src.services.rule37 import compute_37_best
 
 flights_bp = Blueprint('flights', __name__, url_prefix='/flights')

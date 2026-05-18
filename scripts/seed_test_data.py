@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 
 sys.path.insert(0, str(__file__).rsplit('\\', 2)[0])
 
-from src.database import Base, Flight, FlightFareSnapshot, SessionLocal, engine
+from src.extensions.database import Base, Flight, FlightFareSnapshot, SessionLocal, engine
 
 
 def add_test_data():

@@ -1,6 +1,6 @@
 import os
 
-from src.database import DEFAULT_DATABASE_URL
+from src.extensions.database import DEFAULT_DATABASE_URL
 
 
 def _env_int(name: str, default: int) -> int:

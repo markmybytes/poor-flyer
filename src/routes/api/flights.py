@@ -4,7 +4,7 @@ from datetime import UTC, date, datetime
 from flask import Blueprint, jsonify, request
 from sqlalchemy import select
 
-from src.database import Flight, FlightFareSnapshot, db
+from src.extensions.database import Flight, FlightFareSnapshot, db
 from src.services.scraper import scrape_prices
 
 flights_bp = Blueprint('flights', __name__, url_prefix='/flights')

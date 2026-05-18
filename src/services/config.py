@@ -6,7 +6,7 @@ Provides type-safe access with in-memory caching to reduce DB overhead.
 import logging
 from typing import Any
 
-from src.database import Config, db
+from src.extensions.database import Config, db
 
 logger = logging.getLogger(__name__)
 
