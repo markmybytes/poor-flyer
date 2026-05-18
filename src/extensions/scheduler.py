@@ -1,35 +1,12 @@
-"""Scheduler extension module for APScheduler integration with Flask."""
+"""Scheduler extension module for flask-apscheduler integration with Flask."""
 
 import logging
 
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import CronTrigger
-from flask import Flask
+from flask_apscheduler import APScheduler
 
 logger = logging.getLogger(__name__)
 
-# Initialize scheduler
-scheduler = BackgroundScheduler(daemon=True)
-
-
-def configure_scheduler(app: Flask) -> None:
-    """Configure APScheduler with Flask app and register jobs.
-
-    Args:
-        app: Flask application instance
-    """
-    if scheduler.get_job('daily_scrape') is not None:
-        return
-
-    from src.services.scheduler import daily_scrape_job
-
-    scheduler.add_job(
-        id='daily_scrape',
-        name='Daily flight price scrape',
-        func=daily_scrape_job,
-        trigger=CronTrigger.from_crontab(app.config['SCHEDULER_SCRAPE_CRON']),
-        jitter=app.config.get('SCHEDULER_SCRAPE_JITTER_SECONDS', 0),
-    )
+scheduler = APScheduler()
 
 
 def start_scheduler() -> None:
@@ -50,7 +27,7 @@ def get_scheduler():
     """Get the APScheduler instance.
 
     Returns:
-        BackgroundScheduler instance
+        APScheduler instance
     """
     return scheduler
 

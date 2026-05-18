@@ -111,21 +111,13 @@ engine = create_engine(
 SessionLocal = sessionmaker(bind=engine, class_=Session, expire_on_commit=False)
 
 
-def init_db(app=None):
-    """Initialize database with Flask app context.
+def init_db() -> None:
+    """Initialize database schema for direct/script usage.
 
-    Args:
-        app: Flask application instance (optional, for app factory pattern)
+    Flask extension binding is handled in src.extensions.init_extensions.
     """
-    if app is not None:
-        db.init_app(app)
-        with app.app_context():
-            DEFAULT_DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
-            db.create_all()
-    else:
-        # Direct initialization for scripts without Flask app
-        DEFAULT_DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        Base.metadata.create_all(bind=engine)
+    DEFAULT_DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    Base.metadata.create_all(bind=engine)
 
 
 def get_session():

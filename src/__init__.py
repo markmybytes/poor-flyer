@@ -1,11 +1,11 @@
 import os
 
+from apscheduler.triggers.cron import CronTrigger
 from flask import Flask, current_app
 
 from src.cli import dev, run_scheduler
 from src.extensions import init_extensions
-from src.extensions.database import DEFAULT_DATABASE_URL, init_db
-from src.extensions.scheduler import configure_scheduler
+from src.extensions.database import DEFAULT_DATABASE_URL
 from src.routes.api import api_bp
 from src.routes.pages import pages_bp
 from src.utils.json import CamelCaseJSONProvider
@@ -32,29 +32,32 @@ def create_app():
 
     app.config.from_mapping(
         {
+            'JOBS': [
+                {
+                    'id': 'daily_scrape',
+                    'func': 'src.services.scheduler:daily_scrape_job',
+                    'trigger': CronTrigger.from_crontab(
+                        os.getenv('SCHEDULER_SCRAPE_CRON', '0 9 * * *')
+                    ),
+                    'jitter': int(os.getenv('SCHEDULER_SCRAPE_JITTER_SECONDS', 0)),
+                }
+            ],
             'SQLALCHEMY_DATABASE_URI': os.getenv('DATABASE_URL', DEFAULT_DATABASE_URL),
             'SQLALCHEMY_TRACK_MODIFICATIONS': False,
             'SCHEDULER_API_ENABLED': False,
-            'SCHEDULER_TIMEZONE': os.getenv('TZ'),
-            'SCHEDULER_SCRAPE_CRON': os.getenv('SCHEDULER_SCRAPE_CRON', '0 9 * * *'),
-            'SCHEDULER_SCRAPE_JITTER_SECONDS': int(os.getenv('SCHEDULER_SCRAPE_JITTER_SECONDS', 0)),
+            'VITE_HOT_FILE': os.getenv(
+                'VITE_HOT_FILE',
+                os.path.join(app.static_folder, 'dist', 'hot'),
+            ),
         }
-    )
-
-    app.config['VITE_HOT_FILE'] = os.getenv(
-        'VITE_HOT_FILE',
-        os.path.join(app.static_folder, 'dist', 'hot'),
     )
 
     app.json = CamelCaseJSONProvider(app)
 
-    db_uri = str(app.config['SQLALCHEMY_DATABASE_URI'])
-    if db_uri.startswith('sqlite'):
+    if str(app.config['SQLALCHEMY_DATABASE_URI']).startswith('sqlite'):
         app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'connect_args': {'check_same_thread': False}}
 
-    init_db()
     init_extensions(app)
-    configure_scheduler(app)
 
     app.register_blueprint(pages_bp)
     app.register_blueprint(api_bp)
