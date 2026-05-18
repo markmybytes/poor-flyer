@@ -3,6 +3,7 @@
 import logging
 
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 from flask import Flask
 
 logger = logging.getLogger(__name__)
@@ -24,15 +25,10 @@ def configure_scheduler(app: Flask) -> None:
 
     scheduler.add_job(
         id='daily_scrape',
-        func=daily_scrape_job,
-        trigger='cron',
-        hour=app.config['SCHEDULER_SCRAPE_CRON_HOUR'],
-        minute=app.config['SCHEDULER_SCRAPE_CRON_MINUTE'],
-        jitter=app.config['SCHEDULER_SCRAPE_JITTER_SECONDS'],
         name='Daily flight price scrape',
-        coalesce=True,
-        max_instances=1,
-        timezone=app.config['SCHEDULER_TIMEZONE'],
+        func=daily_scrape_job,
+        trigger=CronTrigger.from_crontab(app.config['SCHEDULER_SCRAPE_CRON']),
+        jitter=app.config.get('SCHEDULER_SCRAPE_JITTER_SECONDS', 0),
     )
 
 

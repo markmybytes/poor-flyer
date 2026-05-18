@@ -3,9 +3,8 @@ import os
 from flask import Flask, current_app
 
 from src.cli import dev, run_scheduler
-from src.config import get_app_config
 from src.extensions import init_extensions
-from src.extensions.database import init_db
+from src.extensions.database import DEFAULT_DATABASE_URL, init_db
 from src.extensions.scheduler import configure_scheduler
 from src.routes.api import api_bp
 from src.routes.pages import pages_bp
@@ -31,7 +30,17 @@ def create_app():
         static_folder=os.path.join(base_dir, 'src', 'static'),
     )
 
-    app.config.from_mapping(get_app_config())
+    app.config.from_mapping(
+        {
+            'SQLALCHEMY_DATABASE_URI': os.getenv('DATABASE_URL', DEFAULT_DATABASE_URL),
+            'SQLALCHEMY_TRACK_MODIFICATIONS': False,
+            'SCHEDULER_API_ENABLED': False,
+            'SCHEDULER_TIMEZONE': os.getenv('TZ'),
+            'SCHEDULER_SCRAPE_CRON': os.getenv('SCHEDULER_SCRAPE_CRON', '0 9 * * *'),
+            'SCHEDULER_SCRAPE_JITTER_SECONDS': int(os.getenv('SCHEDULER_SCRAPE_JITTER_SECONDS', 0)),
+        }
+    )
+
     app.config['VITE_HOT_FILE'] = os.getenv(
         'VITE_HOT_FILE',
         os.path.join(app.static_folder, 'dist', 'hot'),
