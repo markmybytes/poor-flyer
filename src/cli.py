@@ -10,32 +10,38 @@ from flask.cli import with_appcontext
 from src.services.scheduler import start_scheduler, stop_scheduler
 
 
+def _terminate_process(proc: subprocess.Popen, label: str) -> None:
+    try:
+        proc.wait(timeout=3)
+    except subprocess.TimeoutExpired:
+        click.echo(click.style(f'Force stopping {label}...', fg='yellow'))
+        proc.terminate()
+        proc.wait(timeout=5)
+
+
 @click.command(name='dev')
 @with_appcontext
 def dev():
-    """Run Vite dev server and Flask server simultaneously."""
-    click.echo(click.style('🚀 Starting development environment...', fg='cyan'))
+    """Run Vite dev server, Flask dev server, and scheduler simultaneously."""
+    click.echo(click.style('Starting development environment...', fg='cyan'))
 
     hot_file = Path(current_app.config['VITE_HOT_FILE'])
     hot_file.unlink(missing_ok=True)
 
-    vitep = subprocess.Popen(
-        ['npm', 'run', 'dev'],
-        stdin=subprocess.DEVNULL,  # block Vite from touching stdin to protect the terminal
-    )
+    vite_process = subprocess.Popen(['npm', 'run', 'dev'], stdin=subprocess.DEVNULL)
+    scheduler_process = subprocess.Popen(['flask', '--app', 'wsgi:app', 'run-scheduler'])
 
     try:
-        subprocess.run(['flask', 'run', '--debug'], check=True)
+        subprocess.run(['flask', '--app', 'wsgi:app', 'run', '--debug'], check=True)
     except KeyboardInterrupt:
-        click.echo(click.style('\nShutting down servers...', fg='yellow'))
-    except subprocess.CalledProcessError as e:
-        click.echo(click.style(f'Error starting Flask: {e}', fg='red'))
+        click.echo(click.style('\nShutting down development services...', fg='yellow'))
+    except subprocess.CalledProcessError as exc:
+        click.echo(click.style(f'Error starting Flask dev server: {exc}', fg='red'))
     finally:
-        try:
-            vitep.wait(timeout=3)
-        except subprocess.TimeoutExpired:
-            vitep.terminate()  # forcefully terminate if it gets stuck
-            vitep.wait()
+        for process, label in [(scheduler_process, 'scheduler'), (vite_process, 'vite')]:
+            if process.poll() is None:
+                process.terminate()
+            _terminate_process(process, label)
 
         hot_file.unlink(missing_ok=True)
         sys.exit(0)
@@ -44,19 +50,12 @@ def dev():
 @click.command(name='run-scheduler')
 @with_appcontext
 def run_scheduler():
-    """
-    Run the APScheduler as a dedicated long-lived process.
-
-    This command starts the scheduler and keeps it running indefinitely.
-    It is designed to be run in a separate process from the web server.
-    """
-    click.echo(click.style('🔔 Starting scheduler process...', fg='cyan'))
-    click.echo(click.style('   Jobs: Daily flight price scrape at 09:00 UTC', fg='yellow'))
+    """Run APScheduler as a dedicated long-lived process."""
+    click.echo(click.style('Starting scheduler process...', fg='cyan'))
 
     start_scheduler()
 
     try:
-        # Keep the scheduler running
         while True:
             time.sleep(60)
     except KeyboardInterrupt:

@@ -1,3 +1,3 @@
 #!/bin/sh
-# Run the APScheduler scheduler as a dedicated process
-exec s6-setuidgid nobody flask run-scheduler
+exec s6-setuidgid ${PUID:-1000}:${PGID:-1000} \
+  flask --app wsgi:app run-scheduler

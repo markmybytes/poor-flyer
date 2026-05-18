@@ -1,17 +1,15 @@
 import os
 
 from flask import Flask, current_app
-from flask_inertia import Inertia
-from flask_migrate import Migrate
 
 from src.cli import dev, run_scheduler
-from src.database import DEFAULT_DATABASE_URL, db, init_db
+from src.config import get_app_config
+from src.database import init_db
+from src.extensions import init_extensions
 from src.routes.api import api_bp
 from src.routes.pages import pages_bp
-from src.services.scheduler import init_scheduler
+from src.services.scheduler import configure_scheduler
 from src.utils.json import CamelCaseJSONProvider
-
-migrate = Migrate()
 
 
 def _inject_vite_url():
@@ -26,12 +24,6 @@ def _inject_vite_url():
 
 
 def create_app():
-    """
-    Flask application factory.
-
-    The scheduler is initialized here but NOT started automatically.
-    It must be started explicitly via the CLI command `flask run-scheduler`.
-    """
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     app = Flask(
         __name__,
@@ -39,25 +31,21 @@ def create_app():
         static_folder=os.path.join(base_dir, 'src', 'static'),
     )
 
-    app.config['INERTIA_TEMPLATE'] = 'base.html'
-    app.config['VITE_HOT_FILE'] = os.path.join(app.static_folder, 'dist', 'hot')
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', DEFAULT_DATABASE_URL)
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config.from_mapping(get_app_config())
+    app.config['VITE_HOT_FILE'] = os.getenv(
+        'VITE_HOT_FILE',
+        os.path.join(app.static_folder, 'dist', 'hot'),
+    )
 
     app.json = CamelCaseJSONProvider(app)
 
-    db_uri = app.config['SQLALCHEMY_DATABASE_URI']
+    db_uri = str(app.config['SQLALCHEMY_DATABASE_URI'])
     if db_uri.startswith('sqlite'):
         app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'connect_args': {'check_same_thread': False}}
 
     init_db()
-    db.init_app(app)
-
-    migrate.init_app(app, db, compare_type=True, render_as_batch=True)
-
-    Inertia(app)
-
-    init_scheduler(app)
+    init_extensions(app)
+    configure_scheduler(app)
 
     app.register_blueprint(pages_bp)
     app.register_blueprint(api_bp)

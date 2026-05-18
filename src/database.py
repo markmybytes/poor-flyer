@@ -1,3 +1,4 @@
+import os
 import uuid
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -15,7 +16,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-DEFAULT_DATABASE_PATH = BASE_DIR / 'data' / 'db.sqlite'
+DEFAULT_DATABASE_PATH = Path(os.getenv('DATABASE_PATH', str(BASE_DIR / 'data' / 'db.sqlite')))
 DEFAULT_DATABASE_URL = f'sqlite:///{DEFAULT_DATABASE_PATH.as_posix()}'
 
 

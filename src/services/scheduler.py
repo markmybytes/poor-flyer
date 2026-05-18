@@ -4,9 +4,9 @@ import uuid
 from datetime import date
 
 from flask import Flask, render_template
-from flask_apscheduler import APScheduler
 
 from src.database import Flight, FlightFareSnapshot, db
+from src.extensions import scheduler
 from src.services.config import ConfigManager
 from src.services.email import get_smtp_config, send_html_email
 from src.services.rule37 import Phase, compute_37_best
@@ -14,12 +14,8 @@ from src.services.scraper import scrape_prices
 
 logger = logging.getLogger(__name__)
 
-# Global scheduler instance - will be initialized in create_app
-scheduler = APScheduler()
-
 
 def daily_scrape_job():
-    """Daily scrape job - runs with app context automatically via flask-apscheduler."""
     try:
         today = date.today()
         flights = (
@@ -96,34 +92,31 @@ def daily_scrape_job():
         db.session.remove()
 
 
-def init_scheduler(app: Flask):
-    """Initialize the scheduler with the Flask app."""
-    scheduler.init_app(app)
+def configure_scheduler(app: Flask) -> None:
+    if scheduler.get_job('daily_scrape') is not None:
+        return
 
     scheduler.add_job(
         id='daily_scrape',
         func=daily_scrape_job,
         trigger='cron',
-        hour=9,
-        minute=0,
-        jitter=1800,
-        name='Daily flight price scrape at 09:00 UTC',
+        hour=app.config['SCHEDULER_SCRAPE_CRON_HOUR'],
+        minute=app.config['SCHEDULER_SCRAPE_CRON_MINUTE'],
+        jitter=app.config['SCHEDULER_SCRAPE_JITTER_SECONDS'],
+        name='Daily flight price scrape',
         coalesce=True,
         max_instances=1,
+        timezone=app.config['SCHEDULER_TIMEZONE'],
     )
 
-    logger.info('Scheduler initialized with daily_scrape job')
 
-
-def start_scheduler():
-    """Start the scheduler - only call this if not already running."""
+def start_scheduler() -> None:
     if not scheduler.running:
         scheduler.start()
         logger.info('Scheduler started')
 
 
-def stop_scheduler():
-    """Stop the scheduler gracefully."""
+def stop_scheduler() -> None:
     if scheduler.running:
-        scheduler.shutdown()
+        scheduler.shutdown(wait=False)
         logger.info('Scheduler stopped')
