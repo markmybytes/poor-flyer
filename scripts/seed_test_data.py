@@ -5,7 +5,7 @@ import random
 import sys
 from datetime import UTC, datetime, timedelta
 
-sys.path.insert(0, str(__file__).rsplit("\\", 2)[0])
+sys.path.insert(0, str(__file__).rsplit('\\', 2)[0])
 
 from src.database import Base, Flight, FlightFareSnapshot, SessionLocal, engine
 
@@ -20,31 +20,25 @@ def add_test_data():
         now = datetime.now(utc)
         today = now.date()
 
-        def add_snap(entry, dt, fare, status="success"):
+        def add_snap(entry, dt, fare, status='success'):
             """Helper to generate structurally accurate snapshots"""
-            base_dt = dt + timedelta(
-                days=30
-            )  # Future flight times relative to snapshot
+            base_dt = dt + timedelta(days=30)  # Future flight times relative to snapshot
             db.add(
                 FlightFareSnapshot(
                     flight_id=entry.id,
                     created_at=dt,
-                    fare=float(fare) if fare and status == "success" else None,
-                    flight_number=f"CX{random.randint(100, 999)}"
-                    if status == "success"
-                    else None,
+                    fare=float(fare) if fare and status == 'success' else None,
+                    flight_number=f'CX{random.randint(100, 999)}' if status == 'success' else None,
                     departure_at=base_dt.replace(hour=10, minute=30)
-                    if status == "success"
+                    if status == 'success'
                     else None,
-                    arrival_at=base_dt.replace(hour=14, minute=45)
-                    if status == "success"
-                    else None,
+                    arrival_at=base_dt.replace(hour=14, minute=45) if status == 'success' else None,
                     scrape_status=status,
-                    error_message="Connection timeout" if status == "error" else None,
+                    error_message='Connection timeout' if status == 'error' else None,
                 )
             )
 
-        print("Generating daily test scenarios...")
+        print('Generating daily test scenarios...')
 
         # ---------------------------------------------------------
         # Scenario 1: Rule 37 BUY_SIGNAL & All Table Row Colors
@@ -52,8 +46,8 @@ def add_test_data():
         # Created 30 days ago, Deadline is 10 days from now.
         # Total window = 40 days. 37% Cutoff = ~15 days ago.
         e1 = Flight(
-            origin="HKG",
-            destination="LHR",
+            origin='HKG',
+            destination='LHR',
             flight_date=today + timedelta(days=30),
             deadline=today + timedelta(days=10),
             is_active=True,
@@ -74,11 +68,9 @@ def add_test_data():
             elif i == 8:
                 fare = 4000  # All-Time Low -> triggers bg-green-50
             elif i == 5:
-                fare = (
-                    4500  # Matches history_best_val, but not ATL -> triggers bg-blue-50
-                )
+                fare = 4500  # Matches history_best_val, but not ATL -> triggers bg-blue-50
             elif i == 2:
-                add_snap(e1, dt, None, status="error")  # Error -> triggers bg-gray-50
+                add_snap(e1, dt, None, status='error')  # Error -> triggers bg-gray-50
                 continue
             elif i == 0:
                 fare = 4200  # Current <= 4500 -> Triggers BUY_SIGNAL Green UI header
@@ -93,8 +85,8 @@ def add_test_data():
         # ---------------------------------------------------------
         # Created 10 days ago, deadline far in the future.
         e2 = Flight(
-            origin="HKG",
-            destination="NRT",
+            origin='HKG',
+            destination='NRT',
             flight_date=today + timedelta(days=60),
             deadline=today + timedelta(days=40),
             is_active=True,
@@ -113,8 +105,8 @@ def add_test_data():
         # ---------------------------------------------------------
         # Cutoff has passed. Best price during observing was $5500. Current is $5800.
         e3 = Flight(
-            origin="HKG",
-            destination="JFK",
+            origin='HKG',
+            destination='JFK',
             flight_date=today + timedelta(days=40),
             deadline=today + timedelta(days=15),
             is_active=True,
@@ -133,17 +125,15 @@ def add_test_data():
             else:  # Post cutoff background noise
                 fare = 5800 + random.randint(0, 200)  # Always higher than 5500
 
-            add_snap(
-                e3, dt, fare
-            )  # Ends higher than history best -> Triggers Gray "等待中" UI
+            add_snap(e3, dt, fare)  # Ends higher than history best -> Triggers Gray "等待中" UI
 
         # ---------------------------------------------------------
         # Scenario 4: Expired & Inactive
         # ---------------------------------------------------------
         # Flight departed 5 days ago. Created 40 days ago.
         e4 = Flight(
-            origin="HKG",
-            destination="TPE",
+            origin='HKG',
+            destination='TPE',
             flight_date=today - timedelta(days=5),
             deadline=today - timedelta(days=10),
             is_active=False,
@@ -161,8 +151,8 @@ def add_test_data():
         # Scenario 5: No Deadline Set
         # ---------------------------------------------------------
         e5 = Flight(
-            origin="HKG",
-            destination="SIN",
+            origin='HKG',
+            destination='SIN',
             flight_date=today + timedelta(days=20),
             deadline=None,
             is_active=True,
@@ -180,8 +170,8 @@ def add_test_data():
         # Scenario 6: Completely Empty
         # ---------------------------------------------------------
         e6 = Flight(
-            origin="HKG",
-            destination="BKK",
+            origin='HKG',
+            destination='BKK',
             flight_date=today + timedelta(days=10),
             deadline=today + timedelta(days=5),
             is_active=True,
@@ -193,23 +183,21 @@ def add_test_data():
 
         db.commit()
 
-        print("\nSuccess! UI Test Data Generated:")
-        print(
-            "  ✓ Entry 1 (HKG->LHR): Rule 37 BUY_SIGNAL (31 daily points + all table row colors)"
-        )
-        print("  ✓ Entry 2 (HKG->NRT): Rule 37 OBSERVING state (11 daily points)")
-        print("  ✓ Entry 3 (HKG->JFK): Rule 37 WAITING state (31 daily points)")
-        print("  ✓ Entry 4 (HKG->TPE): Expired Flight / Inactive UI (36 daily points)")
-        print("  ✓ Entry 5 (HKG->SIN): Missing Deadline fallback (11 daily points)")
-        print("  ✓ Entry 6 (HKG->BKK): Completely Empty fallback (0 points)")
+        print('\nSuccess! UI Test Data Generated:')
+        print('  ✓ Entry 1 (HKG->LHR): Rule 37 BUY_SIGNAL (31 daily points + all table row colors)')
+        print('  ✓ Entry 2 (HKG->NRT): Rule 37 OBSERVING state (11 daily points)')
+        print('  ✓ Entry 3 (HKG->JFK): Rule 37 WAITING state (31 daily points)')
+        print('  ✓ Entry 4 (HKG->TPE): Expired Flight / Inactive UI (36 daily points)')
+        print('  ✓ Entry 5 (HKG->SIN): Missing Deadline fallback (11 daily points)')
+        print('  ✓ Entry 6 (HKG->BKK): Completely Empty fallback (0 points)')
 
     except Exception as e:
         db.rollback()
-        print(f"ERROR: {e}", file=sys.stderr)
+        print(f'ERROR: {e}', file=sys.stderr)
         raise
     finally:
         db.close()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     add_test_data()

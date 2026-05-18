@@ -4,9 +4,9 @@ from enum import Enum
 
 
 class Phase(Enum):
-    OBSERVING = "OBSERVING"
-    BUY_SIGNAL = "BUY_SIGNAL"
-    WAITING = "WAITING"
+    OBSERVING = 'OBSERVING'
+    BUY_SIGNAL = 'BUY_SIGNAL'
+    WAITING = 'WAITING'
 
 
 @dataclass
@@ -36,11 +36,11 @@ def compute_37_best(
 
     latest_val = float(values[max(past)])
     valid_vals = [float(values[d]) for d in past]
-    m = min([float(values[d]) for d in past if d < cutoff_date], default=float("inf"))
+    m = min([float(values[d]) for d in past if d < cutoff_date], default=float('inf'))
 
     if today < cutoff_date:
         phase = Phase.OBSERVING
-    elif m != float("inf") and latest_val < m:
+    elif m != float('inf') and latest_val < m:
         phase = Phase.BUY_SIGNAL
     else:
         phase = Phase.WAITING
@@ -48,7 +48,7 @@ def compute_37_best(
     return DeadlineRule37(
         cutoff_date=cutoff_date,
         phase=phase,
-        history_best_val=m if (m != float("inf") and today >= cutoff_date) else None,
+        history_best_val=m if (m != float('inf') and today >= cutoff_date) else None,
         latest_val=latest_val,
         all_time_high=max(valid_vals),
         all_time_low=min(valid_vals),

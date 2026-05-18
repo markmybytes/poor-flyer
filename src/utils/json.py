@@ -7,13 +7,13 @@ from sqlalchemy import inspect
 
 def to_camel(snake_str):
     """Converts snake_case to camelCase."""
-    parts = snake_str.split("_")
-    return parts[0] + "".join(x.title() for x in parts[1:])
+    parts = snake_str.split('_')
+    return parts[0] + ''.join(x.title() for x in parts[1:])
 
 
 def model_to_dict(model):
     """Convert SQLAlchemy model instance to dict, including loaded relationships."""
-    if not hasattr(model, "__table__"):
+    if not hasattr(model, '__table__'):
         return model
 
     # Grab all standard columns
@@ -38,7 +38,7 @@ def camelize(obj):
     if is_dataclass(obj):
         return camelize(asdict(obj))
     # Handle SQLAlchemy models
-    if hasattr(obj, "__table__"):
+    if hasattr(obj, '__table__'):
         return camelize(model_to_dict(obj))
     return obj
 
@@ -50,6 +50,6 @@ class CamelCaseJSONProvider(DefaultJSONProvider):
     def default(self, obj):
         if isinstance(obj, (datetime, date)):
             return obj.isoformat()
-        if hasattr(obj, "__table__"):
+        if hasattr(obj, '__table__'):
             return camelize(model_to_dict(obj))
         return super().default(obj)
