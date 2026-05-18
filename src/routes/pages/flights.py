@@ -6,7 +6,7 @@ from flask_inertia import render_inertia
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from src.database import Flight, SessionLocal
+from src.database import Flight, db
 from src.services.rule37 import compute_37_best
 
 flights_bp = Blueprint('flights', __name__, url_prefix='/flights')
@@ -30,16 +30,13 @@ def _r37(flight: Flight) -> dict | None:
 
 @flights_bp.route('/')
 def index():
-    with SessionLocal() as db:
-        flights = (
-            db.execute(
-                select(Flight)
-                .options(selectinload(Flight.fare_snapshots))
-                .order_by(Flight.flight_date)
-            )
-            .scalars()
-            .all()
+    flights = (
+        db.session.execute(
+            select(Flight).options(selectinload(Flight.fare_snapshots)).order_by(Flight.flight_date)
         )
+        .scalars()
+        .all()
+    )
     return render_inertia(
         'Flights/Index',
         props={
@@ -68,12 +65,9 @@ def create():
 
 @flights_bp.route('/<flight_id>')
 def show(flight_id):
-    with SessionLocal() as db:
-        flight = db.execute(
-            select(Flight)
-            .options(selectinload(Flight.fare_snapshots))
-            .where(Flight.id == flight_id)
-        ).scalar_one_or_none()
+    flight = db.session.execute(
+        select(Flight).options(selectinload(Flight.fare_snapshots)).where(Flight.id == flight_id)
+    ).scalar_one_or_none()
 
     if not flight:
         return redirect('/flights/')

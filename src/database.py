@@ -1,7 +1,8 @@
-import os
 import uuid
 from datetime import UTC, date, datetime
+from pathlib import Path
 
+from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import (
     Boolean,
     Date,
@@ -10,29 +11,22 @@ from sqlalchemy import (
     ForeignKey,
     String,
     UniqueConstraint,
-    create_engine,
 )
-from sqlalchemy.orm import (
-    DeclarativeBase,
-    Mapped,
-    mapped_column,
-    relationship,
-    sessionmaker,
-)
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///./data/db.sqlite')
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={'check_same_thread': False} if 'sqlite' in DATABASE_URL else {},
-)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+BASE_DIR = Path(__file__).resolve().parent.parent
+DEFAULT_DATABASE_PATH = BASE_DIR / 'data' / 'db.sqlite'
+DEFAULT_DATABASE_URL = f'sqlite:///{DEFAULT_DATABASE_PATH.as_posix()}'
 
 
 class Base(DeclarativeBase):
     pass
 
 
-class Flight(Base):
+db = SQLAlchemy(model_class=Base, session_options={'autoflush': False})
+
+
+class Flight(db.Model):
     __tablename__ = 'flights'
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -52,7 +46,7 @@ class Flight(Base):
     )
 
 
-class FlightFareSnapshot(Base):
+class FlightFareSnapshot(db.Model):
     __tablename__ = 'flight_fare_snapshots'
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -76,7 +70,7 @@ class FlightFareSnapshot(Base):
     flight: Mapped['Flight'] = relationship('Flight', back_populates='fare_snapshots')
 
 
-class Config(Base):
+class Config(db.Model):
     __tablename__ = 'config'
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -88,13 +82,4 @@ class Config(Base):
 
 
 def init_db():
-    os.makedirs('data', exist_ok=True)
-    Base.metadata.create_all(bind=engine)
-
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    DEFAULT_DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)

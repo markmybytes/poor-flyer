@@ -4,7 +4,7 @@ from datetime import UTC, date, datetime
 from flask import Blueprint, jsonify, request
 from sqlalchemy import select
 
-from src.database import Flight, FlightFareSnapshot, SessionLocal
+from src.database import Flight, FlightFareSnapshot, db
 from src.services.scraper import scrape_prices
 
 flights_bp = Blueprint('flights', __name__, url_prefix='/flights')
@@ -12,7 +12,7 @@ flights_bp = Blueprint('flights', __name__, url_prefix='/flights')
 
 @flights_bp.route('', methods=['POST'])
 def create_flight():
-    db = SessionLocal()
+    session = db.session
     try:
         data = request.get_json(silent=True) or request.form.to_dict()
 
@@ -28,21 +28,20 @@ def create_flight():
             is_active=True,
         )
 
-        db.add(entry)
-        db.commit()
+        session.add(entry)
+        session.commit()
         return jsonify({'success': True, 'message': 'Entry created', 'data': entry})
     except Exception as e:
-        db.rollback()
+        session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 400
-    finally:
-        db.close()
 
 
 @flights_bp.route('/<flight_id>', methods=['GET'])
 def get_flight(flight_id):
-    db = SessionLocal()
     try:
-        entry = db.execute(select(Flight).where(Flight.id == flight_id)).scalar_one_or_none()
+        entry = db.session.execute(
+            select(Flight).where(Flight.id == flight_id)
+        ).scalar_one_or_none()
 
         if not entry:
             return jsonify({'success': False, 'message': 'Entry not found'}), 404
@@ -50,15 +49,13 @@ def get_flight(flight_id):
         return jsonify({'success': True, 'message': 'Entry retrieved', 'data': entry})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
-    finally:
-        db.close()
 
 
 @flights_bp.route('/<flight_id>', methods=['PATCH'])
 def update_flight(flight_id):
-    db = SessionLocal()
+    session = db.session
     try:
-        entry = db.execute(select(Flight).where(Flight.id == flight_id)).scalar_one_or_none()
+        entry = session.execute(select(Flight).where(Flight.id == flight_id)).scalar_one_or_none()
 
         if not entry:
             return jsonify({'success': False, 'message': 'Entry not found'}), 404
@@ -71,39 +68,35 @@ def update_flight(flight_id):
         if 'notification_enabled' in data:
             entry.notification_enabled = data['notification_enabled']
 
-        db.commit()
+        session.commit()
         return jsonify({'success': True, 'message': 'Entry updated', 'data': entry})
     except Exception as e:
-        db.rollback()
+        session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 400
-    finally:
-        db.close()
 
 
 @flights_bp.route('/<flight_id>', methods=['DELETE'])
 def delete_flight(flight_id):
-    db = SessionLocal()
+    session = db.session
     try:
-        entry = db.execute(select(Flight).where(Flight.id == flight_id)).scalar_one_or_none()
+        entry = session.execute(select(Flight).where(Flight.id == flight_id)).scalar_one_or_none()
 
         if not entry:
             return jsonify({'success': False, 'message': 'Entry not found'}), 404
 
-        db.delete(entry)
-        db.commit()
+        session.delete(entry)
+        session.commit()
         return jsonify({'success': True, 'message': 'Entry deleted', 'data': None})
     except Exception as e:
-        db.rollback()
+        session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 400
-    finally:
-        db.close()
 
 
 @flights_bp.route('/<flight_id>/scrape', methods=['POST'])
 def scrape_flight(flight_id):
-    db = SessionLocal()
+    session = db.session
     try:
-        entry = db.execute(select(Flight).where(Flight.id == flight_id)).scalar_one_or_none()
+        entry = session.execute(select(Flight).where(Flight.id == flight_id)).scalar_one_or_none()
 
         if not entry:
             return jsonify({'success': False, 'message': 'Entry not found'}), 404
@@ -120,7 +113,7 @@ def scrape_flight(flight_id):
         )
 
         for result in results.results:
-            db.add(
+            session.add(
                 FlightFareSnapshot(
                     flight_id=flight_id,
                     created_at=datetime.now(UTC),
@@ -132,11 +125,9 @@ def scrape_flight(flight_id):
                     error_message=results.error_message,
                 )
             )
-            db.commit()
+            session.commit()
 
         return jsonify({'success': True, 'message': 'Scrape completed', 'data': entry})
     except Exception as e:
-        db.rollback()
+        session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 400
-    finally:
-        db.close()

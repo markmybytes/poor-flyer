@@ -6,7 +6,7 @@ Provides type-safe access with in-memory caching to reduce DB overhead.
 import logging
 from typing import Any
 
-from src.database import Config, SessionLocal
+from src.database import Config, db
 
 logger = logging.getLogger(__name__)
 
@@ -32,17 +32,15 @@ class ConfigManager:
         if cache_key in cls._cache:
             return cls._cache[cache_key]
 
-        db = SessionLocal()
-        try:
-            config = (
-                db.query(Config).filter(Config.namespace == namespace, Config.key == key).first()
-            )
-            if config:
-                cls._cache[cache_key] = config.value
-                return config.value
-            return default
-        finally:
-            db.close()
+        config = (
+            db.session.query(Config)
+            .filter(Config.namespace == namespace, Config.key == key)
+            .first()
+        )
+        if config:
+            cls._cache[cache_key] = config.value
+            return config.value
+        return default
 
     @classmethod
     def get_int(cls, namespace: str, key: str, default: int | None = None) -> int | None:
@@ -81,11 +79,10 @@ class ConfigManager:
         if not settings:
             return
 
-        db = SessionLocal()
         try:
             for key, value in settings.items():
                 config = (
-                    db.query(Config)
+                    db.session.query(Config)
                     .filter(Config.namespace == namespace, Config.key == key)
                     .first()
                 )
@@ -93,9 +90,9 @@ class ConfigManager:
                     config.value = value
                 else:
                     config = Config(namespace=namespace, key=key, value=value)
-                    db.add(config)
+                    db.session.add(config)
 
-            db.commit()
+            db.session.commit()
 
             for key in settings.keys():
                 cache_key = (namespace, key)
@@ -104,11 +101,9 @@ class ConfigManager:
 
             cls._logger.info(f'Bulk updated {len(settings)} settings in {namespace}')
         except Exception as e:
-            db.rollback()
+            db.session.rollback()
             cls._logger.error(f'Failed to bulk update config in {namespace}: {e}')
             raise
-        finally:
-            db.close()
 
     @classmethod
     def get_all(cls, namespace: str) -> dict[str, str]:
@@ -116,16 +111,12 @@ class ConfigManager:
         Bulk fetch for a whole namespace.
         Handy for warming up the cache on startup.
         """
-        db = SessionLocal()
-        try:
-            configs = db.query(Config).filter(Config.namespace == namespace).all()
-            result = {config.key: config.value for config in configs}
+        configs = db.session.query(Config).filter(Config.namespace == namespace).all()
+        result = {config.key: config.value for config in configs}
 
-            for key, value in result.items():
-                cls._cache[(namespace, key)] = value
-            return result
-        finally:
-            db.close()
+        for key, value in result.items():
+            cls._cache[(namespace, key)] = value
+        return result
 
     @classmethod
     def get_all_masked(cls, namespace: str) -> dict[str, str]:

@@ -1,10 +1,13 @@
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import click
 from flask import current_app
 from flask.cli import with_appcontext
+
+from src.services.scheduler import start_scheduler, stop_scheduler
 
 
 @click.command(name='dev')
@@ -36,3 +39,19 @@ def dev():
 
         hot_file.unlink(missing_ok=True)
         sys.exit(0)
+
+
+@click.command(name='run-scheduler')
+@with_appcontext
+def run_scheduler():
+    """Run APScheduler as a dedicated long-lived process."""
+    click.echo(click.style('Starting scheduler process...', fg='cyan'))
+    start_scheduler(current_app._get_current_object())
+
+    try:
+        while True:
+            time.sleep(60)
+    except KeyboardInterrupt:
+        click.echo(click.style('\nStopping scheduler process...', fg='yellow'))
+    finally:
+        stop_scheduler()

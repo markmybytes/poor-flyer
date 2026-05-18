@@ -18,6 +18,9 @@ RUN pip install --no-cache-dir .
 RUN patchright install chrome && patchright install-deps
 
 COPY . .
+
+RUN chmod +x /app/scripts/docker-entrypoint.sh
+
 EXPOSE 8000
 
-CMD ["xvfb-run", "--auto-servernum", "--server-args='-screen 0 1920x1080x24'", "gunicorn", "--bind", "0.0.0.0:8000", "--workers", "1", "wsgi:app"]
+CMD ["/app/scripts/docker-entrypoint.sh"]
