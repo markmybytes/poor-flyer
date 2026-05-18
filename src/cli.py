@@ -44,14 +44,23 @@ def dev():
 @click.command(name='run-scheduler')
 @with_appcontext
 def run_scheduler():
-    """Run APScheduler as a dedicated long-lived process."""
-    click.echo(click.style('Starting scheduler process...', fg='cyan'))
-    start_scheduler(current_app._get_current_object())
+    """
+    Run the APScheduler as a dedicated long-lived process.
+
+    This command starts the scheduler and keeps it running indefinitely.
+    It is designed to be run in a separate process from the web server.
+    """
+    click.echo(click.style('🔔 Starting scheduler process...', fg='cyan'))
+    click.echo(click.style('   Jobs: Daily flight price scrape at 09:00 UTC', fg='yellow'))
+
+    start_scheduler()
 
     try:
+        # Keep the scheduler running
         while True:
             time.sleep(60)
     except KeyboardInterrupt:
-        click.echo(click.style('\nStopping scheduler process...', fg='yellow'))
+        click.echo(click.style('\nShutting down scheduler...', fg='yellow'))
     finally:
         stop_scheduler()
+        click.echo(click.style('Scheduler stopped.', fg='green'))

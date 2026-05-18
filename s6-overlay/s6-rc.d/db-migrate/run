@@ -1,0 +1,3 @@
+#!/bin/sh
+# Run database migrations
+exec flask db upgrade

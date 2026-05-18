@@ -3,8 +3,8 @@ import threading
 import uuid
 from datetime import date
 
-from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask, render_template
+from flask_apscheduler import APScheduler
 
 from src.database import Flight, FlightFareSnapshot, db
 from src.services.config import ConfigManager
@@ -14,102 +14,116 @@ from src.services.scraper import scrape_prices
 
 logger = logging.getLogger(__name__)
 
-scheduler = BackgroundScheduler()
+# Global scheduler instance - will be initialized in create_app
+scheduler = APScheduler()
 
 
-def daily_scrape_job(app: Flask):
-    with app.app_context():
-        try:
-            today = date.today()
-            flights = (
-                db.session.query(Flight).filter(Flight.is_active, Flight.flight_date >= today).all()
-            )
-            for flight in flights:
-                res = scrape_prices(flight.origin, flight.destination, flight.flight_date)
-                for r in res.results:
-                    db.session.add(
-                        FlightFareSnapshot(
-                            id=str(uuid.uuid4()),
-                            flight_id=flight.id,
-                            fare=r.fare,
-                            flight_number=r.flight_number,
-                            departure_at=r.departure_at,
-                            arrival_at=r.arrival_at,
-                            scrape_status='success' if res.success else 'error',
-                            error_message=res.error_message,
-                        )
-                    )
-            db.session.commit()
-
-            smtp_cfg = get_smtp_config()
-            recipients = [
-                r.strip()
-                for r in ConfigManager.get_str('email', 'recipients', '').split(',')
-                if r.strip()
-            ]
-
-            for flight in (f for f in flights if f.notification_enabled and f.deadline):
-                r37 = compute_37_best(
-                    flight.created_at.date(),
-                    today,
-                    flight.deadline,
-                    {
-                        s.created_at.date(): float(s.fare)
-                        for s in flight.fare_snapshots
-                        if s.scrape_status == 'success'
-                    },
-                )
-                if r37.phase != Phase.BUY_SIGNAL:
-                    continue
-
-                snap = max(
-                    (s for s in flight.fare_snapshots if s.scrape_status == 'success'),
-                    key=lambda s: s.created_at,
-                    default=None,
-                )
-                if not snap or not recipients:
-                    continue
-
-                flight_date_str = flight.flight_date.strftime('%Y-%m-%d')
-                subj = f'✈️ 購買信號 | {flight.origin} → {flight.destination} ({flight_date_str})'
-                body = render_template(
-                    'email/buy_signal.html',
-                    flight_origin=flight.origin,
-                    flight_destination=flight.destination,
-                    flight_date=flight_date_str,
-                    current_fare=float(snap.fare),
-                    lowest_fare=float(r37.history_best_val or snap.fare),
-                )
-
-                for email in recipients:
-                    threading.Thread(
-                        target=send_html_email,
-                        args=(smtp_cfg, email, subj, body),
-                        daemon=True,
-                    ).start()
-
-        except Exception as exc:
-            logger.error(f'Job failed: {exc}')
-            db.session.rollback()
-        finally:
-            db.session.remove()
-
-
-def start_scheduler(app: Flask):
-    if not scheduler.running:
-        scheduler.add_job(
-            daily_scrape_job,
-            'cron',
-            hour=9,
-            minute=0,
-            jitter=1800,
-            args=[app],
+def daily_scrape_job():
+    """Daily scrape job - runs with app context automatically via flask-apscheduler."""
+    try:
+        today = date.today()
+        flights = (
+            db.session.query(Flight).filter(Flight.is_active, Flight.flight_date >= today).all()
         )
+        for flight in flights:
+            res = scrape_prices(flight.origin, flight.destination, flight.flight_date)
+            for r in res.results:
+                db.session.add(
+                    FlightFareSnapshot(
+                        id=str(uuid.uuid4()),
+                        flight_id=flight.id,
+                        fare=r.fare,
+                        flight_number=r.flight_number,
+                        departure_at=r.departure_at,
+                        arrival_at=r.arrival_at,
+                        scrape_status='success' if res.success else 'error',
+                        error_message=res.error_message,
+                    )
+                )
+        db.session.commit()
+
+        smtp_cfg = get_smtp_config()
+        recipients = [
+            r.strip()
+            for r in ConfigManager.get_str('email', 'recipients', '').split(',')
+            if r.strip()
+        ]
+
+        for flight in (f for f in flights if f.notification_enabled and f.deadline):
+            r37 = compute_37_best(
+                flight.created_at.date(),
+                today,
+                flight.deadline,
+                {
+                    s.created_at.date(): float(s.fare)
+                    for s in flight.fare_snapshots
+                    if s.scrape_status == 'success'
+                },
+            )
+            if r37.phase != Phase.BUY_SIGNAL:
+                continue
+
+            snap = max(
+                (s for s in flight.fare_snapshots if s.scrape_status == 'success'),
+                key=lambda s: s.created_at,
+                default=None,
+            )
+            if not snap or not recipients:
+                continue
+
+            flight_date_str = flight.flight_date.strftime('%Y-%m-%d')
+            subj = f'✈️ 購買信號 | {flight.origin} → {flight.destination} ({flight_date_str})'
+            body = render_template(
+                'email/buy_signal.html',
+                flight_origin=flight.origin,
+                flight_destination=flight.destination,
+                flight_date=flight_date_str,
+                current_fare=float(snap.fare),
+                lowest_fare=float(r37.history_best_val or snap.fare),
+            )
+
+            for email in recipients:
+                threading.Thread(
+                    target=send_html_email,
+                    args=(smtp_cfg, email, subj, body),
+                    daemon=True,
+                ).start()
+
+    except Exception as exc:
+        logger.error(f'Scheduler job failed: {exc}', exc_info=True)
+        db.session.rollback()
+    finally:
+        db.session.remove()
+
+
+def init_scheduler(app: Flask):
+    """Initialize the scheduler with the Flask app."""
+    scheduler.init_app(app)
+
+    scheduler.add_job(
+        id='daily_scrape',
+        func=daily_scrape_job,
+        trigger='cron',
+        hour=9,
+        minute=0,
+        jitter=1800,
+        name='Daily flight price scrape at 09:00 UTC',
+        coalesce=True,
+        max_instances=1,
+    )
+
+    logger.info('Scheduler initialized with daily_scrape job')
+
+
+def start_scheduler():
+    """Start the scheduler - only call this if not already running."""
+    if not scheduler.running:
         scheduler.start()
         logger.info('Scheduler started')
 
 
 def stop_scheduler():
+    """Stop the scheduler gracefully."""
     if scheduler.running:
         scheduler.shutdown()
         logger.info('Scheduler stopped')

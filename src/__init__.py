@@ -8,6 +8,7 @@ from src.cli import dev, run_scheduler
 from src.database import DEFAULT_DATABASE_URL, db, init_db
 from src.routes.api import api_bp
 from src.routes.pages import pages_bp
+from src.services.scheduler import init_scheduler
 from src.utils.json import CamelCaseJSONProvider
 
 migrate = Migrate()
@@ -25,6 +26,12 @@ def _inject_vite_url():
 
 
 def create_app():
+    """
+    Flask application factory.
+
+    The scheduler is initialized here but NOT started automatically.
+    It must be started explicitly via the CLI command `flask run-scheduler`.
+    """
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     app = Flask(
         __name__,
@@ -37,16 +44,20 @@ def create_app():
     app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', DEFAULT_DATABASE_URL)
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+    app.json = CamelCaseJSONProvider(app)
+
     db_uri = app.config['SQLALCHEMY_DATABASE_URI']
     if db_uri.startswith('sqlite'):
         app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'connect_args': {'check_same_thread': False}}
 
-    app.json = CamelCaseJSONProvider(app)
-
     init_db()
     db.init_app(app)
+
     migrate.init_app(app, db, compare_type=True, render_as_batch=True)
+
     Inertia(app)
+
+    init_scheduler(app)
 
     app.register_blueprint(pages_bp)
     app.register_blueprint(api_bp)

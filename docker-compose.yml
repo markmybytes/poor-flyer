@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  # Web server running Gunicorn + Flask
+  web:
+    build: .
+    container_name: poor-flyer-web
+    ports:
+      - '8000:8000'
+    environment:
+      - DATABASE_URL=sqlite:////app/data/db.sqlite
+      - FLASK_APP=wsgi:app
+    volumes:
+      - ./data:/app/data
+    # Override entrypoint to only run web service (for testing web without scheduler)
+    # Uncomment to test web-only:
+    # entrypoint: >
+    #   sh -c "
+    #   flask db upgrade &&
+    #   xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24'
+    #   gunicorn --bind 0.0.0.0:8000 --workers 1 wsgi:app
+    #   "
+
+  # Separate scheduler process (only if you want to test with separate DB)
+  # scheduler:
+  #   build: .
+  #   container_name: poor-flyer-scheduler
+  #   environment:
+  #     - DATABASE_URL=sqlite:////app/data/db.sqlite
+  #     - FLASK_APP=wsgi:app
+  #   volumes:
+  #     - ./data:/app/data
+  #   entrypoint: >
+  #     sh -c "
+  #     sleep 5 &&
+  #     flask run-scheduler
+  #     "
+  #   depends_on:
+  #     - web
