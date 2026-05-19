@@ -40,7 +40,7 @@ def create_app():
                     'func': 'src.services.scheduler:daily_scrape_job',
                     'trigger': create_cron_trigger(
                         os.getenv('SCHEDULER_SCRAPE_CRON', '0 9 * * *'),
-                        int(os.getenv('SCHEDULER_SCRAPE_JITTER_SECONDS', 0)),
+                        int(os.getenv('SCHEDULER_SCRAPE_JITTER_SECONDS', 1800)),
                     ),
                 }
             ],

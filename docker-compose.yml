@@ -6,9 +6,7 @@ services:
       - '8000:8000'
     environment:
       DATABASE_URL: sqlite:////app/data/db.sqlite
-      SCHEDULER_TIMEZONE: UTC
-      SCHEDULER_SCRAPE_CRON_HOUR: 9
-      SCHEDULER_SCRAPE_CRON_MINUTE: 0
+      SCHEDULER_SCRAPE_CRON: '0 9 * * *'
       SCHEDULER_SCRAPE_JITTER_SECONDS: 1800
       PUID: 1000
       PGID: 1000
