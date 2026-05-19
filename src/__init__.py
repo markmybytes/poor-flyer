@@ -33,6 +33,7 @@ def create_app():
 
     app.config.from_mapping(
         {
+            'INERTIA_TEMPLATE': 'base.html',
             'JOBS': [
                 {
                     'id': 'daily_scrape',
