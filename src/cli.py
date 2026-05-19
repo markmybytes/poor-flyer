@@ -28,11 +28,13 @@ def dev():
     hot_file = Path(current_app.config['VITE_HOT_FILE'])
     hot_file.unlink(missing_ok=True)
 
+    flask_cmd = [sys.executable, '-m', 'flask', '--app', 'wsgi:app']
+
     vite_process = subprocess.Popen(['npm', 'run', 'dev'], stdin=subprocess.DEVNULL)
-    scheduler_process = subprocess.Popen(['flask', '--app', 'wsgi:app', 'run-scheduler'])
+    scheduler_process = subprocess.Popen([*flask_cmd, 'run-scheduler'])
 
     try:
-        subprocess.run(['flask', '--app', 'wsgi:app', 'run', '--debug'], check=True)
+        subprocess.run([*flask_cmd, 'run', '--debug'], check=True)
     except KeyboardInterrupt:
         click.echo(click.style('\nShutting down development services...', fg='yellow'))
     except subprocess.CalledProcessError as exc:
