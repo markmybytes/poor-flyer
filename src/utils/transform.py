@@ -1,3 +1,4 @@
+import collections.abc
 from dataclasses import asdict, is_dataclass
 from datetime import date, datetime
 
@@ -31,13 +32,24 @@ def model_to_dict(model):
 
 def camelize(obj):
     """Recursively transform keys to camelCase."""
-    if isinstance(obj, dict):
+
+    # Handle dicts AND SQLAlchemy RowMappings (anything that acts like a dict)
+    if isinstance(obj, collections.abc.Mapping):
         return {to_camel(k): camelize(v) for k, v in obj.items()}
-    if isinstance(obj, list):
+
+    # Handle SQLAlchemy Raw Rows (converts them to dicts first)
+    if hasattr(obj, '_mapping'):
+        return camelize(dict(obj._mapping))
+
+    # Handle standard iterables (lists, tuples)
+    if isinstance(obj, (list, tuple)):
         return [camelize(i) for i in obj]
+
+    # Handle Dataclasses
     if is_dataclass(obj):
         return camelize(asdict(obj))
-    # Handle SQLAlchemy models
+
+    # Handle full SQLAlchemy Models
     if hasattr(obj, '__table__'):
         return camelize(model_to_dict(obj))
     return obj

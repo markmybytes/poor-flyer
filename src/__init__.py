@@ -9,7 +9,7 @@ from src.extensions.database import DEFAULT_DATABASE_URL
 from src.extensions.scheduler import create_cron_trigger
 from src.routes.api import api_bp
 from src.routes.pages import pages_bp
-from src.utils.json import CamelCaseJSONProvider
+from src.utils.transform import CamelCaseJSONProvider
 
 
 def _inject_vite_url():
