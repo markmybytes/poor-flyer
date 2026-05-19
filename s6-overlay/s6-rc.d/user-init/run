@@ -8,8 +8,8 @@ groupmod -o -g "$PGID" abc
 usermod -o -u "$PUID" abc
 
 # Ensure writable runtime paths exist after UID/GID remap.
-mkdir -p /app/data
-chown -R abc:abc /app/data
+mkdir -p /home/abc /app/data
+chown -R abc:abc /home/abc /app/data
 
 
 echo '

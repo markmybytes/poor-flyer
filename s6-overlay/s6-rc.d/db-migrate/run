@@ -2,4 +2,4 @@
 # shellcheck shell=sh
 
 exec \
-  s6-setuidgid abc flask --app /app/wsgi.py db upgrade
+  s6-setuidgid abc sh -c 'cd /app && export HOME=/home/abc && exec flask --app wsgi:app db upgrade'

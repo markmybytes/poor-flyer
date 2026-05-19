@@ -2,5 +2,4 @@
 # shellcheck shell=sh
 
 exec \
-  s6-setuidgid abc xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' \
-  gunicorn --chdir /app --bind 0.0.0.0:8000 --workers 1 --timeout 120 wsgi:app
+  s6-setuidgid abc sh -c 'cd /app && export HOME=/home/abc && exec xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" gunicorn --bind 0.0.0.0:8000 --workers 1 --timeout 120 wsgi:app'
