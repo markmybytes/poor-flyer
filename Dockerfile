@@ -32,8 +32,9 @@ RUN mkdir -p /var/log/db-migrate /var/log/web /var/log/scheduler && \
 
 RUN find /etc/s6-overlay/s6-rc.d -type f \( -name run -o -name finish \) -exec chmod +x {} +
 
-RUN groupadd -g 1000 appgroup && \
-    useradd -u 1000 -g 1000 -d /home/appuser -m appuser
+RUN groupmod -g 1000 users && \
+    useradd -u 911 -U -d /config -s /bin/false abc && \
+    usermod -G users abc
 
 EXPOSE 8000
 

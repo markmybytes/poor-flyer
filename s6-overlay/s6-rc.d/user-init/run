@@ -1,29 +1,19 @@
-#!/usr/bin/execlineb -P
-# Initialize user with UID/GID from environment variables
-# Similar to linuxserver.io approach
+#!/command/with-contenv bash
+# shellcheck shell=bash
 
-foreground {
-  if { test -z $PUID }
-  foreground { s6-echo "PUID not set, defaulting to 1000" }
-  if { test -z $PGID }
-  foreground { s6-echo "PGID not set, defaulting to 1000" }
-}
+PUID=${PUID:-911}
+PGID=${PGID:-911}
 
-# Create group if it doesn't exist
-foreground {
-  if { ! getent group $PGID }
-  groupadd -g ${PGID:-1000} appgroup
-}
+groupmod -o -g "$PGID" abc
+usermod -o -u "$PUID" abc
 
-# Create user if it doesn't exist, or modify existing one
-foreground {
-  if { getent passwd ${PUID:-1000} }
-  usermod -u ${PUID:-1000} -g ${PGID:-1000} appuser
-  if -n { usermod -u ${PUID:-1000} -g ${PGID:-1000} appuser }
-  useradd -u ${PUID:-1000} -g ${PGID:-1000} -d /home/appuser -m appuser
-}
 
-# Set proper permissions for app directory
-foreground { chown -R ${PUID:-1000}:${PGID:-1000} /app }
-
-s6-echo "User initialized: appuser (UID: ${PUID:-1000}, GID: ${PGID:-1000})"
+echo '
+───────────────────────────────────────
+GID/UID
+───────────────────────────────────────'
+echo "
+User UID:    $(id -u abc)
+User GID:    $(id -g abc)
+───────────────────────────────────────
+"
