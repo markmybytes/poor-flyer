@@ -1,0 +1,87 @@
+<html>
+  <body style="font-family: Arial, sans-serif; color: #333; background-color: #f9fafb">
+    <div
+      style="
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      "
+    >
+      <h1 style="color: #22c55e; margin-bottom: 20px; text-align: center">
+        🎉 購買信號 (BUY SIGNAL)
+      </h1>
+
+      <div
+        style="
+          background: #f0fdf4;
+          border-left: 4px solid #22c55e;
+          padding: 16px;
+          margin-bottom: 20px;
+          border-radius: 4px;
+        "
+      >
+        <h2 style="margin: 0 0 10px 0; font-size: 18px">最佳購買時機已來臨</h2>
+        <p style="margin: 0; color: #6b7280">現在購買可節省最多費用</p>
+      </div>
+
+      <div style="background: #f3f4f6; padding: 16px; border-radius: 8px; margin-bottom: 20px">
+        <table style="width: 100%; border-collapse: collapse">
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold; color: #6b7280; width: 50%">路線：</td>
+            <td style="padding: 8px 0; font-size: 16px; font-weight: bold">
+              {{ flight_origin }} → {{ flight_destination }}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold; color: #6b7280">出發日期：</td>
+            <td style="padding: 8px 0; font-size: 16px">{{ flight_date }}</td>
+          </tr>
+          <tr style="border-top: 1px solid #e5e7eb">
+            <td style="padding: 8px 0; font-weight: bold; color: #6b7280">當前票價：</td>
+            <td style="padding: 8px 0; font-size: 18px; font-weight: bold; color: #ef4444">
+              HK${{ current_fare|round(2) }}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold; color: #6b7280">歷史最低：</td>
+            <td style="padding: 8px 0; font-size: 18px; font-weight: bold; color: #22c55e">
+              HK${{ lowest_fare|round(2) }}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold; color: #6b7280">可節省：</td>
+            <td style="padding: 8px 0; font-size: 16px; font-weight: bold; color: #22c55e">
+              HK${{ (current_fare - lowest_fare)|round(2) }} ({{ ((current_fare - lowest_fare) /
+              lowest_fare * 100)|round(1) }}%)
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <div
+        style="
+          background: #fef3c7;
+          border-left: 4px solid #f59e0b;
+          padding: 16px;
+          border-radius: 4px;
+          margin-bottom: 20px;
+        "
+      >
+        <p style="margin: 0; font-weight: bold">⏰ 建議立即購票</p>
+        <p style="margin: 5px 0 0 0; font-size: 14px; color: #92400e">
+          根據 37% 購票法則，現在購買應為最佳時機
+        </p>
+      </div>
+
+      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0" />
+
+      <p style="font-size: 12px; color: #6b7280; margin: 0">
+        這是來自 PoorFlyer 的自動通知。
+        <br />祝您購票愉快！ ✈️
+      </p>
+    </div>
+  </body>
+</html>

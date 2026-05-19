@@ -1,50 +1,55 @@
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from enum import Enum
-from math import floor
-from typing import Optional
 
 
 class Phase(Enum):
-    OBSERVING = "OBSERVING"
-    BUY_SIGNAL = "BUY_SIGNAL"
-    WAITING = "WAITING"
+    OBSERVING = 'OBSERVING'
+    BUY_SIGNAL = 'BUY_SIGNAL'
+    WAITING = 'WAITING'
 
 
 @dataclass
 class DeadlineRule37:
-    """37% rule anchored to a user-supplied deadline date."""
-
     cutoff_date: date
     phase: Phase
-    history_best_val: Optional[float]
-    latest_val: Optional[float]
-    all_time_high: Optional[float] = None
-    all_time_low: Optional[float] = None
+    history_best_val: float | None
+    latest_val: float | None
+    all_time_high: float | None = None
+    all_time_low: float | None = None
 
 
 def compute_37_best(
     start: date, today: date, end: date, values: dict[date, int | float]
-) -> Optional[DeadlineRule37]:
-    if not (past := [d for d in values if d <= today]):
-        return None
-
+) -> DeadlineRule37:
     cutoff_date = start + timedelta(days=int((end - start).days * 0.37))
+    # ensure dates are within the specificied window
+    past = [d for d in values if start <= d <= min(today, end)]
+
+    if not past:
+        return DeadlineRule37(
+            cutoff_date=cutoff_date,
+            phase=Phase.OBSERVING if today < cutoff_date else Phase.WAITING,
+            history_best_val=None,
+            latest_val=None,
+        )
+
     latest_val = float(values[max(past)])
-    m = min(
-        [float(fare) for d, fare in values.items() if start <= d < cutoff_date],
-        default=float("inf"),
-    )
+    valid_vals = [float(values[d]) for d in past]
+    m = min([float(values[d]) for d in past if d < cutoff_date], default=float('inf'))
+
+    if today < cutoff_date:
+        phase = Phase.OBSERVING
+    elif m != float('inf') and latest_val < m:
+        phase = Phase.BUY_SIGNAL
+    else:
+        phase = Phase.WAITING
 
     return DeadlineRule37(
         cutoff_date=cutoff_date,
-        phase=(
-            Phase.OBSERVING
-            if today < cutoff_date
-            else (Phase.BUY_SIGNAL if latest_val < m else Phase.WAITING)
-        ),
-        history_best_val=None if today < cutoff_date or m == float("inf") else m,
+        phase=phase,
+        history_best_val=m if (m != float('inf') and today >= cutoff_date) else None,
         latest_val=latest_val,
-        all_time_high=max(map(float, values.values()), default=None),
-        all_time_low=min(map(float, values.values()), default=None),
+        all_time_high=max(valid_vals),
+        all_time_low=min(valid_vals),
     )

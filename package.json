@@ -8,7 +8,7 @@
     "build": "run-p type-check \"build-only {@}\" --",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
-    "format": "prettier --write 'src/frontend/**/*.{css,ts,js,vue}' 'src/frontend/**/*.d.ts'",
+    "format": "prettier --write 'src/frontend/**/*.{css,ts,js,vue}'",
     "lint": "prettier --check 'src/frontend/**/*.{css,ts,js,vue}' 'src/frontend/**/*.d.ts' && eslint ./src/frontend"
   },
   "devDependencies": {
@@ -17,6 +17,7 @@
     "@vitejs/plugin-vue": "^6.0.5",
     "@vue/eslint-config-typescript": "^14.7.0",
     "@vue/tsconfig": "^0.9.0",
+    "daisyui": "^5.5.19",
     "eslint": "^10.0.3",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-vue": "^10.8.0",
@@ -34,7 +35,8 @@
     "@inertiajs/vue3": "^2.3.18",
     "@vuepic/vue-datepicker": "^12.1.0",
     "chart.js": "^4.5.1",
-    "vue": "^3.5.30"
+    "vue": "^3.5.30",
+    "vue-toast-notification": "^3.1.3"
   },
   "volta": {
     "node": "24.15.0"

@@ -1,0 +1,3 @@
+#!/bin/sh
+exec s6-setuidgid ${PUID:-1000}:${PGID:-1000} \
+  flask --app wsgi:app run-scheduler

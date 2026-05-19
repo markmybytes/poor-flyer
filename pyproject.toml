@@ -3,19 +3,20 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "airline-price-scraper"
+name = "hk-poor-flyer"
 version = "0.1.0"
-description = "Flight price tracker with daily scraping"
+description = "PoorFlyer - Flight price tracker with daily scraping"
 requires-python = ">=3.12"
 dependencies = [
-    "apscheduler>=3.11.2",
+    "flask-apscheduler>=1.13.1",
     "fake-useragent>=2.2.0",
     "flask>=3.1.3",
+    "flask-migrate>=4.1.0",
     "flask-inertia>=0.10",
     "gunicorn>=26.0.0",
     "httpx>=0.28.1",
     "patchright>=1.59.1",
-    "sqlalchemy>=2.0.49",
+    "flask-sqlalchemy>=3.1.1",
 ]
 
 [project.optional-dependencies]
@@ -27,3 +28,12 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["."]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP"]
+
+[tool.ruff.format]
+quote-style = "single"
