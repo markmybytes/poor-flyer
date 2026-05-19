@@ -5,6 +5,7 @@ services:
     ports:
       - '8000:8000'
     environment:
+      TZ: UTC
       DATABASE_URL: sqlite:////app/data/db.sqlite
       SCHEDULER_SCRAPE_CRON: '0 9 * * *'
       SCHEDULER_SCRAPE_JITTER_SECONDS: 1800
