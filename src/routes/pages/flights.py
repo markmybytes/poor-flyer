@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from src.extensions.database import Flight, db
 from src.services.rule37 import compute_37_best
+from src.utils.transform import model_to_dict
 
 flights_bp = Blueprint('flights', __name__, url_prefix='/flights')
 
@@ -37,18 +38,13 @@ def index():
         .scalars()
         .all()
     )
+
     return render_inertia(
         'Flights/Index',
         props={
             'flights': [
                 {
-                    'id': f.id,
-                    'origin': f.origin,
-                    'destination': f.destination,
-                    'flight_date': f.flight_date,
-                    'deadline': f.deadline,
-                    'is_active': f.is_active,
-                    'created_at': f.created_at,
+                    **model_to_dict(f),
                     'fare_snapshots': f.fare_snapshots,
                     'rule37_analysis': _r37(f),
                 }
@@ -75,13 +71,7 @@ def show(flight_id):
         'Flights/Detail',
         props={
             'flight': {
-                'id': flight.id,
-                'origin': flight.origin,
-                'destination': flight.destination,
-                'flight_date': flight.flight_date,
-                'deadline': flight.deadline,
-                'is_active': flight.is_active,
-                'fare_snapshots': flight.fare_snapshots,
+                **model_to_dict(flight),
                 'rule37_analysis': _r37(flight),
             }
         },
