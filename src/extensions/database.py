@@ -14,15 +14,12 @@ from sqlalchemy import (
     ForeignKey,
     String,
     UniqueConstraint,
-    create_engine,
 )
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
-    Session,
     mapped_column,
     relationship,
-    sessionmaker,
 )
 
 # Database path and URL configuration
@@ -101,29 +98,3 @@ class Config(db.Model):
     value: Mapped[str] = mapped_column(String, nullable=False)
 
     __table_args__ = (UniqueConstraint('namespace', 'key', name='uq_config_namespace_key'),)
-
-
-# Session and engine initialization for direct database access (e.g., scripts)
-engine = create_engine(
-    DEFAULT_DATABASE_URL,
-    connect_args={'check_same_thread': False} if DEFAULT_DATABASE_URL.startswith('sqlite') else {},
-)
-SessionLocal = sessionmaker(bind=engine, class_=Session, expire_on_commit=False)
-
-
-def init_db() -> None:
-    """Initialize database schema for direct/script usage.
-
-    Flask extension binding is handled in src.extensions.init_extensions.
-    """
-    DEFAULT_DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    Base.metadata.create_all(bind=engine)
-
-
-def get_session():
-    """Get current database session.
-
-    Returns:
-        SQLAlchemy session object
-    """
-    return db.session
