@@ -21,7 +21,6 @@ WORKDIR /app
 
 ENV DATABASE_URL=sqlite:////app/data/db.sqlite
 ENV DISPLAY=:99
-ENV HOME=/home/abc
 
 VOLUME ["/app/data"]
 

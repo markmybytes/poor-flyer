@@ -1,0 +1,5 @@
+#!/command/with-contenv sh
+# shellcheck shell=sh
+
+cd /app
+exec s6-setuidgid abc flask --app /app/wsgi.py db upgrade
