@@ -1,1 +1,21 @@
-/etc/s6-overlay/s6-rc.d/user-init/run
+#!/command/with-contenv sh
+# shellcheck shell=sh
+
+set -eu
+
+PUID=${PUID:-911}
+PGID=${PGID:-911}
+
+groupmod -o -g "$PGID" abc
+usermod -o -u "$PUID" abc
+
+# Ensure writable runtime paths exist after UID/GID remap.
+mkdir -p /home/abc /app/data
+chown -R abc:abc /home/abc /app/data
+
+echo '---------------------------------------'
+echo 'UID/GID mapping'
+echo '---------------------------------------'
+echo "User UID: $(id -u abc)"
+echo "User GID: $(id -g abc)"
+echo '---------------------------------------'

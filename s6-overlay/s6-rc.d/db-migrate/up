@@ -1,1 +1,5 @@
-/etc/s6-overlay/s6-rc.d/db-migrate/run
+#!/command/with-contenv sh
+# shellcheck shell=sh
+
+exec \
+	s6-setuidgid abc sh -c 'cd /app && export HOME=/home/abc && exec flask --app wsgi:app db upgrade'
