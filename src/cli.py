@@ -1,5 +1,6 @@
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -19,6 +20,16 @@ def _terminate_process(proc: subprocess.Popen, label: str) -> None:
         proc.wait(timeout=5)
 
 
+def _stream_prefixed_output(proc: subprocess.Popen, label: str, color: str | None = None) -> None:
+    if proc.stdout is None:
+        return
+
+    for line in proc.stdout:
+        message = line.rstrip()
+        if message:
+            click.echo(click.style(f'[{label}] {message}', fg=color))
+
+
 @click.command(name='dev')
 @with_appcontext
 def dev():
@@ -30,20 +41,52 @@ def dev():
 
     flask_cmd = [sys.executable, '-m', 'flask', '--app', 'wsgi:app']
 
-    vite_process = subprocess.Popen(['npm', 'run', 'dev'], stdin=subprocess.DEVNULL)
-    scheduler_process = subprocess.Popen([*flask_cmd, 'run-scheduler'])
+    process_specs = [
+        ('vite', ['npm', 'run', 'dev'], None),
+        ('scheduler', [*flask_cmd, 'run-scheduler'], 'blue'),
+        ('server', [*flask_cmd, 'run', '--debug'], None),
+    ]
+
+    processes: dict[str, subprocess.Popen] = {}
+    stream_threads: list[threading.Thread] = []
+
+    for label, command, color in process_specs:
+        proc = subprocess.Popen(
+            command,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            bufsize=1,
+        )
+        processes[label] = proc
+
+        thread = threading.Thread(
+            target=_stream_prefixed_output,
+            args=(proc, label, color),
+            daemon=True,
+        )
+        thread.start()
+        stream_threads.append(thread)
 
     try:
-        subprocess.run([*flask_cmd, 'run', '--debug'], check=True)
+        server_exit_code = processes['server'].wait()
+        if server_exit_code != 0:
+            raise subprocess.CalledProcessError(server_exit_code, processes['server'].args)
     except KeyboardInterrupt:
         click.echo(click.style('\nShutting down development services...', fg='yellow'))
     except subprocess.CalledProcessError as exc:
         click.echo(click.style(f'Error starting Flask dev server: {exc}', fg='red'))
     finally:
-        for process, label in [(scheduler_process, 'scheduler'), (vite_process, 'vite')]:
+        for label, process in processes.items():
             if process.poll() is None:
                 process.terminate()
             _terminate_process(process, label)
+
+        for thread in stream_threads:
+            thread.join(timeout=1)
 
         hot_file.unlink(missing_ok=True)
         sys.exit(0)
