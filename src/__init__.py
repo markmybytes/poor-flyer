@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 from apscheduler.triggers.cron import CronTrigger
 from flask import Flask, current_app
@@ -16,18 +17,18 @@ def _inject_vite_url():
     vite_dev_url = None
     if current_app.debug:
         hot_file = current_app.config.get('VITE_HOT_FILE')
-        if hot_file and os.path.exists(hot_file):
+        if hot_file and Path(hot_file).exists():
             with open(hot_file) as f:
                 vite_dev_url = f.read().strip()
     return {'vite_dev_url': vite_dev_url}
 
 
 def create_app():
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    base_dir = Path(__file__).resolve().parent.parent
     app = Flask(
         __name__,
-        template_folder=os.path.join(base_dir, 'src', 'templates'),
-        static_folder=os.path.join(base_dir, 'src', 'static'),
+        template_folder=base_dir.joinpath('src', 'templates'),
+        static_folder=base_dir.joinpath('src', 'static'),
     )
 
     app.config.from_mapping(
@@ -47,7 +48,7 @@ def create_app():
             'SCHEDULER_API_ENABLED': False,
             'VITE_HOT_FILE': os.getenv(
                 'VITE_HOT_FILE',
-                os.path.join(app.static_folder, 'dist', 'hot'),
+                str(Path(app.static_folder).joinpath('dist', 'hot')),
             ),
         }
     )
