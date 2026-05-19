@@ -1,12 +1,12 @@
 import os
 from pathlib import Path
 
-from apscheduler.triggers.cron import CronTrigger
 from flask import Flask, current_app
 
 from src.cli import dev, run_scheduler
 from src.extensions import init_extensions
 from src.extensions.database import DEFAULT_DATABASE_URL
+from src.extensions.scheduler import create_cron_trigger
 from src.routes.api import api_bp
 from src.routes.pages import pages_bp
 from src.utils.json import CamelCaseJSONProvider
@@ -37,10 +37,10 @@ def create_app():
                 {
                     'id': 'daily_scrape',
                     'func': 'src.services.scheduler:daily_scrape_job',
-                    'trigger': CronTrigger.from_crontab(
-                        os.getenv('SCHEDULER_SCRAPE_CRON', '0 9 * * *')
+                    'trigger': create_cron_trigger(
+                        os.getenv('SCHEDULER_SCRAPE_CRON', '0 9 * * *'),
+                        int(os.getenv('SCHEDULER_SCRAPE_JITTER_SECONDS', 0)),
                     ),
-                    'jitter': int(os.getenv('SCHEDULER_SCRAPE_JITTER_SECONDS', 0)),
                 }
             ],
             'SQLALCHEMY_DATABASE_URI': os.getenv('DATABASE_URL', DEFAULT_DATABASE_URL),

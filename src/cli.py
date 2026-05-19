@@ -1,7 +1,6 @@
 import subprocess
 import sys
 import threading
-import time
 from pathlib import Path
 
 import click
@@ -98,11 +97,8 @@ def run_scheduler():
     """Run APScheduler as a dedicated long-lived process."""
     click.echo(click.style('Starting scheduler process...', fg='cyan'))
 
-    start_scheduler()
-
     try:
-        while True:
-            time.sleep(60)
+        start_scheduler()
     except KeyboardInterrupt:
         click.echo(click.style('\nShutting down scheduler...', fg='yellow'))
     finally:
