@@ -12,6 +12,7 @@ VOLUME ["/app/data"]
 
 RUN apt-get update && apt-get install -y \
     xvfb \
+    xauth \
     curl \
     xz-utils \
     && rm -rf /var/lib/apt/lists/*
@@ -27,13 +28,10 @@ COPY . .
 
 COPY s6-overlay/s6-rc.d /etc/s6-overlay/s6-rc.d
 
-RUN mkdir -p /var/log/db-migrate /var/log/web /var/log/scheduler && \
-    chmod 755 /var/log/db-migrate /var/log/web /var/log/scheduler
-
-RUN find /etc/s6-overlay/s6-rc.d -type f \( -name run -o -name finish \) -exec chmod +x {} +
+RUN find /etc/s6-overlay/s6-rc.d -type f \( -name run -o -name finish -o -name up -o -name down \) -exec chmod +x {} +
 
 RUN groupmod -g 1000 users && \
-    useradd -u 911 -U -d /config -s /bin/false abc && \
+    useradd -u 911 -U -d /app -s /bin/false abc && \
     usermod -G users abc
 
 EXPOSE 8000
