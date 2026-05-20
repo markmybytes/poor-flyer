@@ -579,8 +579,8 @@ onUnmounted(() => chart?.destroy())
                         :key="snap.id"
                         :class="[
                           snap.scrapeStatus === 'error' ? 'bg-error/10' : '',
-                          snap.fare === legMinMax.min ? 'bg-success/10' : '',
-                          snap.fare === legMinMax.max ? 'bg-error/10' : '',
+                          // snap.fare === legMinMax.min ? 'bg-success/10' : '',
+                          // snap.fare === legMinMax.max ? 'bg-error/10' : '',
                         ]"
                       >
                         <td class="font-semibold text-base-content">
