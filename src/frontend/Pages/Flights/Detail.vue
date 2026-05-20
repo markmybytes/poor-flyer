@@ -47,7 +47,12 @@ const legMinMax = computed(() => {
     .filter((s) => s.scrapeStatus === 'success' && s.fare !== null)
     .map((s) => s.fare as number)
   if (!fares.length) return { min: null, max: null }
-  return { min: Math.min(...fares), max: Math.max(...fares) }
+  const min = Math.min(...fares)
+  const max = Math.max(...fares)
+  if (min === max) {
+    return { min: null, max: null }
+  }
+  return { min, max }
 })
 
 const dailyGroups = computed(() => {
@@ -491,8 +496,14 @@ onUnmounted(() => chart?.destroy())
               <button
                 class="collapse-title flex w-full items-center justify-between pr-14 pl-5 text-left transition-colors hover:bg-base-200/40"
                 :class="{
-                  'bg-success/10': group.lowestSnapshot?.fare === legMinMax.min,
-                  'bg-error/10': group.lowestSnapshot?.fare === legMinMax.max,
+                  'bg-success/10':
+                    legMinMax.min !== null &&
+                    group.snapshots.some((s) => s.fare === legMinMax.min) &&
+                    !group.snapshots.some((s) => s.fare === legMinMax.max),
+                  // 'bg-error/10':
+                  //   legMinMax.max !== null &&
+                  //   group.snapshots.some((s) => s.fare === legMinMax.max) &&
+                  //   !group.snapshots.some((s) => s.fare === legMinMax.min),
                 }"
                 @click="
                   expandedGroups.has(index)
