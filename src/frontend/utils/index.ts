@@ -1,7 +1,14 @@
 import type { Itinerary } from '@/types'
 
-export function fmtFare(amount: number | null, currencyCode: string = 'TWD') {
-  if (amount === null || amount === undefined) return '—'
+export function fmtFare(amount: number | null, currencyCode: string = null) {
+  if (amount === null || amount === undefined) {
+    return '—'
+  }
+
+  if (currencyCode === null) {
+    return `$${amount.toString()}`
+  }
+
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currencyCode,
