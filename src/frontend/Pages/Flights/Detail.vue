@@ -1,31 +1,61 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import AppLayout from '@/Layouts/AppLayout.vue'
-import type { FareSnapshot, Flight } from '@/types'
-import { fmtDate, fmtFare, fmtTime, fmtTz, getFlightStats } from '@/utils'
+import type { FareSnapshot, Itinerary } from '@/types'
+import { fmtDate, fmtFare, fmtItineraryName, fmtTime, fmtTz } from '@/utils'
 import { router } from '@inertiajs/vue3'
 import Chart from 'chart.js/auto'
 import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
 import { useToast } from 'vue-toast-notification'
 
-const props = defineProps<{ flight: Flight }>()
+const props = defineProps<{ itinerary: Itinerary }>()
 
 const toast = useToast()
 
 const chartCanvas = useTemplateRef<HTMLCanvasElement>('chartCanvas')
-const activeTab = ref<'table' | 'graph'>('table')
+const activeTab = ref<string>('0')
 const expandedGroups = ref(new Set<number>())
 const loading = ref({ loading: null as 'toggle' | 'scrape' | 'delete' | null })
-const detailPanel = ref<'analysis' | 'summary'>(props.flight.deadline ? 'analysis' : 'summary')
+const detailPanel = ref<'analysis' | 'summary'>(props.itinerary.deadline ? 'analysis' : 'summary')
 
 let chart: Chart | null = null
 
 const today = new Date().toISOString().split('T')[0]
 
-const flightStats = computed(() => getFlightStats(props.flight.fareSnapshots))
+const ruleAnalysis = computed(() => props.itinerary.rule37Analysis)
+
+const isSingleTrip = computed(() => props.itinerary.tripType === 'SINGLE')
+
+// Which leg is currently selected for the table view
+const selectedFlight = computed(() => {
+  const index = parseInt(activeTab.value, 10)
+  return isNaN(index) ? props.itinerary.flights[0] : props.itinerary.flights[index]
+})
+
+const flightStats = computed(() => {
+  return {
+    latest: ruleAnalysis.value?.latestVal ?? null,
+    lowest: ruleAnalysis.value?.allTimeLow ?? null,
+    highest: ruleAnalysis.value?.allTimeHigh ?? null,
+  }
+})
+
+// Calculate the min/max fare for the *currently selected leg* (for highlighting)
+const legMinMax = computed(() => {
+  const f = selectedFlight.value
+  if (!f || !f.fareSnapshots) return { min: null, max: null }
+  const fares = f.fareSnapshots
+    .filter((s) => s.scrapeStatus === 'success' && s.fare !== null)
+    .map((s) => s.fare as number)
+  if (!fares.length) return { min: null, max: null }
+  return { min: Math.min(...fares), max: Math.max(...fares) }
+})
 
 const dailyGroups = computed(() => {
+  const f = selectedFlight.value
+  if (!f || !f.fareSnapshots) return []
+
   const byDate = new Map<string, FareSnapshot[]>()
-  for (const s of props.flight.fareSnapshots) {
+  for (const s of f.fareSnapshots) {
     const d = s.createdAt.split('T')[0]
     if (!byDate.has(d)) byDate.set(d, [])
     byDate.get(d)!.push(s)
@@ -47,109 +77,141 @@ const dailyGroups = computed(() => {
     })
 })
 
-// Explicit fetch functions for JSON API
 function toggleEntry() {
   loading.value.loading = 'toggle'
-  fetch(`/api/flights/${props.flight.id}`, {
+  fetch('/api/flights/' + props.itinerary.id, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ is_active: !props.flight.isActive }),
+    body: JSON.stringify({ is_active: !props.itinerary.isActive }),
   })
     .then((res) => {
-      if (res.ok) {
-        router.reload()
-      } else {
-        toast.error('操作失敗，請稍後再試')
-      }
+      if (res.ok) router.reload()
+      else toast.error('操作失敗，請稍後再試')
     })
     .catch(() => toast.error('操作失敗，請稍後再試'))
-    .finally(() => {
-      loading.value.loading = null
-    })
+    .finally(() => (loading.value.loading = null))
 }
 
 function scrapeEntry() {
   loading.value.loading = 'scrape'
-  fetch(`/api/flights/${props.flight.id}/scrape`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-  })
+  fetch('/api/flights/' + props.itinerary.id + '/scrape', { method: 'POST' })
     .then((res) => {
-      if (res.ok) {
-        router.reload()
-      } else {
-        toast.error('擷取失敗，請稍後再試')
-      }
+      if (res.ok) router.reload()
+      else toast.error('擷取失敗，請稍後再試')
     })
     .catch(() => toast.error('擷取失敗，請稍後再試'))
-    .finally(() => {
-      loading.value.loading = null
-    })
+    .finally(() => (loading.value.loading = null))
 }
 
 function deleteEntry() {
   if (!confirm('確認刪除此航班追蹤？')) return
   loading.value.loading = 'delete'
-  fetch(`/api/flights/${props.flight.id}`, {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-  })
+  fetch('/api/flights/' + props.itinerary.id, { method: 'DELETE' })
     .then((res) => {
-      if (res.ok) {
-        router.visit('/flights/')
-      } else {
-        toast.error('刪除失敗，請稍後再試')
-      }
+      if (res.ok) router.visit('/flights/')
+      else toast.error('刪除失敗，請稍後再試')
     })
     .catch(() => toast.error('刪除失敗，請稍後再試'))
-    .finally(() => {
-      loading.value.loading = null
-    })
+    .finally(() => (loading.value.loading = null))
 }
 
 function initChart() {
-  if (!chartCanvas.value || !dailyGroups.value?.length) return
+  if (!chartCanvas.value || props.itinerary.flights.length === 0) return
   if (chart) chart.destroy()
 
-  const dateMap = new Map(dailyGroups.value.map((g) => [g.date, g.lowestFare]))
-  const dates = dailyGroups.value.map((g) => g.date).sort()
-  const start = new Date(dates[0]).getTime()
-  const end = new Date(dates[dates.length - 1]).getTime()
+  const labelsSet = new Set<string>()
+  props.itinerary.flights.forEach((f) => {
+    ;(f.fareSnapshots || []).forEach((s) => {
+      if (s.createdAt) labelsSet.add(s.createdAt.split('T')[0])
+    })
+  })
+  if (ruleAnalysis.value?.cutoffDate) labelsSet.add(ruleAnalysis.value.cutoffDate)
+  const labels = Array.from(labelsSet).sort((a, b) => a.localeCompare(b))
 
-  const labels: string[] = []
-  const fareData: (number | null)[] = []
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const datasets: any[] = []
 
-  for (let t = start; t <= end; t += 86400000) {
-    const iso = new Date(t).toISOString().split('T')[0]
-    labels.push(iso)
-    fareData.push(dateMap.get(iso) ?? null)
+  if (!isSingleTrip.value && ruleAnalysis.value) {
+    const combinedData: Record<string, number> = {}
+
+    // We already know labels are sorted. Let's find valid totals per label
+    labels.forEach((date) => {
+      let total = 0
+      let allValid = true
+      props.itinerary.flights.forEach((f) => {
+        const flightsOnDate = (f.fareSnapshots || []).filter(
+          (s) =>
+            s.createdAt &&
+            s.createdAt.startsWith(date) &&
+            s.scrapeStatus === 'success' &&
+            s.fare !== null,
+        )
+        if (!flightsOnDate.length) {
+          allValid = false
+        } else {
+          total += Math.min(...flightsOnDate.map((s) => s.fare as number))
+        }
+      })
+      if (allValid) combinedData[date] = total
+    })
+
+    datasets.push({
+      label: '總價 (每日最低)',
+      data: labels.map((l) => combinedData[l] ?? null),
+      borderColor: '#ff9800',
+      backgroundColor: 'rgba(255, 152, 0, 0.1)',
+      borderWidth: 3,
+      tension: 0.4,
+      fill: false,
+      spanGaps: true,
+    })
+  }
+
+  props.itinerary.flights.forEach((f, idx) => {
+    const dataObj: Record<string, number> = {}
+    ;(f.fareSnapshots || [])
+      .filter((s) => s.scrapeStatus === 'success' && s.fare !== null)
+      .forEach((s) => {
+        const d = s.createdAt.split('T')[0]
+        if (!dataObj[d] || s.fare! < dataObj[d]) dataObj[d] = s.fare! // Get lowest of day
+      })
+
+    const color = isSingleTrip.value ? '#2563eb' : `hsl(${(idx * 137.5) % 360}, 70%, 50%)`
+    datasets.push({
+      label: isSingleTrip.value ? '最低票價' : `${f.origin} → ${f.destination}`,
+      data: labels.map((l) => dataObj[l] ?? null),
+      borderColor: color,
+      backgroundColor: isSingleTrip.value ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
+      borderWidth: 2.5,
+      tension: 0.4,
+      fill: isSingleTrip.value,
+      spanGaps: true,
+    })
+  })
+
+  if (ruleAnalysis.value?.historyBestVal) {
+    datasets.push({
+      label: 'Buying Threshold',
+      data: labels.map(() => ruleAnalysis.value!.historyBestVal),
+      borderColor: 'rgba(255, 99, 132, 0.8)',
+      borderDash: [5, 5],
+      borderWidth: 2,
+      tension: 0,
+      spanGaps: true,
+      pointRadius: 0,
+    })
   }
 
   chart = new Chart(chartCanvas.value, {
     type: 'line',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: '最低票價',
-          data: fareData,
-          borderColor: '#2563eb',
-          backgroundColor: 'rgba(37, 99, 235, 0.1)',
-          borderWidth: 2.5,
-          tension: 0.4,
-          pointBackgroundColor: '#2563eb',
-          pointBorderColor: '#fff',
-          pointBorderWidth: 1,
-          pointRadius: 3.5,
-          pointHoverRadius: 7,
-          fill: true,
-          spanGaps: false,
-        },
-      ],
-    },
+    data: { labels, datasets },
     options: {
       responsive: true,
-      plugins: { legend: { display: false }, tooltip: { padding: 12, cornerRadius: 8 } },
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: !isSingleTrip.value },
+        tooltip: { padding: 12, cornerRadius: 8 },
+      },
       scales: {
         y: { beginAtZero: false, grid: { color: '#f3f4f6' } },
         x: { grid: { display: false } },
@@ -159,15 +221,16 @@ function initChart() {
   })
 }
 
-function switchTab(t: 'table' | 'graph') {
+function switchTab(t: string | 'graph') {
   activeTab.value = t
   if (t === 'graph') {
     nextTick(() => initChart())
   }
 }
 
-watch(dailyGroups, () => {
-  if (activeTab.value === 'graph') initChart()
+watch(activeTab, (val) => {
+  expandedGroups.value.clear()
+  if (val === 'graph') initChart()
 })
 
 onMounted(() => activeTab.value === 'graph' && initChart())
@@ -181,20 +244,20 @@ onUnmounted(() => chart?.destroy())
         <div class="border-b border-base-300/70 px-6 py-5">
           <div class="flex items-start justify-between gap-4">
             <div>
-              <h3 class="text-base font-bold text-base-content">
-                {{ flight.origin }} → {{ flight.destination }}
+              <h3 class="flex items-center gap-2 text-base font-bold text-base-content">
+                {{ fmtItineraryName(itinerary) }}
               </h3>
 
               <p class="mt-0.5 text-sm font-medium text-base-content/60">
-                出發日期：{{ fmtDate(flight.flightDate) }}
-                <span v-if="flight.deadline" class="mx-2 text-base-content/30">|</span>
+                出發日期：{{ fmtDate(itinerary.flights[0].flightDate) }}
+                <span v-if="itinerary.deadline" class="mx-2 text-base-content/30">|</span>
 
-                <span v-if="flight.deadline">限期：{{ fmtDate(flight.deadline) }}</span>
+                <span v-if="itinerary.deadline">限期：{{ fmtDate(itinerary.deadline) }}</span>
               </p>
             </div>
 
             <div class="flex shrink-0 flex-wrap gap-2">
-              <span v-if="flight.isActive" class="badge badge-soft px-3 py-3 badge-success">
+              <span v-if="itinerary.isActive" class="badge badge-soft px-3 py-3 badge-success">
                 <span class="status status-success"></span>
                 追蹤中
               </span>
@@ -215,7 +278,7 @@ onUnmounted(() => chart?.destroy())
                 v-if="loading.loading === 'toggle'"
                 class="loading loading-xs loading-spinner"
               ></span>
-              {{ flight.isActive ? '停止追蹤' : '開啟追蹤' }}
+              {{ itinerary.isActive ? '停止追蹤' : '開啟追蹤' }}
             </button>
 
             <button
@@ -246,13 +309,13 @@ onUnmounted(() => chart?.destroy())
       </div>
     </div>
 
+    <!-- Summary panels strictly derived from rule37Analysis (Grand Totals) -->
     <div
       class="tracker-panel mb-8 rounded-lg border px-6 py-6"
       :class="{
-        'bg-success/10':
-          detailPanel === 'analysis' && flight.rule37Analysis?.phase === 'BUY_SIGNAL',
-        'bg-info/10': detailPanel === 'analysis' && flight.rule37Analysis?.phase === 'WAITING',
-        'bg-neutral/10': detailPanel === 'analysis' && flight.rule37Analysis?.phase === 'OBSERVING',
+        'bg-success/10': detailPanel === 'analysis' && ruleAnalysis?.phase === 'BUY_SIGNAL',
+        'bg-info/10': detailPanel === 'analysis' && ruleAnalysis?.phase === 'WAITING',
+        'bg-neutral/10': detailPanel === 'analysis' && ruleAnalysis?.phase === 'OBSERVING',
       }"
     >
       <div class="join mb-5">
@@ -279,19 +342,16 @@ onUnmounted(() => chart?.destroy())
           class="col-start-1 row-start-1 transition-opacity duration-150"
           :class="detailPanel !== 'analysis' ? 'pointer-events-none invisible' : ''"
         >
-          <div
-            v-if="flight.rule37Analysis && flight.rule37Analysis.latestVal !== null"
-            class="space-y-4"
-          >
+          <div v-if="ruleAnalysis && ruleAnalysis.latestVal !== null" class="space-y-4">
             <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div class="flex items-center gap-3">
-                <template v-if="flight.rule37Analysis.phase === 'BUY_SIGNAL'">
+                <template v-if="ruleAnalysis.phase === 'BUY_SIGNAL'">
                   <span class="status status-lg status-success"></span>
 
                   <span class="text-lg font-bold text-success">購買信號 (最佳時機)</span>
                 </template>
 
-                <template v-else-if="flight.rule37Analysis.phase === 'OBSERVING'">
+                <template v-else-if="ruleAnalysis.phase === 'OBSERVING'">
                   <span class="status status-lg status-neutral"></span>
 
                   <span class="text-lg font-bold text-neutral">觀察期</span>
@@ -299,8 +359,7 @@ onUnmounted(() => chart?.destroy())
                   <span class="badge px-2 py-1 text-xs font-medium badge-warning">
                     {{
                       Math.ceil(
-                        (new Date(flight.rule37Analysis.cutoffDate).getTime() -
-                          new Date(today).getTime()) /
+                        (new Date(ruleAnalysis.cutoffDate).getTime() - new Date(today).getTime()) /
                           86400000,
                       )
                     }}
@@ -318,36 +377,34 @@ onUnmounted(() => chart?.destroy())
               <div class="space-y-1 text-xs text-base-content/70">
                 <p>
                   <span class="font-medium">決策期開始：</span>
-                  {{ fmtDate(flight.rule37Analysis.cutoffDate) }}
+                  {{ fmtDate(ruleAnalysis.cutoffDate) }}
                 </p>
 
                 <p>
                   <span class="font-medium">門檻：</span>
-                  {{ fmtFare(flight.rule37Analysis.historyBestVal) }}
+                  {{ fmtFare(ruleAnalysis.historyBestVal) }}
                 </p>
               </div>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
               <div class="rounded-lg bg-base-100/60 px-4 py-3">
-                <p class="text-xs font-bold tracking-widest uppercase opacity-55">最新票價</p>
+                <p class="text-xs font-bold tracking-widest uppercase opacity-55">總價 (最新)</p>
 
-                <p class="mt-1 text-base font-bold">
-                  {{ fmtFare(flight.rule37Analysis.latestVal) }}
-                </p>
+                <p class="mt-1 text-base font-bold">{{ fmtFare(ruleAnalysis.latestVal) }}</p>
               </div>
 
               <div class="rounded-lg bg-base-100/60 px-4 py-3">
-                <p class="text-xs font-bold tracking-widest uppercase opacity-55">歷史最低</p>
+                <p class="text-xs font-bold tracking-widest uppercase opacity-55">歷史總價最低</p>
 
                 <p class="mt-1 text-base font-bold text-success">
-                  {{ fmtFare(flight.rule37Analysis.allTimeLow) }}
+                  {{ fmtFare(ruleAnalysis.allTimeLow) }}
                 </p>
               </div>
             </div>
           </div>
 
-          <div v-else-if="flight.rule37Analysis" class="py-4 text-center">
+          <div v-else-if="ruleAnalysis" class="py-4 text-center">
             <p class="text-sm font-medium text-base-content/60">
               數據不足，尚無法分析最佳購買時機。
             </p>
@@ -360,7 +417,8 @@ onUnmounted(() => chart?.destroy())
           </div>
         </div>
 
-        <!-- Summary panel -->
+        <!-- Summar
+ panel -->
         <div
           class="col-start-1 row-start-1 transition-opacity duration-150"
           :class="detailPanel !== 'summary' ? 'pointer-events-none invisible' : ''"
@@ -388,19 +446,33 @@ onUnmounted(() => chart?.destroy())
       </div>
     </div>
 
+    <!-- Dynamic Tabs & Accordion Table -->
     <div class="tracker-panel card rounded-lg">
       <div class="card-body p-4 md:p-6">
-        <div class="tabs-box tabs bg-base-200/70 p-1">
+        <div class="tabs-box tabs flex-nowrap overflow-x-auto bg-base-200/70 p-1 whitespace-nowrap">
           <button
-            class="tab h-12 flex-1 text-sm font-bold"
-            :class="activeTab === 'table' ? 'tab-active' : ''"
-            @click="switchTab('table')"
+            v-if="isSingleTrip"
+            class="tab h-12 shrink-0 px-6 text-sm font-bold"
+            :class="activeTab === '0' ? 'tab-active' : ''"
+            @click="switchTab('0')"
           >
             詳細數據列表
           </button>
 
+          <template v-else>
+            <button
+              v-for="(f, i) in itinerary.flights"
+              :key="f.id"
+              class="tab h-12 shrink-0 px-6 text-sm font-bold"
+              :class="activeTab === String(i) ? 'tab-active' : ''"
+              @click="switchTab(String(i))"
+            >
+              {{ f.origin }} → {{ f.destination }}
+            </button>
+          </template>
+
           <button
-            class="tab h-12 flex-1 text-sm font-bold"
+            class="tab h-12 shrink-0 px-6 text-sm font-bold"
             :class="activeTab === 'graph' ? 'tab-active' : ''"
             @click="switchTab('graph')"
           >
@@ -408,7 +480,7 @@ onUnmounted(() => chart?.destroy())
           </button>
         </div>
 
-        <div v-show="activeTab === 'table'" class="pt-5">
+        <div v-show="activeTab !== 'graph'" class="pt-5">
           <template v-if="dailyGroups.length">
             <div
               v-for="(group, index) in dailyGroups"
@@ -419,11 +491,8 @@ onUnmounted(() => chart?.destroy())
               <button
                 class="collapse-title flex w-full items-center justify-between pr-14 pl-5 text-left transition-colors hover:bg-base-200/40"
                 :class="{
-                  'bg-success/10': group.lowestSnapshot?.fare === flightStats.lowest,
-                  'bg-primary/10':
-                    flight.rule37Analysis?.phase &&
-                    group.date >= flight.rule37Analysis.cutoffDate &&
-                    group.lowestSnapshot?.fare === flight.rule37Analysis.historyBestVal,
+                  'bg-success/10': group.lowestSnapshot?.fare === legMinMax.min,
+                  'bg-error/10': group.lowestSnapshot?.fare === legMinMax.max,
                 }"
                 @click="
                   expandedGroups.has(index)
@@ -448,9 +517,9 @@ onUnmounted(() => chart?.destroy())
                           fmtFare(group.lowestFare)
                         }}</span>
 
-                        <template v-if="group.lowestSnapshot.flightNumber">
-                          · {{ group.lowestSnapshot.flightNumber }}
-                        </template>
+                        <template v-if="group.lowestSnapshot.flightNumber"
+                          >· {{ group.lowestSnapshot.flightNumber }}</template
+                        >
                       </template>
 
                       <span v-else class="text-error">無有效價格數據</span>
@@ -466,9 +535,7 @@ onUnmounted(() => chart?.destroy())
               </button>
 
               <div
-                v-if="
-                  flight.rule37Analysis?.phase && group.date === flight.rule37Analysis.cutoffDate
-                "
+                v-if="ruleAnalysis?.phase && group.date === ruleAnalysis.cutoffDate"
                 class="border-y border-warning/20 bg-warning/15 px-5 py-1.5 text-center"
               >
                 <p class="text-[11px] font-bold tracking-widest text-warning-content">
@@ -483,7 +550,7 @@ onUnmounted(() => chart?.destroy())
                 <div
                   class="overflow-x-auto rounded-[1.25rem] border border-base-300/70 bg-base-100"
                 >
-                  <table class="table table-zebra text-sm">
+                  <table class="table w-full table-zebra text-sm">
                     <thead>
                       <tr>
                         <th class="text-xs font-bold tracking-wider text-base-content/55 uppercase">
@@ -508,11 +575,13 @@ onUnmounted(() => chart?.destroy())
 
                     <tbody>
                       <tr
-                        v-for="snap in group.snapshots.toSorted(
-                          (a, b) => a.flightNumber?.localeCompare(b.flightNumber ?? '') ?? 0,
-                        )"
+                        v-for="snap in group.snapshots"
                         :key="snap.id"
-                        :class="{ 'bg-error/10': snap.scrapeStatus === 'error' }"
+                        :class="[
+                          snap.scrapeStatus === 'error' ? 'bg-error/10' : '',
+                          snap.fare === legMinMax.min ? 'bg-success/10' : '',
+                          snap.fare === legMinMax.max ? 'bg-error/10' : '',
+                        ]"
                       >
                         <td class="font-semibold text-base-content">
                           {{ snap.flightNumber ?? '—' }}
@@ -534,29 +603,24 @@ onUnmounted(() => chart?.destroy())
 
                         <td class="text-right font-bold text-base-content">
                           <template v-if="snap.scrapeStatus === 'success' && snap.fare !== null">
-                            <div class="flex items-center justify-end gap-2">
-                              <div class="flex gap-1">
+                            <div
+                              class="flex flex-col items-end justify-end gap-2 sm:flex-row sm:items-center"
+                            >
+                              <div class="flex flex-wrap justify-end gap-1">
                                 <span
-                                  v-if="snap.fare === flightStats.lowest"
+                                  v-if="snap.fare === legMinMax.min"
                                   class="badge badge-soft badge-xs badge-success"
+                                  >[歷史低位]</span
                                 >
-                                  歷史低位
-                                </span>
 
                                 <span
-                                  v-if="
-                                    flight.rule37Analysis?.phase &&
-                                    snap.fare === flight.rule37Analysis.historyBestVal &&
-                                    (snap.departureAt?.slice(0, 10) ?? '') >=
-                                      flight.rule37Analysis.cutoffDate
-                                  "
-                                  class="badge badge-soft badge-xs badge-primary"
+                                  v-if="snap.fare === legMinMax.max"
+                                  class="badge badge-soft badge-xs badge-error"
+                                  >[歷史高位]</span
                                 >
-                                  最佳選擇
-                                </span>
                               </div>
 
-                              <span>{{ fmtFare(snap.fare) }}</span>
+                              <span>{{ fmtFare(snap.fare, snap.currency) }}</span>
                             </div>
                           </template>
 
@@ -578,9 +642,12 @@ onUnmounted(() => chart?.destroy())
         </div>
 
         <div v-show="activeTab === 'graph'" class="pt-5">
-          <template v-if="dailyGroups.length">
-            <div class="rounded-3xl bg-base-100 p-4 md:p-6">
-              <canvas ref="chartCanvas" height="100"></canvas>
+          <template v-if="itinerary.flights.length">
+            <div
+              class="rounded-3xl bg-base-100 p-4 md:p-6"
+              style="height: 400px; position: relative"
+            >
+              <canvas ref="chartCanvas"></canvas>
             </div>
           </template>
 

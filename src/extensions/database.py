@@ -39,49 +39,69 @@ db = SQLAlchemy(model_class=Base, session_options={'autoflush': False})
 
 
 # Database models
-class Flight(db.Model):
-    """Flight tracking model."""
+class Itinerary(db.Model):
+    """Itinerary tracking model. Represents a multi-leg tracked trip."""
 
-    __tablename__ = 'flights'
+    __tablename__ = 'itineraries'
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    origin: Mapped[str] = mapped_column(String, nullable=False)
-    destination: Mapped[str] = mapped_column(String, nullable=False)
-    flight_date: Mapped[date] = mapped_column(Date, nullable=False)
+    trip_type: Mapped[str] = mapped_column(
+        String, nullable=False
+    )  # 'SINGLE', 'ROUND_TRIP', 'MULTI_CITY'
     deadline: Mapped[date | None] = mapped_column(Date, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    notification_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
 
-    fare_snapshots: Mapped[list['FlightFareSnapshot']] = relationship(
-        'FlightFareSnapshot', cascade='all, delete-orphan', back_populates='flight'
+    flights: Mapped[list['Flight']] = relationship(
+        'Flight',
+        cascade='all, delete-orphan',
+        back_populates='itinerary',
+        order_by='Flight.sequence',
     )
 
 
-class FlightFareSnapshot(db.Model):
-    """Flight fare snapshot model."""
+class Flight(db.Model):
+    """Flight leg model."""
 
-    __tablename__ = 'flight_fare_snapshots'
+    __tablename__ = 'flights'
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    itinerary_id: Mapped[str] = mapped_column(
+        String, ForeignKey('itineraries.id', ondelete='CASCADE'), nullable=False
+    )
+    sequence: Mapped[int] = mapped_column(db.Integer, nullable=False)
+    origin: Mapped[str] = mapped_column(String, nullable=False)
+    destination: Mapped[str] = mapped_column(String, nullable=False)
+    flight_date: Mapped[date] = mapped_column(Date, nullable=False)
+
+    itinerary: Mapped['Itinerary'] = relationship('Itinerary', back_populates='flights')
+    fare_snapshots: Mapped[list['FareSnapshot']] = relationship(
+        'FareSnapshot', cascade='all, delete-orphan', back_populates='flight'
+    )
+
+
+class FareSnapshot(db.Model):
+    """Fare snapshot model."""
+
+    __tablename__ = 'fare_snapshots'
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     flight_id: Mapped[str] = mapped_column(
         String, ForeignKey('flights.id', ondelete='CASCADE'), nullable=False
     )
 
-    fare: Mapped[float | None] = mapped_column(Float, nullable=True)
     flight_number: Mapped[str | None] = mapped_column(String, nullable=True)
     departure_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     arrival_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    fare: Mapped[float | None] = mapped_column(Float, nullable=True)
+    currency: Mapped[str | None] = mapped_column(String, nullable=True)
     scrape_status: Mapped[str] = mapped_column(String, nullable=False)
-    error_message: Mapped[str | None] = mapped_column(String, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        default=lambda: datetime.now(UTC),
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
 
     flight: Mapped['Flight'] = relationship('Flight', back_populates='fare_snapshots')

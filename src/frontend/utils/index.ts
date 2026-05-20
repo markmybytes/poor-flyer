@@ -1,7 +1,12 @@
-import type { FareSnapshot } from '@/types'
+import type { Itinerary } from '@/types'
 
-export function fmtFare(fare: number | null) {
-  return fare !== null ? `$${Math.round(fare)}` : '—'
+export function fmtFare(amount: number | null, currencyCode: string = 'TWD') {
+  if (amount === null || amount === undefined) return '—'
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currencyCode,
+    maximumFractionDigits: 0,
+  }).format(amount)
 }
 
 export function fmtDate(iso: string | null) {
@@ -22,14 +27,14 @@ export function fmtTz(iso: string | null) {
   return iso ? (iso.match(/([+-]\d{2}:\d{2}|Z)$/) || [''])[0] : ''
 }
 
-export function getFlightStats(snapshots: FareSnapshot[]) {
-  const validFares = (snapshots || [])
-    .filter((s) => s.scrapeStatus === 'success' && s.fare != null)
-    .map((s) => s.fare as number)
-
-  return {
-    latest: validFares.length ? validFares[validFares.length - 1] : null,
-    lowest: validFares.length ? Math.min(...validFares) : null,
-    highest: validFares.length ? Math.max(...validFares) : null,
+export function fmtItineraryName(itinerary: Itinerary) {
+  if (!itinerary.flights || itinerary.flights.length === 0) {
+    return ''
   }
+  if (itinerary.tripType === 'SINGLE') {
+    return `${itinerary.flights[0].origin} → ${itinerary.flights[0].destination}`
+  } else if (itinerary.tripType === 'ROUND_TRIP') {
+    return `${itinerary.flights[0].origin} ⇄ ${itinerary.flights[0].destination}`
+  }
+  return itinerary.flights.map((f) => `${f.origin} → ${f.destination}`).join(' | ')
 }

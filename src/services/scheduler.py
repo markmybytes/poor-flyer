@@ -5,7 +5,7 @@ from datetime import date
 
 from flask import render_template
 
-from src.extensions.database import Flight, FlightFareSnapshot, db
+from src.extensions.database import FareSnapshot, Flight, db
 from src.services.config import ConfigManager
 from src.services.email import get_smtp_config, send_html_email
 from src.services.rule37 import Phase, compute_37_best
@@ -25,7 +25,7 @@ def daily_scrape_job():
             res = scrape_prices(flight.origin, flight.destination, flight.flight_date)
             for r in res.results:
                 db.session.add(
-                    FlightFareSnapshot(
+                    FareSnapshot(
                         id=str(uuid.uuid4()),
                         flight_id=flight.id,
                         fare=r.fare,

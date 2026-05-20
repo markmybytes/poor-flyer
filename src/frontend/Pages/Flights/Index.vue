@@ -1,32 +1,34 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import AppLayout from '@/Layouts/AppLayout.vue'
-import type { Flight } from '@/types'
-import { fmtDate, fmtFare, getFlightStats } from '@/utils'
+import type { Itinerary } from '@/types'
+import { fmtDate, fmtFare, fmtItineraryName } from '@/utils'
 import { Link } from '@inertiajs/vue3'
 import { computed } from 'vue'
 
-const props = defineProps<{ flights: Flight[] }>()
+const props = defineProps<{ itineraries: Itinerary[] }>()
 
 const summary = computed(() => {
-  const active = props.flights.filter((flight) => flight.isActive).length
-  const buySignals = props.flights.filter(
-    (flight) => flight.rule37Analysis?.phase === 'BUY_SIGNAL',
-  ).length
-  const lowestFare = props.flights
-    .flatMap((flight) => flight.fareSnapshots ?? [])
-    .filter((snapshot) => snapshot.scrapeStatus === 'success' && snapshot.fare !== null)
-    .reduce<number | null>((lowest, snapshot) => {
-      if (snapshot.fare === null) return lowest
-      if (lowest === null || snapshot.fare < lowest) return snapshot.fare
+  const active = props.itineraries?.filter((it) => it.isActive).length ?? 0
+  const buySignals =
+    props.itineraries?.filter((it) => it.rule37Analysis?.phase === 'BUY_SIGNAL').length ?? 0
+
+  const lowestTotal = (props.itineraries || [])
+    .filter(
+      (it) => it.rule37Analysis?.allTimeLow !== null && it.rule37Analysis?.allTimeLow !== undefined,
+    )
+    .reduce<number | null>((lowest, it) => {
+      const val = it.rule37Analysis!.allTimeLow
+      if (val === null) return lowest
+      if (lowest === null || val < lowest) return val
       return lowest
     }, null)
 
   return {
-    total: props.flights.length,
+    total: props.itineraries?.length ?? 0,
     active,
-    paused: props.flights.length - active,
+    paused: (props.itineraries?.length ?? 0) - active,
     buySignals,
-    lowestFare,
+    lowestTotal,
   }
 })
 </script>
@@ -43,7 +45,7 @@ const summary = computed(() => {
 
     <div class="tracker-panel stats mb-8 w-full stats-horizontal gap-0 rounded-lg">
       <div class="stat px-4 py-3 sm:px-6 sm:py-4">
-        <div class="stat-title text-xs sm:text-sm">航線總數</div>
+        <div class="stat-title text-xs sm:text-sm">行程總數</div>
 
         <div class="stat-value text-xl text-primary sm:text-3xl">{{ summary.total }}</div>
 
@@ -63,42 +65,41 @@ const summary = computed(() => {
 
         <div class="stat-value text-xl text-success sm:text-3xl">{{ summary.buySignals }}</div>
 
-        <div class="stat-desc hidden sm:block">符合 BUY_SIGNAL 的航線</div>
+        <div class="stat-desc hidden sm:block">符合 BUY_SIGNAL 的行程</div>
       </div>
     </div>
 
-    <div class="mb-8 flex items-center justify-between">
+    <div class="items- center mb-8 flex justify-between">
       <div class="flex-1"></div>
 
       <Link href="/flights/create" class="btn shadow-sm btn-primary">建立追蹤</Link>
     </div>
 
-    <div v-if="flights?.length" class="grid gap-6 lg:grid-cols-2">
+    <div v-if="itineraries && itineraries.length" class="grid gap-6 lg:grid-cols-2">
       <div
-        v-for="flight in flights"
-        :key="flight.id"
+        v-for="itinerary in itineraries"
+        :key="itinerary.id"
         class="tracker-panel group card rounded-lg transition-all hover:-translate-y-1 hover:shadow-xl"
       >
         <div class="card-body gap-5 p-6">
           <div class="flex items-start justify-between gap-4">
             <div>
               <div
-                class="mb-2 flex items-center gap-3 text-2xl font-black tracking-tight text-base-content"
+                class="mb-2 flex flex-wrap items-center gap-3 text-xl font-black tracking-tight text-base-content"
               >
-                <span>{{ flight.origin }}</span>
-
-                <span class="text-base-content/25">→</span>
-
-                <span>{{ flight.destination }}</span>
+                <span>{{ fmtItineraryName(itinerary) }}</span>
               </div>
 
               <p class="text-sm font-medium text-base-content/65">
-                出發日期：{{ fmtDate(flight.flightDate) }}
+                出發 日期：{{ fmtDate(itinerary.flights[0]?.flightDate) }}
               </p>
             </div>
 
             <div class="shrink-0">
-              <span v-if="!flight.isActive" class="badge gap-2 badge-soft px-3 py-3 badge-warning">
+              <span
+                v-if="!itinerary.isActive"
+                class="badge gap-2 badge-soft px-3 py-3 badge-warning"
+              >
                 已暫停
               </span>
 
@@ -111,10 +112,10 @@ const summary = computed(() => {
 
           <div class="stats stats-vertical rounded-lg bg-base-200/70 lg:stats-horizontal">
             <div class="stat px-5 py-4">
-              <div class="stat-title text-base-content/55">最新票價</div>
+              <div class="stat-title text-base-content/55">最新總價</div>
 
               <div class="stat-value text-3xl text-primary">
-                {{ fmtFare(getFlightStats(flight.fareSnapshots || []).latest) }}
+                {{ fmtFare(itinerary.rule37Analysis?.latestVal ?? null) }}
               </div>
             </div>
 
@@ -122,7 +123,7 @@ const summary = computed(() => {
               <div class="stat-title text-base-content/55">歷史最低</div>
 
               <div class="stat-value text-2xl text-success">
-                {{ fmtFare(getFlightStats(flight.fareSnapshots || []).lowest) }}
+                {{ fmtFare(itinerary.rule37Analysis?.allTimeLow ?? null) }}
               </div>
             </div>
 
@@ -130,32 +131,32 @@ const summary = computed(() => {
               <div class="stat-title text-base-content/55">歷史最高</div>
 
               <div class="stat-value text-2xl text-error">
-                {{ fmtFare(getFlightStats(flight.fareSnapshots || []).highest) }}
+                {{ fmtFare(itinerary.rule37Analysis?.allTimeHigh ?? null) }}
               </div>
             </div>
           </div>
 
           <div class="mt-auto">
             <div
-              v-if="flight.rule37Analysis && flight.rule37Analysis.latestVal !== null"
+              v-if="itinerary.rule37Analysis && itinerary.rule37Analysis.latestVal !== null"
               class="tracker-panel rounded-lg border px-4 py-4"
               :class="{
-                'bg-success/10': flight.rule37Analysis.phase === 'BUY_SIGNAL',
-                'bg-info/10': flight.rule37Analysis.phase === 'WAITING',
-                'bg-neutral/10': flight.rule37Analysis.phase === 'OBSERVING',
+                'bg-success/10': itinerary.rule37Analysis.phase === 'BUY_SIGNAL',
+                'bg-info/10': itinerary.rule37Analysis.phase === 'WAITING',
+                'bg-neutral/10': itinerary.rule37Analysis.phase === 'OBSERVING',
               }"
             >
               <div class="space-y-3">
                 <p class="text-xs font-bold tracking-widest uppercase opacity-60">購買時機分析</p>
 
                 <div class="flex items-center gap-2">
-                  <template v-if="flight.rule37Analysis.phase === 'BUY_SIGNAL'">
+                  <template v-if="itinerary.rule37Analysis.phase === 'BUY_SIGNAL'">
                     <span class="status status-lg status-success"></span>
 
                     <span class="text-sm font-bold text-success">購買信號（最佳時機）</span>
                   </template>
 
-                  <template v-else-if="flight.rule37Analysis.phase === 'OBSERVING'">
+                  <template v-else-if="itinerary.rule37Analysis.phase === 'OBSERVING'">
                     <span class="status status-lg status-neutral"></span>
 
                     <span class="text-sm font-bold text-neutral">觀察期</span>
@@ -165,7 +166,7 @@ const summary = computed(() => {
                     <span class="status status-lg status-info"></span>
 
                     <span class="text-sm font-bold text-info">
-                      等待中（門檻: {{ fmtFare(flight.rule37Analysis.historyBestVal) }}）
+                      等待中（門檻: {{ fmtFare(itinerary.rule37Analysis.historyBestVal ?? null) }}）
                     </span>
                   </template>
                 </div>
@@ -173,13 +174,13 @@ const summary = computed(() => {
                 <div class="text-xs text-base-content/60">
                   <span class="font-medium">限期：</span>
 
-                  <span>{{ fmtDate(flight.deadline) }}</span>
+                  <span>{{ fmtDate(itinerary.deadline) }}</span>
                 </div>
               </div>
             </div>
 
             <div
-              v-else-if="flight.rule37Analysis"
+              v-else-if="itinerary.rule37Analysis"
               class="tracker-panel rounded-lg border border-dashed px-4 py-4 text-center"
             >
               <span class="text-sm font-medium text-base-content/60">收集數據中</span>
@@ -193,7 +194,7 @@ const summary = computed(() => {
           </div>
 
           <div class="card-actions justify-end border-t border-base-300/70 pt-5">
-            <Link :href="`/flights/${flight.id}`" class="btn btn-neutral">查看詳情</Link>
+            <Link :href="`/flights/${itinerary.id}`" class="btn btn-neutral">查看詳情</Link>
           </div>
         </div>
       </div>
