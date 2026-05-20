@@ -19,8 +19,6 @@ const detailPanel = ref(props.itinerary.deadline ? 'analysis' : 'summary')
 let chart: Chart | null = null
 const today = new Date().toISOString().split('T')[0]
 
-const ruleAnalysis = computed(() => props.itinerary.rule37Analysis)
-const isSingleTrip = computed(() => props.itinerary.tripType === 'SINGLE')
 const selectedFlight = computed(
   () => props.itinerary.flights[parseInt(activeTab.value, 10)] || props.itinerary.flights[0],
 )
@@ -99,7 +97,9 @@ function initChart() {
       ...props.itinerary.flights.flatMap((f) =>
         (f.fareSnapshots || []).map((s) => s.createdAt.split('T')[0]),
       ),
-      ...(ruleAnalysis.value?.cutoffDate ? [ruleAnalysis.value.cutoffDate] : []),
+      ...(props.itinerary.rule37Analysis?.cutoffDate
+        ? [props.itinerary.rule37Analysis.cutoffDate]
+        : []),
     ]),
   ]
     .filter(Boolean)
@@ -108,7 +108,7 @@ function initChart() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const datasets: any[] = []
 
-  if (!isSingleTrip.value && props.itinerary.statistics) {
+  if (props.itinerary.tripType !== 'SINGLE' && props.itinerary.statistics) {
     datasets.push({
       label: '總價 (每日最低)',
       data: labels.map((date) => {
@@ -145,21 +145,23 @@ function initChart() {
       )
 
     datasets.push({
-      label: isSingleTrip.value ? '最低票價' : `${f.origin} → ${f.destination}`,
+      label: props.itinerary.tripType === 'SINGLE' ? '最低票價' : `${f.origin} → ${f.destination}`,
       data: labels.map((l) => dataObj[l] ?? null),
-      borderColor: isSingleTrip.value ? '#2563eb' : `hsl(${(idx * 137.5) % 360}, 70%, 50%)`,
-      backgroundColor: isSingleTrip.value ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
+      borderColor:
+        props.itinerary.tripType === 'SINGLE' ? '#2563eb' : `hsl(${(idx * 137.5) % 360}, 70%, 50%)`,
+      backgroundColor:
+        props.itinerary.tripType === 'SINGLE' ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
       borderWidth: 2.5,
       tension: 0.4,
-      fill: isSingleTrip.value,
+      fill: props.itinerary.tripType === 'SINGLE',
       spanGaps: true,
     })
   })
 
-  if (ruleAnalysis.value?.historyBestVal) {
+  if (props.itinerary.rule37Analysis?.historyBestVal) {
     datasets.push({
       label: 'Buying Threshold',
-      data: labels.map(() => ruleAnalysis.value!.historyBestVal),
+      data: labels.map(() => props.itinerary.rule37Analysis!.historyBestVal),
       borderColor: 'rgba(255, 99, 132, 0.8)',
       borderDash: [5, 5],
       borderWidth: 2,
@@ -176,7 +178,7 @@ function initChart() {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { display: !isSingleTrip.value },
+        legend: { display: props.itinerary.tripType !== 'SINGLE' },
         tooltip: { padding: 12, cornerRadius: 8 },
       },
       scales: { y: { grid: { color: '#f3f4f6' } }, x: { grid: { display: false } } },
@@ -264,9 +266,11 @@ onUnmounted(() => chart?.destroy())
     <div
       class="tracker-panel mb-8 rounded-lg border px-6 py-6"
       :class="{
-        'bg-success/10': detailPanel === 'analysis' && ruleAnalysis?.phase === 'BUY_SIGNAL',
-        'bg-info/10': detailPanel === 'analysis' && ruleAnalysis?.phase === 'WAITING',
-        'bg-neutral/10': detailPanel === 'analysis' && ruleAnalysis?.phase === 'OBSERVING',
+        'bg-success/10':
+          detailPanel === 'analysis' && itinerary.rule37Analysis?.phase === 'BUY_SIGNAL',
+        'bg-info/10': detailPanel === 'analysis' && itinerary.rule37Analysis?.phase === 'WAITING',
+        'bg-neutral/10':
+          detailPanel === 'analysis' && itinerary.rule37Analysis?.phase === 'OBSERVING',
       }"
     >
       <div class="join mb-5">
@@ -292,16 +296,16 @@ onUnmounted(() => chart?.destroy())
           class="col-start-1 row-start-1 transition-opacity duration-150"
           :class="detailPanel !== 'analysis' ? 'pointer-events-none invisible' : ''"
         >
-          <div v-if="itinerary.deadline && ruleAnalysis?.phase" class="space-y-4">
+          <div v-if="itinerary.deadline && itinerary.rule37Analysis?.phase" class="space-y-4">
             <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div class="flex items-center gap-3">
-                <template v-if="ruleAnalysis.phase === 'BUY_SIGNAL'">
+                <template v-if="itinerary.rule37Analysis.phase === 'BUY_SIGNAL'">
                   <span class="status status-lg status-success"></span>
 
                   <span class="text-lg font-bold text-success">購買信號 (最佳時機)</span>
                 </template>
 
-                <template v-else-if="ruleAnalysis.phase === 'OBSERVING'">
+                <template v-else-if="itinerary.rule37Analysis.phase === 'OBSERVING'">
                   <span class="status status-lg status-neutral"></span>
 
                   <span class="text-lg font-bold text-neutral">觀察期</span>
@@ -309,7 +313,8 @@ onUnmounted(() => chart?.destroy())
                   <span class="badge px-2 py-1 text-xs font-medium badge-warning">
                     {{
                       Math.ceil(
-                        (new Date(ruleAnalysis.cutoffDate).getTime() - new Date(today).getTime()) /
+                        (new Date(itinerary.rule37Analysis.cutoffDate).getTime() -
+                          new Date(today).getTime()) /
                           86400000,
                       )
                     }}
@@ -327,11 +332,12 @@ onUnmounted(() => chart?.destroy())
               <div class="space-y-1 text-xs text-base-content/70">
                 <p>
                   <span class="font-medium">決策期開始：</span>
-                  {{ fmtDate(ruleAnalysis.cutoffDate) }}
+                  {{ fmtDate(itinerary.rule37Analysis.cutoffDate) }}
                 </p>
 
                 <p>
-                  <span class="font-medium">門檻：</span> {{ fmtFare(ruleAnalysis.historyBestVal) }}
+                  <span class="font-medium">門檻：</span>
+                  {{ fmtFare(itinerary.rule37Analysis.historyBestVal) }}
                 </p>
               </div>
             </div>
@@ -405,7 +411,7 @@ onUnmounted(() => chart?.destroy())
       <div class="card-body p-4 md:p-6">
         <div class="tabs-box tabs flex-nowrap overflow-x-auto bg-base-200/70 p-1 whitespace-nowrap">
           <button
-            v-if="isSingleTrip"
+            v-if="itinerary.tripType === 'SINGLE'"
             class="tab h-12 shrink-0 px-6 text-sm font-bold"
             :class="activeTab === '0' ? 'tab-active' : ''"
             @click="switchTab('0')"
@@ -491,7 +497,10 @@ onUnmounted(() => chart?.destroy())
               </button>
 
               <div
-                v-if="ruleAnalysis?.phase && group.date === ruleAnalysis.cutoffDate"
+                v-if="
+                  itinerary.rule37Analysis?.phase &&
+                  group.date === itinerary.rule37Analysis.cutoffDate
+                "
                 class="border-y border-warning/20 bg-warning/15 px-5 py-1.5 text-center"
               >
                 <p class="text-[11px] font-bold tracking-widest text-warning-content">
