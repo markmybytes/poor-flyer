@@ -17,7 +17,6 @@ const loading = ref<string | null>(null)
 const detailPanel = ref(props.itinerary.deadline ? 'analysis' : 'summary')
 
 let chart: Chart | null = null
-const today = new Date().toISOString().split('T')[0]
 
 const selectedFlight = computed(
   () => props.itinerary.flights[parseInt(activeTab.value, 10)] || props.itinerary.flights[0],
@@ -187,14 +186,12 @@ function initChart() {
   })
 }
 
-function switchTab(t: string) {
-  activeTab.value = t
-  if (t === 'graph') nextTick(() => initChart())
-}
-
-watch(activeTab, (val) => {
+watch(activeTab, async (val) => {
   expandedGroups.value.clear()
-  if (val === 'graph') initChart()
+  if (val === 'graph') {
+    await nextTick()
+    initChart()
+  }
 })
 
 onMounted(() => activeTab.value === 'graph' && initChart())
@@ -313,8 +310,7 @@ onUnmounted(() => chart?.destroy())
                   <span class="badge px-2 py-1 text-xs font-medium badge-warning">
                     {{
                       Math.ceil(
-                        (new Date(itinerary.rule37Analysis.cutoffDate).getTime() -
-                          new Date(today).getTime()) /
+                        (new Date(itinerary.rule37Analysis.cutoffDate).getTime() - Date.now()) /
                           86400000,
                       )
                     }}
@@ -414,7 +410,7 @@ onUnmounted(() => chart?.destroy())
             v-if="itinerary.tripType === 'SINGLE'"
             class="tab h-12 shrink-0 px-6 text-sm font-bold"
             :class="activeTab === '0' ? 'tab-active' : ''"
-            @click="switchTab('0')"
+            @click="activeTab = '0'"
           >
             詳細數據列表
           </button>
@@ -425,7 +421,7 @@ onUnmounted(() => chart?.destroy())
               :key="f.id"
               class="tab h-12 shrink-0 px-6 text-sm font-bold"
               :class="activeTab === String(i) ? 'tab-active' : ''"
-              @click="switchTab(String(i))"
+              @click="activeTab = String(i)"
             >
               {{ f.origin }} → {{ f.destination }}
             </button>
@@ -434,7 +430,7 @@ onUnmounted(() => chart?.destroy())
           <button
             class="tab h-12 shrink-0 px-6 text-sm font-bold"
             :class="activeTab === 'graph' ? 'tab-active' : ''"
-            @click="switchTab('graph')"
+            @click="activeTab = 'graph'"
           >
             價格趨勢圖表
           </button>
