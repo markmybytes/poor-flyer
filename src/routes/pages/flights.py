@@ -22,7 +22,11 @@ def _r37(itinerary: Itinerary) -> dict | None:
     for flight in itinerary.flights:
         for s in flight.fare_snapshots:
             if s.scrape_status == 'success' and s.fare:
-                s_date = s.created_at.date() if isinstance(s.created_at, datetime) else getattr(s.created_at, 'date', lambda: s.created_at)()
+                s_date = (
+                    s.created_at.date()
+                    if isinstance(s.created_at, datetime)
+                    else getattr(s.created_at, 'date', lambda: s.created_at)()
+                )
                 if flight.id not in date_fares[s_date] or s.fare < date_fares[s_date][flight.id]:
                     date_fares[s_date][flight.id] = s.fare
 
@@ -38,7 +42,11 @@ def _r37(itinerary: Itinerary) -> dict | None:
     if not combined_totals:
         return None
 
-    it_created_at = itinerary.created_at.date() if isinstance(itinerary.created_at, datetime) else getattr(itinerary.created_at, 'date', lambda: itinerary.created_at)()
+    it_created_at = (
+        itinerary.created_at.date()
+        if isinstance(itinerary.created_at, datetime)
+        else getattr(itinerary.created_at, 'date', lambda: itinerary.created_at)()
+    )
 
     r37 = compute_37_best(
         it_created_at,
@@ -53,7 +61,9 @@ def _r37(itinerary: Itinerary) -> dict | None:
 def index():
     itineraries = (
         db.session.execute(
-            select(Itinerary).options(selectinload(Itinerary.flights).selectinload(Flight.fare_snapshots)).order_by(Itinerary.created_at)
+            select(Itinerary)
+            .options(selectinload(Itinerary.flights).selectinload(Flight.fare_snapshots))
+            .order_by(Itinerary.created_at)
         )
         .scalars()
         .unique()
@@ -89,7 +99,9 @@ def create():
 @flights_bp.route('/<flight_id>')
 def show(flight_id):
     itinerary = db.session.execute(
-        select(Itinerary).options(selectinload(Itinerary.flights).selectinload(Flight.fare_snapshots)).where(Itinerary.id == flight_id)
+        select(Itinerary)
+        .options(selectinload(Itinerary.flights).selectinload(Flight.fare_snapshots))
+        .where(Itinerary.id == flight_id)
     ).scalar_one_or_none()
 
     if not itinerary:
