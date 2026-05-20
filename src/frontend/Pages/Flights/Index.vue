@@ -10,7 +10,7 @@ const props = defineProps<{ itineraries: Itinerary[] }>()
 const summary = computed(() => {
   const its = props.itineraries || []
   const active = its.filter((it) => it.isActive).length
-  const lows = its.map((it) => it.rule37Analysis?.allTimeLow).filter((v) => v != null) as number[]
+  const lows = its.map((it) => it.statistics?.allTimeLow).filter((v) => v != null) as number[]
 
   return {
     total: its.length,
@@ -102,7 +102,7 @@ const summary = computed(() => {
               <div class="stat-title text-base-content/55">最新總價</div>
 
               <div class="stat-value text-3xl text-primary">
-                {{ fmtFare(itinerary.rule37Analysis?.latestVal ?? null) }}
+                {{ fmtFare(itinerary.statistics?.latestVal ?? null) }}
               </div>
             </div>
 
@@ -110,7 +110,7 @@ const summary = computed(() => {
               <div class="stat-title text-base-content/55">歷史最低</div>
 
               <div class="stat-value text-2xl text-success">
-                {{ fmtFare(itinerary.rule37Analysis?.allTimeLow ?? null) }}
+                {{ fmtFare(itinerary.statistics?.allTimeLow ?? null) }}
               </div>
             </div>
 
@@ -118,14 +118,14 @@ const summary = computed(() => {
               <div class="stat-title text-base-content/55">歷史最高</div>
 
               <div class="stat-value text-2xl text-error">
-                {{ fmtFare(itinerary.rule37Analysis?.allTimeHigh ?? null) }}
+                {{ fmtFare(itinerary.statistics?.allTimeHigh ?? null) }}
               </div>
             </div>
           </div>
 
           <div class="mt-auto">
             <div
-              v-if="itinerary.rule37Analysis?.latestVal !== null && itinerary.rule37Analysis"
+              v-if="itinerary.rule37Analysis && itinerary.statistics?.latestVal !== null"
               class="tracker-panel rounded-lg border px-4 py-4"
               :class="{
                 'bg-success/10': itinerary.rule37Analysis.phase === 'BUY_SIGNAL',

@@ -8,20 +8,17 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from src.extensions.database import Flight, Itinerary, db
-from src.services.rule37 import compute_37_best
+from src.services.rule37 import compute_37_best, compute_price_stats
 from src.utils.transform import model_to_dict
 
 flights_bp = Blueprint('flights', __name__, url_prefix='/flights')
 
 
-def _r37(itinerary: Itinerary) -> dict | None:
-    if not itinerary.deadline:
-        return None
-
+def _get_combined_totals(itinerary: Itinerary) -> dict[date, float]:
     date_fares = defaultdict(dict)
     for flight in itinerary.flights:
         for s in flight.fare_snapshots:
-            if s.scrape_status == 'success' and s.fare:
+            if s.scrape_status == 'success' and s.fare is not None:
                 s_date = (
                     s.created_at.date()
                     if isinstance(s.created_at, datetime)
@@ -33,28 +30,46 @@ def _r37(itinerary: Itinerary) -> dict | None:
     combined_totals = {}
     num_flights = len(itinerary.flights)
     if num_flights == 0:
-        return None
+        return {}
 
     for d, f_fares in date_fares.items():
         if len(f_fares) == num_flights:
             combined_totals[d] = float(sum(f_fares.values()))
 
-    if not combined_totals:
-        return None
+    return combined_totals
 
-    it_created_at = (
-        itinerary.created_at.date()
-        if isinstance(itinerary.created_at, datetime)
-        else getattr(itinerary.created_at, 'date', lambda: itinerary.created_at)()
-    )
 
-    r37 = compute_37_best(
-        it_created_at,
-        date.today(),
-        itinerary.deadline,
-        combined_totals,
-    )
-    return {**asdict(r37), 'phase': r37.phase.value}
+def _serialize_itinerary(itinerary: Itinerary) -> dict:
+    combined = _get_combined_totals(itinerary)
+
+    # 1. ALWAYS compute basic price statistics
+    stats = compute_price_stats(combined)
+    stats_dict = asdict(stats) if stats else None
+
+    # 2. ONLY compute Rule37 if a deadline exists
+    r37_dict = None
+    if itinerary.deadline and combined:
+        it_created_at = (
+            itinerary.created_at.date()
+            if isinstance(itinerary.created_at, datetime)
+            else getattr(itinerary.created_at, 'date', lambda: itinerary.created_at)()
+        )
+        r37 = compute_37_best(it_created_at, date.today(), itinerary.deadline, combined)
+        if r37:
+            r37_dict = {**asdict(r37), 'phase': r37.phase.value}
+
+    return {
+        **model_to_dict(itinerary),
+        'flights': [
+            {
+                **model_to_dict(f),
+                'fare_snapshots': f.fare_snapshots,
+            }
+            for f in itinerary.flights
+        ],
+        'statistics': stats_dict,
+        'rule37_analysis': r37_dict,
+    }
 
 
 @flights_bp.route('/')
@@ -72,22 +87,7 @@ def index():
 
     return render_inertia(
         'Flights/Index',
-        props={
-            'itineraries': [
-                {
-                    **model_to_dict(itinerary),
-                    'flights': [
-                        {
-                            **model_to_dict(f),
-                            'fare_snapshots': f.fare_snapshots,
-                        }
-                        for f in itinerary.flights
-                    ],
-                    'rule37_analysis': _r37(itinerary),
-                }
-                for itinerary in itineraries
-            ]
-        },
+        props={'itineraries': [_serialize_itinerary(it) for it in itineraries]},
     )
 
 
@@ -106,19 +106,8 @@ def show(flight_id):
 
     if not itinerary:
         return redirect('/flights/')
+
     return render_inertia(
         'Flights/Detail',
-        props={
-            'itinerary': {
-                **model_to_dict(itinerary),
-                'flights': [
-                    {
-                        **model_to_dict(f),
-                        'fare_snapshots': f.fare_snapshots,
-                    }
-                    for f in itinerary.flights
-                ],
-                'rule37_analysis': _r37(itinerary),
-            }
-        },
+        props={'itinerary': _serialize_itinerary(itinerary)},
     )

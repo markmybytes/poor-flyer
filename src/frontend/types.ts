@@ -1,10 +1,13 @@
+export interface PriceStats {
+  latestVal: number | null
+  allTimeHigh: number | null
+  allTimeLow: number | null
+}
+
 export interface Rule37Analysis {
   phase: 'BUY_SIGNAL' | 'OBSERVING' | 'WAITING' | string
   cutoffDate: string
   historyBestVal: number | null
-  latestVal: number | null
-  allTimeHigh: number | null
-  allTimeLow: number | null
 }
 
 export interface FareSnapshot {
@@ -35,5 +38,6 @@ export interface Itinerary {
   deadline: string | null
   createdAt: string
   flights: Flight[]
+  statistics?: PriceStats | null
   rule37Analysis?: Rule37Analysis | null
 }

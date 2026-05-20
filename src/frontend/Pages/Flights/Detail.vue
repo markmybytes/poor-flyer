@@ -25,12 +25,6 @@ const selectedFlight = computed(
   () => props.itinerary.flights[parseInt(activeTab.value, 10)] || props.itinerary.flights[0],
 )
 
-const flightStats = computed(() => ({
-  latest: ruleAnalysis.value?.latestVal ?? null,
-  lowest: ruleAnalysis.value?.allTimeLow ?? null,
-  highest: ruleAnalysis.value?.allTimeHigh ?? null,
-}))
-
 const legMinMax = computed(() => {
   const fares = (selectedFlight.value?.fareSnapshots || [])
     .filter((s) => s.scrapeStatus === 'success' && s.fare !== null)
@@ -114,7 +108,7 @@ function initChart() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const datasets: any[] = []
 
-  if (!isSingleTrip.value && ruleAnalysis.value) {
+  if (!isSingleTrip.value && props.itinerary.statistics) {
     datasets.push({
       label: '總價 (每日最低)',
       data: labels.map((date) => {
@@ -298,7 +292,7 @@ onUnmounted(() => chart?.destroy())
           class="col-start-1 row-start-1 transition-opacity duration-150"
           :class="detailPanel !== 'analysis' ? 'pointer-events-none invisible' : ''"
         >
-          <div v-if="ruleAnalysis?.latestVal !== null && ruleAnalysis" class="space-y-4">
+          <div v-if="itinerary.deadline && ruleAnalysis?.phase" class="space-y-4">
             <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div class="flex items-center gap-3">
                 <template v-if="ruleAnalysis.phase === 'BUY_SIGNAL'">
@@ -346,20 +340,22 @@ onUnmounted(() => chart?.destroy())
               <div class="rounded-lg bg-base-100/60 px-4 py-3">
                 <p class="text-xs font-bold tracking-widest uppercase opacity-55">總價 (最新)</p>
 
-                <p class="mt-1 text-base font-bold">{{ fmtFare(ruleAnalysis.latestVal) }}</p>
+                <p class="mt-1 text-base font-bold">
+                  {{ fmtFare(itinerary.statistics?.latestVal ?? null) }}
+                </p>
               </div>
 
               <div class="rounded-lg bg-base-100/60 px-4 py-3">
                 <p class="text-xs font-bold tracking-widest uppercase opacity-55">歷史總價最低</p>
 
                 <p class="mt-1 text-base font-bold text-success">
-                  {{ fmtFare(ruleAnalysis.allTimeLow) }}
+                  {{ fmtFare(itinerary.statistics?.allTimeLow ?? null) }}
                 </p>
               </div>
             </div>
           </div>
 
-          <div v-else-if="ruleAnalysis" class="py-4 text-center">
+          <div v-else-if="itinerary.deadline" class="py-4 text-center">
             <p class="text-sm font-medium text-base-content/60">
               數據不足，尚無法分析最佳購買時機。
             </p>
@@ -380,19 +376,25 @@ onUnmounted(() => chart?.destroy())
             <div class="stat px-5 py-4">
               <div class="stat-title text-base-content/55">最新票價</div>
 
-              <div class="stat-value text-2xl text-primary">{{ fmtFare(flightStats.latest) }}</div>
+              <div class="stat-value text-2xl text-primary">
+                {{ fmtFare(itinerary.statistics?.latestVal ?? null) }}
+              </div>
             </div>
 
             <div class="stat px-5 py-4">
               <div class="stat-title text-base-content/55">歷史最低</div>
 
-              <div class="stat-value text-2xl text-success">{{ fmtFare(flightStats.lowest) }}</div>
+              <div class="stat-value text-2xl text-success">
+                {{ fmtFare(itinerary.statistics?.allTimeLow ?? null) }}
+              </div>
             </div>
 
             <div class="stat px-5 py-4">
               <div class="stat-title text-base-content/55">歷史最高</div>
 
-              <div class="stat-value text-2xl text-error">{{ fmtFare(flightStats.highest) }}</div>
+              <div class="stat-value text-2xl text-error">
+                {{ fmtFare(itinerary.statistics?.allTimeHigh ?? null) }}
+              </div>
             </div>
           </div>
         </div>
