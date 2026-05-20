@@ -8,27 +8,16 @@ import { computed } from 'vue'
 const props = defineProps<{ itineraries: Itinerary[] }>()
 
 const summary = computed(() => {
-  const active = props.itineraries?.filter((it) => it.isActive).length ?? 0
-  const buySignals =
-    props.itineraries?.filter((it) => it.rule37Analysis?.phase === 'BUY_SIGNAL').length ?? 0
-
-  const lowestTotal = (props.itineraries || [])
-    .filter(
-      (it) => it.rule37Analysis?.allTimeLow !== null && it.rule37Analysis?.allTimeLow !== undefined,
-    )
-    .reduce<number | null>((lowest, it) => {
-      const val = it.rule37Analysis!.allTimeLow
-      if (val === null) return lowest
-      if (lowest === null || val < lowest) return val
-      return lowest
-    }, null)
+  const its = props.itineraries || []
+  const active = its.filter((it) => it.isActive).length
+  const lows = its.map((it) => it.rule37Analysis?.allTimeLow).filter((v) => v != null) as number[]
 
   return {
-    total: props.itineraries?.length ?? 0,
+    total: its.length,
     active,
-    paused: (props.itineraries?.length ?? 0) - active,
-    buySignals,
-    lowestTotal,
+    paused: its.length - active,
+    buySignals: its.filter((it) => it.rule37Analysis?.phase === 'BUY_SIGNAL').length,
+    lowestTotal: lows.length ? Math.min(...lows) : null,
   }
 })
 </script>
@@ -69,13 +58,13 @@ const summary = computed(() => {
       </div>
     </div>
 
-    <div class="items- center mb-8 flex justify-between">
+    <div class="mb-8 flex items-center justify-between">
       <div class="flex-1"></div>
 
       <Link href="/flights/create" class="btn shadow-sm btn-primary">建立追蹤</Link>
     </div>
 
-    <div v-if="itineraries && itineraries.length" class="grid gap-6 lg:grid-cols-2">
+    <div v-if="itineraries?.length" class="grid gap-6 lg:grid-cols-2">
       <div
         v-for="itinerary in itineraries"
         :key="itinerary.id"
@@ -99,13 +88,11 @@ const summary = computed(() => {
               <span
                 v-if="!itinerary.isActive"
                 class="badge gap-2 badge-soft px-3 py-3 badge-warning"
+                >已暫停</span
               >
-                已暫停
-              </span>
 
               <span v-else class="badge gap-2 badge-soft px-3 py-3 badge-success">
-                <span class="status status-success"></span>
-                追蹤中
+                <span class="status status-success"></span> 追蹤中
               </span>
             </div>
           </div>
@@ -138,7 +125,7 @@ const summary = computed(() => {
 
           <div class="mt-auto">
             <div
-              v-if="itinerary.rule37Analysis && itinerary.rule37Analysis.latestVal !== null"
+              v-if="itinerary.rule37Analysis?.latestVal !== null && itinerary.rule37Analysis"
               class="tracker-panel rounded-lg border px-4 py-4"
               :class="{
                 'bg-success/10': itinerary.rule37Analysis.phase === 'BUY_SIGNAL',
@@ -215,9 +202,9 @@ const summary = computed(() => {
           加入您想關注的出發地與目的地，我們將為您不間斷追蹤價格，並在最佳時機提示您購買。
         </p>
 
-        <Link href="/flights/create" class="btn shadow-sm btn-lg btn-primary">
-          建立您的第一個追蹤
-        </Link>
+        <Link href="/flights/create" class="btn shadow-sm btn-lg btn-primary"
+          >建立您的第一個追蹤</Link
+        >
       </div>
     </div>
   </AppLayout>

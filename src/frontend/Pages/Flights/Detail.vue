@@ -8,161 +8,127 @@ import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch 
 import { useToast } from 'vue-toast-notification'
 
 const props = defineProps<{ itinerary: Itinerary }>()
-
 const toast = useToast()
 
 const chartCanvas = useTemplateRef<HTMLCanvasElement>('chartCanvas')
-const activeTab = ref<string>('0')
+const activeTab = ref('0')
 const expandedGroups = ref(new Set<number>())
-const loading = ref({ loading: null as 'toggle' | 'scrape' | 'delete' | null })
-const detailPanel = ref<'analysis' | 'summary'>(props.itinerary.deadline ? 'analysis' : 'summary')
+const loading = ref<string | null>(null)
+const detailPanel = ref(props.itinerary.deadline ? 'analysis' : 'summary')
 
 let chart: Chart | null = null
-
 const today = new Date().toISOString().split('T')[0]
 
 const ruleAnalysis = computed(() => props.itinerary.rule37Analysis)
-
 const isSingleTrip = computed(() => props.itinerary.tripType === 'SINGLE')
+const selectedFlight = computed(
+  () => props.itinerary.flights[parseInt(activeTab.value, 10)] || props.itinerary.flights[0],
+)
 
-// Which leg is currently selected for the table view
-const selectedFlight = computed(() => {
-  const index = parseInt(activeTab.value, 10)
-  return isNaN(index) ? props.itinerary.flights[0] : props.itinerary.flights[index]
-})
+const flightStats = computed(() => ({
+  latest: ruleAnalysis.value?.latestVal ?? null,
+  lowest: ruleAnalysis.value?.allTimeLow ?? null,
+  highest: ruleAnalysis.value?.allTimeHigh ?? null,
+}))
 
-const flightStats = computed(() => {
-  return {
-    latest: ruleAnalysis.value?.latestVal ?? null,
-    lowest: ruleAnalysis.value?.allTimeLow ?? null,
-    highest: ruleAnalysis.value?.allTimeHigh ?? null,
-  }
-})
-
-// Calculate the min/max fare for the *currently selected leg* (for highlighting)
 const legMinMax = computed(() => {
-  const f = selectedFlight.value
-  if (!f || !f.fareSnapshots) return { min: null, max: null }
-  const fares = f.fareSnapshots
+  const fares = (selectedFlight.value?.fareSnapshots || [])
     .filter((s) => s.scrapeStatus === 'success' && s.fare !== null)
     .map((s) => s.fare as number)
+
   if (!fares.length) return { min: null, max: null }
-  const min = Math.min(...fares)
-  const max = Math.max(...fares)
-  if (min === max) {
-    return { min: null, max: null }
-  }
-  return { min, max }
+  const min = Math.min(...fares),
+    max = Math.max(...fares)
+  return min === max ? { min: null, max: null } : { min, max }
 })
 
 const dailyGroups = computed(() => {
-  const f = selectedFlight.value
-  if (!f || !f.fareSnapshots) return []
+  const byDate = (selectedFlight.value?.fareSnapshots || []).reduce(
+    (acc, s) => {
+      const d = s.createdAt.split('T')[0]
+      ;(acc[d] ??= []).push(s)
+      return acc
+    },
+    {} as Record<string, FareSnapshot[]>,
+  )
 
-  const byDate = new Map<string, FareSnapshot[]>()
-  for (const s of f.fareSnapshots) {
-    const d = s.createdAt.split('T')[0]
-    if (!byDate.has(d)) byDate.set(d, [])
-    byDate.get(d)!.push(s)
-  }
-
-  return [...byDate.entries()]
+  return Object.entries(byDate)
     .sort(([a], [b]) => b.localeCompare(a))
-    .map(([date, snapshots]) => {
-      const low =
-        snapshots
-          .filter((s) => s.scrapeStatus === 'success' && s.fare != null)
-          .sort((a, b) => (a.fare as number) - (b.fare as number))[0] ?? null
+    .map(([date, snaps]) => {
+      const low = snaps
+        .filter((s) => s.scrapeStatus === 'success' && s.fare != null)
+        .sort((a, b) => (a.fare as number) - (b.fare as number))[0]
       return {
         date,
         lowestFare: low?.fare ?? null,
         lowestSnapshot: low ? { flightNumber: low.flightNumber, fare: low.fare } : null,
-        snapshots: [...snapshots].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+        snapshots: snaps.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
       }
     })
 })
 
-function toggleEntry() {
-  loading.value.loading = 'toggle'
-  fetch('/api/flights/' + props.itinerary.id, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ is_active: !props.itinerary.isActive }),
-  })
-    .then((res) => {
-      if (res.ok) router.reload()
-      else toast.error('操作失敗，請稍後再試')
-    })
-    .catch(() => toast.error('操作失敗，請稍後再試'))
-    .finally(() => (loading.value.loading = null))
-}
+const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
+  if (action === 'delete' && !confirm('確認刪除此航班追蹤？')) return
+  loading.value = action
 
-function scrapeEntry() {
-  loading.value.loading = 'scrape'
-  fetch('/api/flights/' + props.itinerary.id + '/scrape', { method: 'POST' })
-    .then((res) => {
-      if (res.ok) router.reload()
-      else toast.error('擷取失敗，請稍後再試')
-    })
-    .catch(() => toast.error('擷取失敗，請稍後再試'))
-    .finally(() => (loading.value.loading = null))
-}
+  const opts: RequestInit = {
+    method: action === 'toggle' ? 'PATCH' : action === 'scrape' ? 'POST' : 'DELETE',
+  }
+  if (action === 'toggle') {
+    opts.headers = { 'Content-Type': 'application/json' }
+    opts.body = JSON.stringify({ is_active: !props.itinerary.isActive })
+  }
 
-function deleteEntry() {
-  if (!confirm('確認刪除此航班追蹤？')) return
-  loading.value.loading = 'delete'
-  fetch('/api/flights/' + props.itinerary.id, { method: 'DELETE' })
-    .then((res) => {
-      if (res.ok) router.visit('/flights/')
-      else toast.error('刪除失敗，請稍後再試')
-    })
-    .catch(() => toast.error('刪除失敗，請稍後再試'))
-    .finally(() => (loading.value.loading = null))
+  try {
+    const res = await fetch(
+      `/api/flights/${props.itinerary.id}${action === 'scrape' ? '/scrape' : ''}`,
+      opts,
+    )
+    if (!res.ok) throw new Error()
+    if (action === 'delete') router.visit('/flights/')
+    else router.reload()
+  } catch {
+    toast.error(
+      `${action === 'scrape' ? '擷取' : action === 'delete' ? '刪除' : '操作'}失敗，請稍後再試`,
+    )
+  } finally {
+    loading.value = null
+  }
 }
 
 function initChart() {
-  if (!chartCanvas.value || props.itinerary.flights.length === 0) return
+  if (!chartCanvas.value || !props.itinerary.flights.length) return
   if (chart) chart.destroy()
 
-  const labelsSet = new Set<string>()
-  props.itinerary.flights.forEach((f) => {
-    ;(f.fareSnapshots || []).forEach((s) => {
-      if (s.createdAt) labelsSet.add(s.createdAt.split('T')[0])
-    })
-  })
-  if (ruleAnalysis.value?.cutoffDate) labelsSet.add(ruleAnalysis.value.cutoffDate)
-  const labels = Array.from(labelsSet).sort((a, b) => a.localeCompare(b))
+  const labels = [
+    ...new Set([
+      ...props.itinerary.flights.flatMap((f) =>
+        (f.fareSnapshots || []).map((s) => s.createdAt.split('T')[0]),
+      ),
+      ...(ruleAnalysis.value?.cutoffDate ? [ruleAnalysis.value.cutoffDate] : []),
+    ]),
+  ]
+    .filter(Boolean)
+    .sort()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const datasets: any[] = []
 
   if (!isSingleTrip.value && ruleAnalysis.value) {
-    const combinedData: Record<string, number> = {}
-
-    // We already know labels are sorted. Let's find valid totals per label
-    labels.forEach((date) => {
-      let total = 0
-      let allValid = true
-      props.itinerary.flights.forEach((f) => {
-        const flightsOnDate = (f.fareSnapshots || []).filter(
-          (s) =>
-            s.createdAt &&
-            s.createdAt.startsWith(date) &&
-            s.scrapeStatus === 'success' &&
-            s.fare !== null,
-        )
-        if (!flightsOnDate.length) {
-          allValid = false
-        } else {
-          total += Math.min(...flightsOnDate.map((s) => s.fare as number))
-        }
-      })
-      if (allValid) combinedData[date] = total
-    })
-
     datasets.push({
       label: '總價 (每日最低)',
-      data: labels.map((l) => combinedData[l] ?? null),
+      data: labels.map((date) => {
+        const totals = props.itinerary.flights.map((f) => {
+          const fares = (f.fareSnapshots || [])
+            .filter(
+              (s) =>
+                s.createdAt.startsWith(date) && s.scrapeStatus === 'success' && s.fare !== null,
+            )
+            .map((s) => s.fare as number)
+          return fares.length ? Math.min(...fares) : null
+        })
+        return totals.includes(null) ? null : totals.reduce((a, b) => a! + b!, 0)
+      }),
       borderColor: '#ff9800',
       backgroundColor: 'rgba(255, 152, 0, 0.1)',
       borderWidth: 3,
@@ -173,19 +139,21 @@ function initChart() {
   }
 
   props.itinerary.flights.forEach((f, idx) => {
-    const dataObj: Record<string, number> = {}
-    ;(f.fareSnapshots || [])
+    const dataObj = (f.fareSnapshots || [])
       .filter((s) => s.scrapeStatus === 'success' && s.fare !== null)
-      .forEach((s) => {
-        const d = s.createdAt.split('T')[0]
-        if (!dataObj[d] || s.fare! < dataObj[d]) dataObj[d] = s.fare! // Get lowest of day
-      })
+      .reduce(
+        (acc, s) => {
+          const d = s.createdAt.split('T')[0]
+          if (!acc[d] || s.fare! < acc[d]) acc[d] = s.fare!
+          return acc
+        },
+        {} as Record<string, number>,
+      )
 
-    const color = isSingleTrip.value ? '#2563eb' : `hsl(${(idx * 137.5) % 360}, 70%, 50%)`
     datasets.push({
       label: isSingleTrip.value ? '最低票價' : `${f.origin} → ${f.destination}`,
       data: labels.map((l) => dataObj[l] ?? null),
-      borderColor: color,
+      borderColor: isSingleTrip.value ? '#2563eb' : `hsl(${(idx * 137.5) % 360}, 70%, 50%)`,
       backgroundColor: isSingleTrip.value ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
       borderWidth: 2.5,
       tension: 0.4,
@@ -217,20 +185,15 @@ function initChart() {
         legend: { display: !isSingleTrip.value },
         tooltip: { padding: 12, cornerRadius: 8 },
       },
-      scales: {
-        y: { beginAtZero: false, grid: { color: '#f3f4f6' } },
-        x: { grid: { display: false } },
-      },
+      scales: { y: { grid: { color: '#f3f4f6' } }, x: { grid: { display: false } } },
       interaction: { intersect: false, mode: 'index' },
     },
   })
 }
 
-function switchTab(t: string | 'graph') {
+function switchTab(t: string) {
   activeTab.value = t
-  if (t === 'graph') {
-    nextTick(() => initChart())
-  }
+  if (t === 'graph') nextTick(() => initChart())
 }
 
 watch(activeTab, (val) => {
@@ -263,8 +226,7 @@ onUnmounted(() => chart?.destroy())
 
             <div class="flex shrink-0 flex-wrap gap-2">
               <span v-if="itinerary.isActive" class="badge badge-soft px-3 py-3 badge-success">
-                <span class="status status-success"></span>
-                追蹤中
+                <span class="status status-success"></span> 追蹤中
               </span>
 
               <span v-else class="badge badge-soft px-3 py-3 badge-warning">已暫停</span>
@@ -276,37 +238,28 @@ onUnmounted(() => chart?.destroy())
           <div class="join gap-2">
             <button
               class="btn join-item btn-sm"
-              :disabled="loading.loading === 'toggle'"
-              @click="toggleEntry"
+              :disabled="loading === 'toggle'"
+              @click="runAction('toggle')"
             >
-              <span
-                v-if="loading.loading === 'toggle'"
-                class="loading loading-xs loading-spinner"
-              ></span>
+              <span v-if="loading === 'toggle'" class="loading loading-xs loading-spinner"></span>
               {{ itinerary.isActive ? '停止追蹤' : '開啟追蹤' }}
             </button>
 
             <button
               class="btn join-item btn-sm btn-primary"
-              :disabled="loading.loading === 'scrape'"
-              @click="scrapeEntry"
+              :disabled="loading === 'scrape'"
+              @click="runAction('scrape')"
             >
-              <span
-                v-if="loading.loading === 'scrape'"
-                class="loading loading-xs loading-spinner"
-              ></span>
-              {{ loading.loading === 'scrape' ? '擷取中...' : '擷取最新價格' }}
+              <span v-if="loading === 'scrape'" class="loading loading-xs loading-spinner"></span>
+              {{ loading === 'scrape' ? '擷取中...' : '擷取最新價格' }}
             </button>
 
             <button
               class="btn join-item btn-soft btn-sm btn-error"
-              :disabled="loading.loading === 'delete'"
-              @click="deleteEntry"
+              :disabled="loading === 'delete'"
+              @click="runAction('delete')"
             >
-              <span
-                v-if="loading.loading === 'delete'"
-                class="loading loading-xs loading-spinner"
-              ></span>
+              <span v-if="loading === 'delete'" class="loading loading-xs loading-spinner"></span>
               刪除
             </button>
           </div>
@@ -314,7 +267,6 @@ onUnmounted(() => chart?.destroy())
       </div>
     </div>
 
-    <!-- Summary panels strictly derived from rule37Analysis (Grand Totals) -->
     <div
       class="tracker-panel mb-8 rounded-lg border px-6 py-6"
       :class="{
@@ -342,12 +294,11 @@ onUnmounted(() => chart?.destroy())
       </div>
 
       <div class="grid">
-        <!-- Analysis panel -->
         <div
           class="col-start-1 row-start-1 transition-opacity duration-150"
           :class="detailPanel !== 'analysis' ? 'pointer-events-none invisible' : ''"
         >
-          <div v-if="ruleAnalysis && ruleAnalysis.latestVal !== null" class="space-y-4">
+          <div v-if="ruleAnalysis?.latestVal !== null && ruleAnalysis" class="space-y-4">
             <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div class="flex items-center gap-3">
                 <template v-if="ruleAnalysis.phase === 'BUY_SIGNAL'">
@@ -386,8 +337,7 @@ onUnmounted(() => chart?.destroy())
                 </p>
 
                 <p>
-                  <span class="font-medium">門檻：</span>
-                  {{ fmtFare(ruleAnalysis.historyBestVal) }}
+                  <span class="font-medium">門檻：</span> {{ fmtFare(ruleAnalysis.historyBestVal) }}
                 </p>
               </div>
             </div>
@@ -422,8 +372,6 @@ onUnmounted(() => chart?.destroy())
           </div>
         </div>
 
-        <!-- Summar
- panel -->
         <div
           class="col-start-1 row-start-1 transition-opacity duration-150"
           :class="detailPanel !== 'summary' ? 'pointer-events-none invisible' : ''"
@@ -451,7 +399,6 @@ onUnmounted(() => chart?.destroy())
       </div>
     </div>
 
-    <!-- Dynamic Tabs & Accordion Table -->
     <div class="tracker-panel card rounded-lg">
       <div class="card-body p-4 md:p-6">
         <div class="tabs-box tabs flex-nowrap overflow-x-auto bg-base-200/70 p-1 whitespace-nowrap">
@@ -500,10 +447,6 @@ onUnmounted(() => chart?.destroy())
                     legMinMax.min !== null &&
                     group.snapshots.some((s) => s.fare === legMinMax.min) &&
                     !group.snapshots.some((s) => s.fare === legMinMax.max),
-                  // 'bg-error/10':
-                  //   legMinMax.max !== null &&
-                  //   group.snapshots.some((s) => s.fare === legMinMax.max) &&
-                  //   !group.snapshots.some((s) => s.fare === legMinMax.min),
                 }"
                 @click="
                   expandedGroups.has(index)
@@ -588,11 +531,7 @@ onUnmounted(() => chart?.destroy())
                       <tr
                         v-for="snap in group.snapshots"
                         :key="snap.id"
-                        :class="[
-                          snap.scrapeStatus === 'error' ? 'bg-error/10' : '',
-                          // snap.fare === legMinMax.min ? 'bg-success/10' : '',
-                          // snap.fare === legMinMax.max ? 'bg-error/10' : '',
-                        ]"
+                        :class="[snap.scrapeStatus === 'error' ? 'bg-error/10' : '']"
                       >
                         <td class="font-semibold text-base-content">
                           {{ snap.flightNumber ?? '—' }}
