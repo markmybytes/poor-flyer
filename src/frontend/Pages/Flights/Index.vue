@@ -50,11 +50,11 @@ const summary = computed(() => {
       </div>
 
       <div class="stat px-4 py-3 sm:px-6 sm:py-4">
-        <div class="stat-title text-xs sm:text-sm">最佳買點</div>
+        <div class="stat-title text-xs sm:text-sm">最佳時機</div>
 
         <div class="stat-value text-xl text-success sm:text-3xl">{{ summary.buySignals }}</div>
 
-        <div class="stat-desc hidden sm:block">符合 BUY_SIGNAL 的行程</div>
+        <div class="stat-desc hidden sm:block">處於最佳購買時機的行程</div>
       </div>
     </div>
 
