@@ -1,65 +1,24 @@
 ﻿<script setup lang="ts">
+import FareGraph from '@/Components/FareGraph.vue'
+import FaretList from '@/Components/FareList.vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
-import type { FareSnapshot, Itinerary } from '@/types'
-import { fmtDate, fmtFare, fmtItineraryName, fmtTime, fmtTz } from '@/utils'
+import type { Itinerary } from '@/types'
+import { fmtDate, fmtFare, fmtItineraryName } from '@/utils'
 import { router } from '@inertiajs/vue3'
-import Chart from 'chart.js/auto'
-import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
+import { ref } from 'vue'
 import { useToast } from 'vue-toast-notification'
 
 const props = defineProps<{ itinerary: Itinerary }>()
 const toast = useToast()
 
-const chartCanvas = useTemplateRef<HTMLCanvasElement>('chartCanvas')
 const activeTab = ref('0')
-const expandedGroups = ref(new Set<number>())
 const loading = ref<string | null>(null)
 const detailPanel = ref(props.itinerary.deadline ? 'analysis' : 'summary')
 
-let chart: Chart | null = null
-
-const selectedFlight = computed(
-  () => props.itinerary.flights[parseInt(activeTab.value, 10)] || props.itinerary.flights[0],
-)
-
-const legMinMax = computed(() => {
-  const fares = (selectedFlight.value?.fareSnapshots || [])
-    .filter((s) => s.scrapeStatus === 'success' && s.fare !== null)
-    .map((s) => s.fare as number)
-
-  if (!fares.length) return { min: null, max: null }
-  const min = Math.min(...fares),
-    max = Math.max(...fares)
-  return min === max ? { min: null, max: null } : { min, max }
-})
-
-const dailyGroups = computed(() => {
-  const byDate = (selectedFlight.value?.fareSnapshots || []).reduce(
-    (acc, s) => {
-      const d = s.createdAt.split('T')[0]
-      ;(acc[d] ??= []).push(s)
-      return acc
-    },
-    {} as Record<string, FareSnapshot[]>,
-  )
-
-  return Object.entries(byDate)
-    .sort(([a], [b]) => b.localeCompare(a))
-    .map(([date, snaps]) => {
-      const low = snaps
-        .filter((s) => s.scrapeStatus === 'success' && s.fare != null)
-        .sort((a, b) => (a.fare as number) - (b.fare as number))[0]
-      return {
-        date,
-        lowestFare: low?.fare ?? null,
-        lowestSnapshot: low ? { flightNumber: low.flightNumber, fare: low.fare } : null,
-        snapshots: snaps.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-      }
-    })
-})
-
 const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
-  if (action === 'delete' && !confirm('確認刪除此航班追蹤？')) return
+  if (action === 'delete' && !confirm('確認刪除此航班追蹤？')) {
+    return
+  }
   loading.value = action
 
   const opts: RequestInit = {
@@ -75,9 +34,15 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
       `/api/flights/${props.itinerary.id}${action === 'scrape' ? '/scrape' : ''}`,
       opts,
     )
-    if (!res.ok) throw new Error()
-    if (action === 'delete') router.visit('/flights/')
-    else router.reload()
+    if (!res.ok) {
+      throw new Error()
+    }
+
+    if (action === 'delete') {
+      router.visit('/flights/')
+    } else {
+      router.reload()
+    }
   } catch {
     toast.error(
       `${action === 'scrape' ? '擷取' : action === 'delete' ? '刪除' : '操作'}失敗，請稍後再試`,
@@ -86,116 +51,6 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
     loading.value = null
   }
 }
-
-function initChart() {
-  if (!chartCanvas.value || !props.itinerary.flights.length) return
-  if (chart) chart.destroy()
-
-  const labels = [
-    ...new Set([
-      ...props.itinerary.flights.flatMap((f) =>
-        (f.fareSnapshots || []).map((s) => s.createdAt.split('T')[0]),
-      ),
-      ...(props.itinerary.rule37Analysis?.cutoffDate
-        ? [props.itinerary.rule37Analysis.cutoffDate]
-        : []),
-    ]),
-  ]
-    .filter(Boolean)
-    .sort()
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const datasets: any[] = []
-
-  if (props.itinerary.tripType !== 'SINGLE' && props.itinerary.statistics) {
-    datasets.push({
-      label: '總價 (每日最低)',
-      data: labels.map((date) => {
-        const totals = props.itinerary.flights.map((f) => {
-          const fares = (f.fareSnapshots || [])
-            .filter(
-              (s) =>
-                s.createdAt.startsWith(date) && s.scrapeStatus === 'success' && s.fare !== null,
-            )
-            .map((s) => s.fare as number)
-          return fares.length ? Math.min(...fares) : null
-        })
-        return totals.includes(null) ? null : totals.reduce((a, b) => a! + b!, 0)
-      }),
-      borderColor: '#ff9800',
-      backgroundColor: 'rgba(255, 152, 0, 0.1)',
-      borderWidth: 3,
-      tension: 0.4,
-      fill: false,
-      spanGaps: true,
-    })
-  }
-
-  props.itinerary.flights.forEach((f, idx) => {
-    const dataObj = (f.fareSnapshots || [])
-      .filter((s) => s.scrapeStatus === 'success' && s.fare !== null)
-      .reduce(
-        (acc, s) => {
-          const d = s.createdAt.split('T')[0]
-          if (!acc[d] || s.fare! < acc[d]) acc[d] = s.fare!
-          return acc
-        },
-        {} as Record<string, number>,
-      )
-
-    datasets.push({
-      label: props.itinerary.tripType === 'SINGLE' ? '最低票價' : `${f.origin} → ${f.destination}`,
-      data: labels.map((l) => dataObj[l] ?? null),
-      borderColor:
-        props.itinerary.tripType === 'SINGLE' ? '#2563eb' : `hsl(${(idx * 137.5) % 360}, 70%, 50%)`,
-      backgroundColor:
-        props.itinerary.tripType === 'SINGLE' ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
-      borderWidth: 2.5,
-      tension: 0.4,
-      fill: props.itinerary.tripType === 'SINGLE',
-      spanGaps: true,
-    })
-  })
-
-  if (props.itinerary.rule37Analysis?.historyBestVal) {
-    datasets.push({
-      label: 'Buying Threshold',
-      data: labels.map(() => props.itinerary.rule37Analysis!.historyBestVal),
-      borderColor: 'rgba(255, 99, 132, 0.8)',
-      borderDash: [5, 5],
-      borderWidth: 2,
-      tension: 0,
-      spanGaps: true,
-      pointRadius: 0,
-    })
-  }
-
-  chart = new Chart(chartCanvas.value, {
-    type: 'line',
-    data: { labels, datasets },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: props.itinerary.tripType !== 'SINGLE' },
-        tooltip: { padding: 12, cornerRadius: 8 },
-      },
-      scales: { y: { grid: { color: '#f3f4f6' } }, x: { grid: { display: false } } },
-      interaction: { intersect: false, mode: 'index' },
-    },
-  })
-}
-
-watch(activeTab, async (val) => {
-  expandedGroups.value.clear()
-  if (val === 'graph') {
-    await nextTick()
-    initChart()
-  }
-})
-
-onMounted(() => activeTab.value === 'graph' && initChart())
-onUnmounted(() => chart?.destroy())
 </script>
 
 <template>
@@ -291,7 +146,9 @@ onUnmounted(() => chart?.destroy())
       <div class="grid">
         <div
           class="col-start-1 row-start-1 transition-opacity duration-150"
-          :class="detailPanel !== 'analysis' ? 'pointer-events-none invisible' : ''"
+          :class="
+            detailPanel !== 'analysis' ? 'pointer-events-none invisible opacity-0' : 'opacity-100'
+          "
         >
           <div v-if="itinerary.deadline && itinerary.rule37Analysis?.phase" class="space-y-4">
             <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -372,7 +229,9 @@ onUnmounted(() => chart?.destroy())
 
         <div
           class="col-start-1 row-start-1 transition-opacity duration-150"
-          :class="detailPanel !== 'summary' ? 'pointer-events-none invisible' : ''"
+          :class="
+            detailPanel !== 'summary' ? 'pointer-events-none invisible opacity-0' : 'opacity-100'
+          "
         >
           <div class="stats w-full stats-vertical rounded-lg bg-base-200/60 lg:stats-horizontal">
             <div class="stat px-5 py-4">
@@ -436,183 +295,34 @@ onUnmounted(() => chart?.destroy())
           </button>
         </div>
 
-        <div v-show="activeTab !== 'graph'" class="pt-5">
-          <template v-if="dailyGroups.length">
-            <div
-              v-for="(group, index) in dailyGroups"
-              :key="group.date"
-              class="collapse-plus collapse mb-3 border border-base-300/70 bg-base-100 last:mb-0"
-              :class="expandedGroups.has(index) ? 'collapse-open' : 'collapse-close'"
-            >
-              <button
-                class="collapse-title flex w-full items-center justify-between pr-14 pl-5 text-left transition-colors hover:bg-base-200/40"
-                :class="{
-                  'bg-success/10':
-                    legMinMax.min !== null &&
-                    group.snapshots.some((s) => s.fare === legMinMax.min) &&
-                    !group.snapshots.some((s) => s.fare === legMinMax.max),
-                }"
-                @click="
-                  expandedGroups.has(index)
-                    ? expandedGroups.delete(index)
-                    : expandedGroups.add(index)
-                "
-              >
-                <div class="flex flex-1 items-center gap-4">
-                  <div>
-                    <p class="leading-tight font-bold text-base-content">
-                      {{ fmtDate(group.date) }}
-                      <span class="ml-1 text-xs font-medium text-base-content/55">
-                        （{{
-                          ['日', '一', '二', '三', '四', '五', '六'][new Date(group.date).getDay()]
-                        }}）
-                      </span>
-                    </p>
-
-                    <p class="text-xs font-medium text-base-content/60">
-                      <template v-if="group.lowestSnapshot">
-                        當日最低：<span class="font-bold text-base-content">{{
-                          fmtFare(group.lowestFare)
-                        }}</span>
-
-                        <template v-if="group.lowestSnapshot.flightNumber"
-                          >· {{ group.lowestSnapshot.flightNumber }}</template
-                        >
-                      </template>
-
-                      <span v-else class="text-error">無有效價格數據</span>
-                    </p>
-                  </div>
-                </div>
-
-                <div
-                  class="badge shrink-0 badge-outline px-3 py-3 text-xs font-semibold badge-primary"
-                >
-                  {{ group.snapshots.length }} 筆紀錄
-                </div>
-              </button>
-
-              <div
-                v-if="
-                  itinerary.rule37Analysis?.phase &&
-                  group.date === itinerary.rule37Analysis.cutoffDate
-                "
-                class="border-y border-warning/20 bg-warning/15 px-5 py-1.5 text-center"
-              >
-                <p class="text-[11px] font-bold tracking-widest text-warning-content">
-                  ▴ 購買時機分析 · 決策期 ▴
-                </p>
-              </div>
-
-              <div
-                v-show="expandedGroups.has(index)"
-                class="collapse-content border-t border-base-300/70 bg-base-200/40 px-5 py-4"
-              >
-                <div
-                  class="overflow-x-auto rounded-[1.25rem] border border-base-300/70 bg-base-100"
-                >
-                  <table class="table w-full table-zebra text-sm">
-                    <thead>
-                      <tr>
-                        <th class="text-xs font-bold tracking-wider text-base-content/55 uppercase">
-                          航班編號
-                        </th>
-
-                        <th class="text-xs font-bold tracking-wider text-base-content/55 uppercase">
-                          起飛時間
-                        </th>
-
-                        <th class="text-xs font-bold tracking-wider text-base-content/55 uppercase">
-                          降落時間
-                        </th>
-
-                        <th
-                          class="text-right text-xs font-bold tracking-wider text-base-content/55 uppercase"
-                        >
-                          票價
-                        </th>
-                      </tr>
-                    </thead>
-
-                    <tbody>
-                      <tr
-                        v-for="snap in group.snapshots"
-                        :key="snap.id"
-                        :class="[snap.scrapeStatus === 'error' ? 'bg-error/10' : '']"
-                      >
-                        <td class="font-semibold text-base-content">
-                          {{ snap.flightNumber ?? '—' }}
-                        </td>
-
-                        <td class="text-base-content/70">
-                          {{ fmtTime(snap.departureAt) }}
-                          <span class="text-[10px] text-base-content/40">{{
-                            fmtTz(snap.departureAt)
-                          }}</span>
-                        </td>
-
-                        <td class="text-base-content/70">
-                          {{ fmtTime(snap.arrivalAt) }}
-                          <span class="text-[10px] text-base-content/40">{{
-                            fmtTz(snap.arrivalAt)
-                          }}</span>
-                        </td>
-
-                        <td class="text-right font-bold text-base-content">
-                          <template v-if="snap.scrapeStatus === 'success' && snap.fare !== null">
-                            <div
-                              class="flex flex-col items-end justify-end gap-2 sm:flex-row sm:items-center"
-                            >
-                              <div class="flex flex-wrap justify-end gap-1">
-                                <span
-                                  v-if="snap.fare === legMinMax.min"
-                                  class="badge badge-soft badge-xs badge-success"
-                                  >[歷史低位]</span
-                                >
-
-                                <span
-                                  v-if="snap.fare === legMinMax.max"
-                                  class="badge badge-soft badge-xs badge-error"
-                                  >[歷史高位]</span
-                                >
-                              </div>
-
-                              <span>{{ fmtFare(snap.fare, snap.currency) }}</span>
-                            </div>
-                          </template>
-
-                          <span v-else class="text-xs text-error">擷取失敗</span>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+        <div class="grid overflow-hidden pt-5">
+          <Transition
+            v-for="(f, i) in itinerary.flights"
+            :key="f.id"
+            enter-active-class="transition-all duration-300 ease-out"
+            enter-from-class="opacity-0 -translate-x-8"
+            enter-to-class="opacity-100 translate-x-0"
+            leave-active-class="transition-all duration-200 ease-in"
+            leave-from-class="opacity-100 translate-x-0"
+            leave-to-class="opacity-0 -translate-x-8"
+          >
+            <div v-show="activeTab === String(i)" class="col-start-1 row-start-1">
+              <FaretList :flight="f" :rule37-analysis="itinerary.rule37Analysis" />
             </div>
-          </template>
+          </Transition>
 
-          <div v-else class="hero py-16 text-center">
-            <div class="hero-content">
-              <p class="font-medium text-base-content/50">暫無價格數據。</p>
+          <Transition
+            enter-active-class="transition-all duration-300 ease-out"
+            enter-from-class="opacity-0 translate-x-8"
+            enter-to-class="opacity-100 translate-x-0"
+            leave-active-class="transition-all duration-200 ease-in"
+            leave-from-class="opacity-100 translate-x-0"
+            leave-to-class="opacity-0 translate-x-8"
+          >
+            <div v-show="activeTab === 'graph'" class="col-start-1 row-start-1">
+              <FareGraph :itinerary="itinerary" />
             </div>
-          </div>
-        </div>
-
-        <div v-show="activeTab === 'graph'" class="pt-5">
-          <template v-if="itinerary.flights.length">
-            <div
-              class="rounded-3xl bg-base-100 p-4 md:p-6"
-              style="height: 400px; position: relative"
-            >
-              <canvas ref="chartCanvas"></canvas>
-            </div>
-          </template>
-
-          <div v-else class="hero py-16 text-center">
-            <div class="hero-content">
-              <p class="font-medium text-base-content/50">暫無趨勢數據。</p>
-            </div>
-          </div>
+          </Transition>
         </div>
       </div>
     </div>
