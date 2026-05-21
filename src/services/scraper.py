@@ -14,6 +14,14 @@ class Flight:
     departure_at: datetime | None
     arrival_at: datetime | None
     fare: float
+    currency: str
+
+
+@dataclass
+class FlightQuery:
+    origin: str
+    destination: str
+    flight_date: date
 
 
 @dataclass
@@ -23,36 +31,52 @@ class ScrapeResult:
     results: list[Flight] = field(default_factory=list)
 
 
-def _parse_hkexpress_response(data: dict) -> ScrapeResult:
-    journeys = [
-        j
-        for trip in data.get('trip', [])
-        for j in trip.get('journey', [])
-        if j.get('display_item_amount')
-    ]
+def _parse_hkexpress_response(data: dict) -> list[ScrapeResult]:
+    """Parse the API response into one ScrapeResult per requested trip leg."""
+    output: list[ScrapeResult] = []
 
-    if not journeys:
-        return ScrapeResult(success=False, error_message='API returned no valid trip data.')
-
-    return ScrapeResult(
-        success=True,
-        results=[
-            Flight(
-                fare=float(j['display_item_amount']),
-                flight_number=j.get('segment', [{}])[0].get('flight_number', ''),
-                departure_at=datetime.fromisoformat(
-                    f'{j["departure_date_time"]}{j.get("departure_timezone", "")}'
-                ),
-                arrival_at=datetime.fromisoformat(
-                    f'{j["arrival_date_time"]}{j.get("arrival_timezone", "")}'
-                ),
+    for trip in data.get('trip', []):
+        journeys = [j for j in trip.get('journey', []) if j.get('display_item_amount')]
+        if not journeys:
+            output.append(
+                ScrapeResult(
+                    success=False,
+                    error_message='API returned no valid journey data for leg.',
+                )
             )
-            for j in journeys
-        ],
-    )
+            continue
+
+        output.append(
+            ScrapeResult(
+                success=True,
+                results=[
+                    Flight(
+                        fare=float(j['display_item_amount']),
+                        currency=j.get('fare', {}).get('currency_code', 'HKD'),
+                        flight_number=((j.get('segment') or [{}])[0].get('flight_number', '')),
+                        departure_at=datetime.fromisoformat(
+                            f'{j["departure_date_time"]}'
+                            f'{(j.get("segment") or [{}])[0].get("departure_timezone", "")}'
+                        ),
+                        arrival_at=datetime.fromisoformat(
+                            f'{j["arrival_date_time"]}'
+                            f'{(j.get("segment") or [{}])[0].get("arrival_timezone", "")}'
+                        ),
+                    )
+                    for j in journeys
+                ],
+            )
+        )
+
+    if not output:
+        return [ScrapeResult(success=False, error_message='API returned no trip data.')]
+
+    return output
 
 
-def scrape_prices_advanced(origin: str, destination: str, flight_date: date) -> ScrapeResult:
+def scrape_prices_advanced(
+    queries: list[FlightQuery], currency_code: str = 'HKD'
+) -> list[ScrapeResult]:
     try:
         with sync_playwright() as p:
             ctx = p.chromium.launch_persistent_context(
@@ -78,7 +102,8 @@ def scrape_prices_advanced(origin: str, destination: str, flight_date: date) -> 
 
                 ch = page.evaluate("""
                         () => navigator.userAgentData ? {
-                            brands: navigator.userAgentData.brands.map(b => `"${b.brand}";v="${b.version}"`).join(', '),
+                            brands: navigator.userAgentData.brands
+                                .map(b => `"${b.brand}";v="${b.version}"`).join(', '),
                             mobile: navigator.userAgentData.mobile ? "?1" : "?0",
                             platform: `"${navigator.userAgentData.platform}"`
                         } : {}
@@ -102,14 +127,15 @@ def scrape_prices_advanced(origin: str, destination: str, flight_date: date) -> 
                     },
                     data={
                         'application_code': 'IBE',
-                        'currency_code': 'HKD',
+                        'currency_code': currency_code,
                         'promotion_code': '',
                         'flights': [
                             {
-                                'origin': origin,
-                                'destination': destination,
-                                'begin_date': flight_date.isoformat(),
+                                'origin': q.origin,
+                                'destination': q.destination,
+                                'begin_date': q.flight_date.isoformat(),
                             }
+                            for q in queries
                         ],
                         'passengers': {
                             'adult_count': 1,
@@ -120,33 +146,41 @@ def scrape_prices_advanced(origin: str, destination: str, flight_date: date) -> 
                 )
 
                 if not resp.ok:
-                    return ScrapeResult(
-                        success=False,
-                        error_message=f'HTTP {resp.status}: {resp.text()[:200]}',
+                    msg = f'HTTP {resp.status}: {resp.text()[:200]}'
+                    return [ScrapeResult(success=False, error_message=msg)] * len(queries)
+
+                results = _parse_hkexpress_response(resp.json())
+                # Pad with error entries if the API returned fewer trips than expected
+                while len(results) < len(queries):
+                    results.append(
+                        ScrapeResult(success=False, error_message='No data returned for leg.')
                     )
-                return _parse_hkexpress_response(resp.json())
+                return results[: len(queries)]
 
             finally:
                 ctx.close()
     except Exception as exc:
-        return ScrapeResult(success=False, error_message=f'Playwright Error: {exc}')
+        return [ScrapeResult(success=False, error_message=f'Playwright Error: {exc}')] * len(
+            queries
+        )
 
 
-def scrape_prices(origin: str, destination: str, flight_date: date) -> ScrapeResult:
+def scrape_prices(queries: list[FlightQuery], currency_code: str = 'HKD') -> list[ScrapeResult]:
     try:
         with httpx.Client(timeout=30) as client:
             resp = client.post(
                 'https://api.hkexpress.com/flt-booking-query/public/v1/availability/search',
                 json={
                     'application_code': 'IBE',
-                    'currency_code': 'HKD',
+                    'currency_code': currency_code,
                     'promotion_code': '',
                     'flights': [
                         {
-                            'origin': origin,
-                            'destination': destination,
-                            'begin_date': flight_date.isoformat(),
+                            'origin': q.origin,
+                            'destination': q.destination,
+                            'begin_date': q.flight_date.isoformat(),
                         }
+                        for q in queries
                     ],
                     'passengers': {
                         'adult_count': 1,
@@ -170,11 +204,15 @@ def scrape_prices(origin: str, destination: str, flight_date: date) -> ScrapeRes
             )
 
         if resp.status_code != 200:
-            return ScrapeResult(
-                success=False,
-                error_message=f'HTTP {resp.status_code}: {resp.text[:200]}',
-            )
-        return _parse_hkexpress_response(resp.json())
+            msg = f'HTTP {resp.status_code}: {resp.text[:200]}'
+            return [ScrapeResult(success=False, error_message=msg)] * len(queries)
+
+        results = _parse_hkexpress_response(resp.json())
+        # Pad with error entries if the API returned fewer trips than expected
+        while len(results) < len(queries):
+            results.append(ScrapeResult(success=False, error_message='No data returned for leg.'))
+        return results[: len(queries)]
 
     except Exception as exc:
-        return ScrapeResult(success=False, error_message=f'HTTPX Error: {exc}')
+        print(exc, flush=True)
+        return [ScrapeResult(success=False, error_message=f'HTTPX Error: {exc}')] * len(queries)

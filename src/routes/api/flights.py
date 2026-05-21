@@ -6,7 +6,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import selectinload
 
 from src.extensions.database import FareSnapshot, Flight, Itinerary, db
-from src.services.scraper import scrape_prices
+from src.services.scraper import FlightQuery, scrape_prices
 
 flights_bp = Blueprint('flights', __name__, url_prefix='/flights')
 
@@ -134,32 +134,29 @@ def scrape_flight(flight_id):
             )
 
         any_scraped_or_attempted = False
-        for flight in itinerary.flights:
-            if flight.flight_date < today:
-                continue
-
+        if active_flights := [f for f in itinerary.flights if f.flight_date >= today]:
             any_scraped_or_attempted = True
 
             results = scrape_prices(
-                origin=flight.origin,
-                destination=flight.destination,
-                flight_date=flight.flight_date,
+                [FlightQuery(f.origin, f.destination, f.flight_date) for f in active_flights]
             )
 
-            # Note: scrape_status='success' if results.success else 'error'
-            for result in results.results:
-                session.add(
-                    FareSnapshot(
-                        id=str(uuid.uuid4()),
-                        flight_id=flight.id,
-                        created_at=datetime.now(UTC),
-                        fare=result.fare,
-                        flight_number=result.flight_number,
-                        departure_at=result.departure_at,
-                        arrival_at=result.arrival_at,
-                        scrape_status='success' if results.success else 'error',
+            for flight, res in zip(active_flights, results, strict=False):
+                for result in res.results:
+                    session.add(
+                        FareSnapshot(
+                            id=str(uuid.uuid4()),
+                            flight_id=flight.id,
+                            created_at=datetime.now(UTC),
+                            fare=result.fare,
+                            currency=result.currency,
+                            flight_number=result.flight_number,
+                            departure_at=result.departure_at,
+                            arrival_at=result.arrival_at,
+                            scrape_status='success' if res.success else 'error',
+                            error_message=res.error_message,
+                        )
                     )
-                )
 
         if not any_scraped_or_attempted:
             session.rollback()
