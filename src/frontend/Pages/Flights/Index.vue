@@ -32,7 +32,9 @@ const summary = computed(() => {
       </p>
     </div>
 
-    <div class="tracker-panel stats mb-8 w-full stats-horizontal gap-0 rounded-lg">
+    <div
+      class="tracker-panel stats mb-8 w-full stats-horizontal gap-0 rounded-lg border border-base-200 shadow-sm"
+    >
       <div class="stat px-4 py-3 sm:px-6 sm:py-4">
         <div class="stat-title text-xs sm:text-sm">行程總數</div>
 
@@ -65,22 +67,30 @@ const summary = computed(() => {
     </div>
 
     <div v-if="itineraries?.length" class="grid gap-6 lg:grid-cols-2">
-      <div
+      <Link
         v-for="itinerary in itineraries.toSorted((a, b) => a.createdAt.localeCompare(b.createdAt))"
         :key="itinerary.id"
-        class="tracker-panel group card rounded-lg transition-all hover:-translate-y-1 hover:shadow-xl"
+        :href="`/flights/${itinerary.id}`"
+        class="tracker-panel group card rounded-lg border bg-base-100 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+        :class="{
+          'border-success/40 hover:border-success/70':
+            itinerary.isActive && itinerary.rule37Analysis?.phase === 'BUY_SIGNAL',
+          'border-base-200': itinerary.isActive && itinerary.rule37Analysis?.phase !== 'BUY_SIGNAL',
+          'border-base-200 opacity-75 grayscale-[25%] hover:opacity-100 hover:grayscale-0':
+            !itinerary.isActive,
+        }"
       >
         <div class="card-body gap-5 p-6">
           <div class="flex items-start justify-between gap-4">
             <div>
               <div
-                class="mb-2 flex flex-wrap items-center gap-3 text-xl font-black tracking-tight text-base-content"
+                class="mb-2 flex flex-wrap items-center gap-3 text-xl font-black tracking-tight text-base-content transition-colors group-hover:text-primary"
               >
                 <span>{{ fmtItineraryName(itinerary) }}</span>
               </div>
 
               <p class="text-sm font-medium text-base-content/65">
-                出發 日期：{{ fmtDate(itinerary.flights[0]?.flightDate) }}
+                出發日期：{{ fmtDate(itinerary.flights[0]?.flightDate) }}
               </p>
             </div>
 
@@ -97,16 +107,25 @@ const summary = computed(() => {
             </div>
           </div>
 
-          <div class="stats stats-vertical rounded-lg bg-base-200/70 lg:stats-horizontal">
-            <div class="stat px-5 py-4">
+          <div
+            class="stats stats-vertical rounded-lg border border-base-200 bg-base-200/50 lg:stats-horizontal"
+          >
+            <div class="stat px-5 py-4 transition-colors group-hover:bg-base-200/80">
               <div class="stat-title text-base-content/55">最新總價</div>
 
-              <div class="stat-value text-3xl text-primary">
+              <div
+                class="stat-value text-3xl"
+                :class="
+                  itinerary.isActive && itinerary.rule37Analysis?.phase === 'BUY_SIGNAL'
+                    ? 'text-success'
+                    : 'text-primary'
+                "
+              >
                 {{ fmtFare(itinerary.statistics?.latestVal ?? null) }}
               </div>
             </div>
 
-            <div class="stat px-5 py-4">
+            <div class="stat px-5 py-4 transition-colors group-hover:bg-base-200/80">
               <div class="stat-title text-base-content/55">歷史最低</div>
 
               <div class="stat-value text-2xl text-success">
@@ -114,7 +133,7 @@ const summary = computed(() => {
               </div>
             </div>
 
-            <div class="stat px-5 py-4">
+            <div class="stat px-5 py-4 transition-colors group-hover:bg-base-200/80">
               <div class="stat-title text-base-content/55">歷史最高</div>
 
               <div class="stat-value text-2xl text-error">
@@ -126,11 +145,14 @@ const summary = computed(() => {
           <div class="mt-auto">
             <div
               v-if="itinerary.rule37Analysis && itinerary.statistics?.latestVal !== null"
-              class="tracker-panel rounded-lg border px-4 py-4"
+              class="rounded-lg border px-4 py-4 transition-colors"
               :class="{
-                'bg-success/10': itinerary.rule37Analysis.phase === 'BUY_SIGNAL',
-                'bg-info/10': itinerary.rule37Analysis.phase === 'WAITING',
-                'bg-neutral/10': itinerary.rule37Analysis.phase === 'OBSERVING',
+                'border-success/20 bg-success/10 group-hover:bg-success/15':
+                  itinerary.rule37Analysis.phase === 'BUY_SIGNAL',
+                'border-info/20 bg-info/10 group-hover:bg-info/15':
+                  itinerary.rule37Analysis.phase === 'WAITING',
+                'border-neutral/10 bg-neutral/5 group-hover:bg-neutral/10':
+                  itinerary.rule37Analysis.phase === 'OBSERVING',
               }"
             >
               <div class="space-y-3">
@@ -138,7 +160,7 @@ const summary = computed(() => {
 
                 <div class="flex items-center gap-2">
                   <template v-if="itinerary.rule37Analysis.phase === 'BUY_SIGNAL'">
-                    <span class="status status-lg status-success"></span>
+                    <span class="status status-lg animate-pulse status-success"></span>
 
                     <span class="text-sm font-bold text-success">購買信號（最佳時機）</span>
                   </template>
@@ -168,28 +190,27 @@ const summary = computed(() => {
 
             <div
               v-else-if="itinerary.rule37Analysis"
-              class="tracker-panel rounded-lg border border-dashed px-4 py-4 text-center"
+              class="group-hover:border-base-400 rounded-lg border border-dashed border-base-300 px-4 py-4 text-center transition-colors group-hover:bg-base-200/30"
             >
               <span class="text-sm font-medium text-base-content/60">收集數據中</span>
             </div>
 
-            <div v-else class="tracker-panel rounded-lg border border-dashed px-4 py-4 text-center">
+            <div
+              v-else
+              class="group-hover:border-base-400 rounded-lg border border-dashed border-base-300 px-4 py-4 text-center transition-colors group-hover:bg-base-200/30"
+            >
               <span class="text-sm font-medium text-base-content/60"
                 >未設定購票限期，無法分析購買時機</span
               >
             </div>
           </div>
-
-          <div class="card-actions justify-end border-t border-base-300/70 pt-5">
-            <Link :href="`/flights/${itinerary.id}`" class="btn btn-neutral">查看詳情</Link>
-          </div>
         </div>
-      </div>
+      </Link>
     </div>
 
     <div
       v-else
-      class="tracker-panel hero rounded-lg border-2 border-dashed py-12 text-center sm:py-20"
+      class="tracker-panel hero rounded-lg border-2 border-dashed border-base-300 py-12 text-center sm:py-20"
     >
       <div class="hero-content flex-col">
         <div class="placeholder avatar mb-6">
@@ -202,9 +223,9 @@ const summary = computed(() => {
           加入您想關注的出發地與目的地，我們將為您不間斷追蹤價格，並在最佳時機提示您購買。
         </p>
 
-        <Link href="/flights/create" class="btn shadow-sm btn-lg btn-primary"
-          >建立您的第一個追蹤</Link
-        >
+        <Link href="/flights/create" class="btn shadow-sm btn-lg btn-primary">
+          建立您的第一個追蹤
+        </Link>
       </div>
     </div>
   </AppLayout>
