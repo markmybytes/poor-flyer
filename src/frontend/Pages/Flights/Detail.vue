@@ -213,7 +213,7 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
           class="grid shrink-0 grid-cols-2 gap-px bg-base-300/60 sm:grid-cols-4 lg:w-120 xl:w-140"
         >
           <div
-            class="col-span-2 flex flex-col justify-center bg-base-100 p-4 transition-colors hover:bg-base-200/30 sm:p-5"
+            class="col-span-2 flex flex-col justify-center bg-base-100 p-4 transition-colors sm:p-5"
           >
             <div class="flex items-center justify-between">
               <span class="text-[10px] font-bold tracking-widest text-base-content/50 uppercase">
@@ -236,9 +236,7 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
             </div>
           </div>
 
-          <div
-            class="flex flex-col justify-center bg-base-100 p-4 transition-colors hover:bg-base-200/30 sm:p-5"
-          >
+          <div class="flex flex-col justify-center bg-base-100 p-4 transition-colors sm:p-5">
             <span class="text-[10px] font-bold tracking-widest text-base-content/50 uppercase">
               歷史最低
             </span>
@@ -248,9 +246,7 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
             </span>
           </div>
 
-          <div
-            class="flex flex-col justify-center bg-base-100 p-4 transition-colors hover:bg-base-200/30 sm:p-5"
-          >
+          <div class="flex flex-col justify-center bg-base-100 p-4 transition-colors sm:p-5">
             <span class="text-[10px] font-bold tracking-widest text-base-content/50 uppercase">
               歷史最高
             </span>
