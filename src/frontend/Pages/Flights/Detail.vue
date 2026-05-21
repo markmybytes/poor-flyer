@@ -13,7 +13,6 @@ const toast = useToast()
 
 const activeTab = ref('0')
 const loading = ref<string | null>(null)
-const detailPanel = ref(props.itinerary.deadline ? 'analysis' : 'summary')
 
 const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
   if (action === 'delete' && !confirm('確認刪除此航班追蹤？')) {
@@ -116,147 +115,149 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
     </div>
 
     <div
-      class="tracker-panel mb-8 rounded-lg border px-6 py-6"
+      class="tracker-panel mb-8 overflow-hidden rounded-xl border transition-all"
       :class="{
-        'bg-success/10':
-          detailPanel === 'analysis' && itinerary.rule37Analysis?.phase === 'BUY_SIGNAL',
-        'bg-info/10': detailPanel === 'analysis' && itinerary.rule37Analysis?.phase === 'WAITING',
-        'bg-neutral/10':
-          detailPanel === 'analysis' && itinerary.rule37Analysis?.phase === 'OBSERVING',
+        'border-success/30 bg-success/5': itinerary.rule37Analysis?.phase === 'BUY_SIGNAL',
+        'border-info/30 bg-info/5': itinerary.rule37Analysis?.phase === 'WAITING',
+        'border-base-300 bg-base-200/30': itinerary.rule37Analysis?.phase === 'OBSERVING',
+        'border-base-200 bg-base-100': !itinerary.rule37Analysis?.phase,
       }"
     >
-      <div class="join mb-5">
-        <button
-          class="btn join-item btn-xs"
-          :class="detailPanel === 'analysis' ? 'btn-neutral' : 'opacity-50 btn-ghost'"
-          @click="detailPanel = 'analysis'"
-        >
-          購買時機分析
-        </button>
+      <div class="flex flex-col lg:flex-row lg:items-stretch">
+        <div class="flex flex-1 flex-col justify-center p-5 sm:p-6">
+          <template v-if="itinerary.deadline && itinerary.rule37Analysis?.phase">
+            <div class="flex items-center gap-3">
+              <span
+                class="status status-lg shadow-sm"
+                :class="{
+                  'animate-pulse status-success': itinerary.rule37Analysis.phase === 'BUY_SIGNAL',
+                  'status-neutral': itinerary.rule37Analysis.phase === 'OBSERVING',
+                  'status-info': itinerary.rule37Analysis.phase === 'WAITING',
+                }"
+              ></span>
 
-        <button
-          class="btn join-item btn-xs"
-          :class="detailPanel === 'summary' ? 'btn-neutral' : 'opacity-50 btn-ghost'"
-          @click="detailPanel = 'summary'"
-        >
-          價格摘要
-        </button>
-      </div>
+              <span
+                class="text-xl font-extrabold tracking-tight"
+                :class="{
+                  'text-success': itinerary.rule37Analysis.phase === 'BUY_SIGNAL',
+                  'text-neutral': itinerary.rule37Analysis.phase === 'OBSERVING',
+                  'text-info': itinerary.rule37Analysis.phase === 'WAITING',
+                }"
+              >
+                {{
+                  itinerary.rule37Analysis.phase === 'BUY_SIGNAL'
+                    ? '購買信號 (最佳時機)'
+                    : itinerary.rule37Analysis.phase === 'OBSERVING'
+                      ? '觀察期'
+                      : '等待中'
+                }}
+              </span>
 
-      <div class="grid">
-        <div
-          class="col-start-1 row-start-1 transition-opacity duration-150"
-          :class="
-            detailPanel !== 'analysis' ? 'pointer-events-none invisible opacity-0' : 'opacity-100'
-          "
-        >
-          <div v-if="itinerary.deadline && itinerary.rule37Analysis?.phase" class="space-y-4">
-            <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div class="flex items-center gap-3">
-                <template v-if="itinerary.rule37Analysis.phase === 'BUY_SIGNAL'">
-                  <span class="status status-lg status-success"></span>
-
-                  <span class="text-lg font-bold text-success">購買信號 (最佳時機)</span>
-                </template>
-
-                <template v-else-if="itinerary.rule37Analysis.phase === 'OBSERVING'">
-                  <span class="status status-lg status-neutral"></span>
-
-                  <span class="text-lg font-bold text-neutral">觀察期</span>
-
-                  <span class="badge px-2 py-1 text-xs font-medium badge-warning">
-                    {{
-                      Math.ceil(
-                        (new Date(itinerary.rule37Analysis.cutoffDate).getTime() - Date.now()) /
-                          86400000,
-                      )
-                    }}
-                    天後結束
-                  </span>
-                </template>
-
-                <template v-else>
-                  <span class="status status-lg status-info"></span>
-
-                  <span class="text-lg font-bold text-info">等待中</span>
-                </template>
-              </div>
-
-              <div class="space-y-1 text-xs text-base-content/70">
-                <p>
-                  <span class="font-medium">決策期開始：</span>
-                  {{ fmtDate(itinerary.rule37Analysis.cutoffDate) }}
-                </p>
-
-                <p>
-                  <span class="font-medium">門檻：</span>
-                  {{ fmtFare(itinerary.rule37Analysis.historyBestVal) }}
-                </p>
-              </div>
+              <span
+                v-if="itinerary.rule37Analysis.phase === 'OBSERVING'"
+                class="badge badge-outline px-2 badge-sm font-semibold"
+              >
+                {{
+                  Math.ceil(
+                    (new Date(itinerary.rule37Analysis.cutoffDate).getTime() - Date.now()) /
+                      86400000,
+                  )
+                }}
+                天後結束
+              </span>
             </div>
 
-            <div class="grid grid-cols-2 gap-3">
-              <div class="rounded-lg bg-base-100/60 px-4 py-3">
-                <p class="text-xs font-bold tracking-widest uppercase opacity-55">總價 (最新)</p>
+            <p class="mt-2 text-xs font-medium text-base-content/60">
+              <span v-if="itinerary.rule37Analysis.phase === 'BUY_SIGNAL'">
+                價格低於門檻，為購入的最佳時機。
+              </span>
 
-                <p class="mt-1 text-base font-bold">
-                  {{ fmtFare(itinerary.statistics?.latestVal ?? null) }}
-                </p>
-              </div>
+              <span v-else-if="itinerary.rule37Analysis.phase === 'OBSERVING'">
+                收集基準數據中。決策期將於
+                <span class="font-bold">{{ fmtDate(itinerary.rule37Analysis.cutoffDate) }}</span>
+                開始。
+              </span>
 
-              <div class="rounded-lg bg-base-100/60 px-4 py-3">
-                <p class="text-xs font-bold tracking-widest uppercase opacity-55">歷史總價最低</p>
+              <span v-else>已進入決策期。若價格低於觸發門檻，系統將提示購買。</span>
+            </p>
+          </template>
 
-                <p class="mt-1 text-base font-bold text-success">
-                  {{ fmtFare(itinerary.statistics?.allTimeLow ?? null) }}
-                </p>
-              </div>
+          <template v-else-if="itinerary.deadline">
+            <div class="flex items-center gap-3">
+              <span class="status status-lg status-warning shadow-sm"></span>
+
+              <span class="text-xl font-extrabold tracking-tight text-warning">收集數據中</span>
             </div>
-          </div>
 
-          <div v-else-if="itinerary.deadline" class="py-4 text-center">
-            <p class="text-sm font-medium text-base-content/60">
-              數據不足，尚無法分析最佳購買時機。
+            <p class="mt-2 text-sm font-medium text-base-content/60">
+              尚無足夠的歷史數據以進行購買時機分析。
             </p>
-          </div>
+          </template>
 
-          <div v-else class="py-4 text-center">
-            <p class="text-sm font-medium text-base-content/60">
-              未設定購票限期，無法分析購買時機。
+          <template v-else>
+            <div class="flex items-center gap-3">
+              <span class="status status-lg status-neutral opacity-40"></span>
+
+              <span class="text-xl font-extrabold tracking-tight text-base-content/40">
+                無購票限期
+              </span>
+            </div>
+
+            <p class="mt-2 text-sm font-medium text-base-content/40">
+              設定限期以啟用購買時機分析。
             </p>
-          </div>
+          </template>
         </div>
 
         <div
-          class="col-start-1 row-start-1 transition-opacity duration-150"
-          :class="
-            detailPanel !== 'summary' ? 'pointer-events-none invisible opacity-0' : 'opacity-100'
-          "
+          class="grid shrink-0 grid-cols-2 gap-px bg-base-300/60 sm:grid-cols-4 lg:w-120 xl:w-140"
         >
-          <div class="stats w-full stats-vertical rounded-lg bg-base-200/60 lg:stats-horizontal">
-            <div class="stat px-5 py-4">
-              <div class="stat-title text-base-content/55">最新票價</div>
+          <div
+            class="col-span-2 flex flex-col justify-center bg-base-100 p-4 transition-colors hover:bg-base-200/30 sm:p-5"
+          >
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-bold tracking-widest text-base-content/50 uppercase">
+                最新總價
+              </span>
+            </div>
 
-              <div class="stat-value text-2xl text-primary">
+            <div class="mt-1 flex items-baseline gap-2">
+              <span class="text-3xl font-black text-primary lg:text-4xl">
                 {{ fmtFare(itinerary.statistics?.latestVal ?? null) }}
-              </div>
+              </span>
             </div>
 
-            <div class="stat px-5 py-4">
-              <div class="stat-title text-base-content/55">歷史最低</div>
+            <div class="mt-1.5 text-xs font-medium text-base-content/40">
+              <template v-if="itinerary.rule37Analysis?.historyBestVal">
+                門檻：{{ fmtFare(itinerary.rule37Analysis.historyBestVal) }}
+              </template>
 
-              <div class="stat-value text-2xl text-success">
-                {{ fmtFare(itinerary.statistics?.allTimeLow ?? null) }}
-              </div>
+              <template v-else-if="itinerary.deadline">觀察中...</template>
             </div>
+          </div>
 
-            <div class="stat px-5 py-4">
-              <div class="stat-title text-base-content/55">歷史最高</div>
+          <div
+            class="flex flex-col justify-center bg-base-100 p-4 transition-colors hover:bg-base-200/30 sm:p-5"
+          >
+            <span class="text-[10px] font-bold tracking-widest text-base-content/50 uppercase">
+              歷史最低
+            </span>
 
-              <div class="stat-value text-2xl text-error">
-                {{ fmtFare(itinerary.statistics?.allTimeHigh ?? null) }}
-              </div>
-            </div>
+            <span class="mt-1 text-xl font-black text-success lg:text-2xl">
+              {{ fmtFare(itinerary.statistics?.allTimeLow ?? null) }}
+            </span>
+          </div>
+
+          <div
+            class="flex flex-col justify-center bg-base-100 p-4 transition-colors hover:bg-base-200/30 sm:p-5"
+          >
+            <span class="text-[10px] font-bold tracking-widest text-base-content/50 uppercase">
+              歷史最高
+            </span>
+
+            <span class="mt-1 text-xl font-black text-error lg:text-2xl">
+              {{ fmtFare(itinerary.statistics?.allTimeHigh ?? null) }}
+            </span>
           </div>
         </div>
       </div>
