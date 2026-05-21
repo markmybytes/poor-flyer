@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, render_template, request
 
-from src.services.config import ConfigManager
+from src.services import config
 from src.services.email import get_smtp_config, send_html_email
 
 settings_bp = Blueprint('settings', __name__, url_prefix='/settings')
@@ -12,7 +12,7 @@ def get_settings():
         return jsonify(
             {
                 'success': True,
-                'data': {ns: ConfigManager.get_all_masked(ns) for ns in ['smtp', 'email']},
+                'data': {ns: config.get_all_masked(ns) for ns in ['smtp', 'email']},
             }
         )
     except Exception as e:
@@ -43,10 +43,10 @@ def update_settings():
             if smtp.get('password'):
                 smtp_settings['password'] = smtp['password']
 
-            ConfigManager.set_many('smtp', smtp_settings)
+            config.set_many('smtp', smtp_settings)
 
         if email := data.get('email', {}):
-            ConfigManager.set_many('email', {'recipients': email.get('recipients', '')})
+            config.set_many('email', {'recipients': email.get('recipients', '')})
 
         return jsonify({'success': True, 'message': 'Settings updated successfully'})
     except Exception as e:

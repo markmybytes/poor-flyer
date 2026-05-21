@@ -1,7 +1,7 @@
 from flask import Blueprint
 from flask_inertia import render_inertia
 
-from src.services.config import ConfigManager
+from src.services import config
 
 settings_bp = Blueprint('settings', __name__, url_prefix='/settings')
 
@@ -12,8 +12,8 @@ def index():
         'Settings/Index',
         props={
             'settings': {
-                'smtp': ConfigManager.get_all_masked('smtp'),
-                'email': ConfigManager.get_all_masked('email'),
+                'smtp': config.get_all_masked('smtp'),
+                'email': config.get_all_masked('email'),
             }
         },
     )

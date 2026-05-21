@@ -6,7 +6,7 @@ from datetime import date
 from flask import render_template
 
 from src.extensions.database import FareSnapshot, Itinerary, db
-from src.services.config import ConfigManager
+from src.services import config
 from src.services.email import get_smtp_config, send_html_email
 from src.services.rule37 import Phase, compute_37_best
 from src.services.scraper import FlightQuery, scrape_prices
@@ -49,9 +49,7 @@ def daily_scrape_job():
 
             smtp_cfg = get_smtp_config()
             recipients = [
-                r.strip()
-                for r in ConfigManager.get_str('email', 'recipients', '').split(',')
-                if r.strip()
+                r.strip() for r in config.get_str('email', 'recipients', '').split(',') if r.strip()
             ]
 
             all_active_legs = [

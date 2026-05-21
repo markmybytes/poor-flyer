@@ -4,7 +4,7 @@ from email.message import Message
 from email.mime.text import MIMEText
 from typing import TypedDict
 
-from src.services.config import ConfigManager
+from src.services import config
 
 logger = logging.getLogger(__name__)
 
@@ -20,14 +20,14 @@ class SMTPConfig(TypedDict):
 
 
 def get_smtp_config() -> SMTPConfig:
-    protocol = ConfigManager.get_str('smtp', 'protocol') or 'STARTTLS'
+    protocol = config.get_str('smtp', 'protocol') or 'STARTTLS'
     return {
-        'host': ConfigManager.get_str('smtp', 'host') or '',
-        'port': ConfigManager.get_int('smtp', 'port') or 587,
-        'user': ConfigManager.get_str('smtp', 'user') or '',
-        'password': ConfigManager.get_str('smtp', 'password') or '',
-        'sender_email': ConfigManager.get_str('smtp', 'sender_email') or '',
-        'require_auth': ConfigManager.get_bool('smtp', 'require_auth', True),
+        'host': config.get_str('smtp', 'host') or '',
+        'port': config.get_int('smtp', 'port') or 587,
+        'user': config.get_str('smtp', 'user') or '',
+        'password': config.get_str('smtp', 'password') or '',
+        'sender_email': config.get_str('smtp', 'sender_email') or '',
+        'require_auth': config.get_bool('smtp', 'require_auth', True),
         'protocol': protocol,
     }
 
