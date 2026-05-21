@@ -66,7 +66,7 @@ const summary = computed(() => {
 
     <div v-if="itineraries?.length" class="grid gap-6 lg:grid-cols-2">
       <div
-        v-for="itinerary in itineraries"
+        v-for="itinerary in itineraries.toSorted((a, b) => a.createdAt.localeCompare(b.createdAt))"
         :key="itinerary.id"
         class="tracker-panel group card rounded-lg transition-all hover:-translate-y-1 hover:shadow-xl"
       >
