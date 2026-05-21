@@ -263,7 +263,7 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
     </div>
 
     <div class="tracker-panel card rounded-lg">
-      <div class="card-body p-4 md:p-6">
+      <div class="card-body gap-6 p-4 md:p-6">
         <div class="tabs-box tabs flex-nowrap overflow-x-auto bg-base-200/70 p-1 whitespace-nowrap">
           <button
             v-if="itinerary.tripType === 'SINGLE'"
@@ -295,7 +295,7 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
           </button>
         </div>
 
-        <div class="grid overflow-hidden pt-5">
+        <div class="grid overflow-hidden">
           <Transition
             v-for="(f, i) in itinerary.flights"
             :key="f.id"
