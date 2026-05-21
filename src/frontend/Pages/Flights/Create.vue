@@ -112,9 +112,7 @@ function submit() {
       <div>
         <h2 class="text-3xl font-extrabold tracking-tight text-base-content">建立新追蹤</h2>
 
-        <p class="mt-2 text-base-content/70">
-          輸入航班資訊，系統會依照排程抓取最新票價並建立價格歷史。
-        </p>
+        <p class="mt-2 text-base-content/70">輸入航班資訊，系統會依照排程收集機票價格資料。</p>
       </div>
     </div>
 
@@ -124,17 +122,17 @@ function submit() {
 
         <div class="space-y-3 text-sm leading-relaxed text-base-content/70">
           <p>
-            PoorFlyer 採用<span class="font-semibold text-base-content">「37% 法則」</span
-            >來判斷購票時機。這是一個來自最優停止理論（Optimal Stopping
+            PoorFlyer 採用<span class="font-semibold text-base-content">「37% 法則」</span>
+            來判斷購票時機。這是一個來自最優停止理論（Optimal Stopping
             Theory）的數學策略，用於在有限時間內做出最優決策。
           </p>
 
-          <p>運作方式：當你設定購票限期後，系統會將整段觀察期分為兩個階段——</p>
+          <p>運作方式：當你設定購票限期後，系統會將整段觀察期分為兩個階段：</p>
 
           <ul class="list-inside list-disc space-y-1.5 pl-1">
             <li>
               <span class="font-semibold text-base-content">觀察期</span>
-              （前 37% 時間）：純粹收集數據，記錄出現過的最低票價作為基準。
+              （前 37% 時間）：收集數據，記錄出現過的最低票價格作為基準。
             </li>
 
             <li>
@@ -309,9 +307,7 @@ function submit() {
                 </template>
               </VueDatePicker>
 
-              <p class="label mt-1 p-0 text-xs text-base-content/55">
-                設定後將啟用 Rule37 分析模型
-              </p>
+              <p class="label mt-1 p-0 text-xs text-base-content/55">設定後將啟用購買時機分析</p>
             </fieldset>
 
             <fieldset class="fieldset justify-end">
@@ -326,9 +322,9 @@ function submit() {
                 />
 
                 <div>
-                  <span class="label-text block text-sm font-bold">立即啟用追蹤</span>
+                  <span class="label-text block text-sm font-bold">啟用追蹤</span>
 
-                  <span class="label-text-alt text-base-content/60">建立後將自動開始抓取票價</span>
+                  <span class="label-text-alt text-base-content/60">建立後將自動收集票價</span>
                 </div>
               </label>
             </fieldset>
