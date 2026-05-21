@@ -49,6 +49,25 @@ const dailySnapshots = computed(() => {
 
 <template>
   <div>
+    <div class="py-1">
+      <div v-if="dailySnapshots.length" class="flex justify-end py-2">
+        <button
+          class="btn btn-outline btn-xs btn-neutral"
+          @click="
+            () => {
+              if (expandedGroups.size === 0) {
+                expandedGroups = new Set(Array(dailySnapshots.length).keys())
+              } else {
+                expandedGroups.clear()
+              }
+            }
+          "
+        >
+          {{ expandedGroups.size === 0 ? '全部展開' : '全部收起' }}
+        </button>
+      </div>
+    </div>
+
     <template v-if="dailySnapshots.length">
       <div
         v-for="(group, i) in dailySnapshots"
