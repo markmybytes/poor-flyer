@@ -262,7 +262,7 @@ function sendTestEmail() {
 
           <form class="space-y-5 p-6" @submit.prevent="saveSettings('currency')">
             <fieldset class="fieldset">
-              <legend class="fieldset-legend text-sm font-bold">基準貨幣</legend>
+              <legend class="fieldset-legend text-sm font-bold">基準貨幣／顯示貨幣</legend>
 
               <select v-model="form.currency.base_currency" class="select-bordered select w-full">
                 <option v-for="code in supportedCurrencies" :key="code" :value="code">
@@ -273,19 +273,19 @@ function sendTestEmail() {
 
             <fieldset class="fieldset">
               <legend class="fieldset-legend text-sm font-bold">
-                FXRates API Key
+                FXRatesAPI API 金鑰
                 <span class="text-base-content/45">（選填）</span>
               </legend>
 
               <input
                 v-model="form.currency.fxrates_api_key"
                 type="text"
-                placeholder="若供應商允許可留空"
                 class="input-bordered input w-full"
               />
 
               <p class="label text-xs text-base-content/55">
-                留空時系統仍會嘗試抓取匯率；若供應商日後改為必填，請回來補上 API Key。
+                留空時系統仍會嘗試向 FXRatesAPI 查詢匯率；若失敗，請到 FXRatesAPI 註冊以取得 API
+                Key。
               </p>
             </fieldset>
 
@@ -300,7 +300,8 @@ function sendTestEmail() {
               />
 
               <p class="label text-xs text-base-content/55">
-                86400 代表 24 小時。手動「抓取最新匯率」會直接略過快取。
+                越短的快取時間可以讓匯率更貼近實際，但同時也會增加查詢次數。建議根據 FXRatesAPI
+                的使用限制與更新頻率來調整此值。
               </p>
             </fieldset>
 
@@ -383,7 +384,7 @@ function sendTestEmail() {
               <select v-model="form.smtp.protocol" class="select-bordered select w-full">
                 <option value="STARTTLS">STARTTLS</option>
 
-                <option value="SMTP_SSL">SMTP_SSL</option>
+                <option value="SMTP_SSL">SSL／無</option>
               </select>
             </fieldset>
 
@@ -500,7 +501,7 @@ function sendTestEmail() {
           <div class="border-b border-base-300/70 px-6 py-5">
             <h3 class="text-base font-bold text-base-content">通知收件者</h3>
 
-            <p class="mt-0.5 text-sm font-medium text-base-content/60">接收價格警報的郵件地址</p>
+            <p class="mt-0.5 text-sm font-medium text-base-content/60">接收系統通知的郵件地址</p>
           </div>
 
           <form class="space-y-4 p-6">
@@ -524,7 +525,7 @@ function sendTestEmail() {
               @click.prevent="saveSettings('email')"
             >
               <span v-if="ui.saving" class="loading loading-sm loading-spinner"></span>
-              {{ ui.saving ? '保存中...' : '保存收件者' }}
+              {{ ui.saving ? '保存中...' : '保存設定' }}
             </button>
           </form>
         </div>
@@ -535,7 +536,7 @@ function sendTestEmail() {
       <div class="modal-box max-w-2xl overflow-hidden rounded-lg border border-base-300 p-0">
         <div class="flex items-center justify-between border-b border-base-300/70 px-6 py-5">
           <div>
-            <h3 class="text-base font-bold text-base-content">匯率狀態</h3>
+            <h3 class="text-base font-bold text-base-content">貨幣匯率換算</h3>
 
             <p class="mt-0.5 text-sm font-medium text-base-content/60">
               目前使用 {{ fxStatusState.base_currency }} 作為換算基準
@@ -568,7 +569,7 @@ function sendTestEmail() {
                 @click="refreshFxRates"
               >
                 <span v-if="ui.refreshingRates" class="loading loading-sm loading-spinner"></span>
-                {{ ui.refreshingRates ? '刷新中...' : '抓取最新匯率' }}
+                {{ ui.refreshingRates ? '更新中...' : '下載最新匯率' }}
               </button>
             </div>
           </div>
