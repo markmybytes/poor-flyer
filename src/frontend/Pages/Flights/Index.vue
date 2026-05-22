@@ -74,10 +74,8 @@ const summary = computed(() => {
         class="tracker-panel group card rounded-lg border bg-base-100 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
         :class="{
           'border-success/40 hover:border-success/70':
-            itinerary.isActive && itinerary.rule37Analysis?.phase === 'BUY_SIGNAL',
-          'border-base-200': itinerary.isActive && itinerary.rule37Analysis?.phase !== 'BUY_SIGNAL',
-          'border-base-200 opacity-75 grayscale-25 hover:opacity-100 hover:grayscale-0':
-            !itinerary.isActive,
+            itinerary.rule37Analysis?.phase === 'BUY_SIGNAL',
+          'border-base-200': itinerary.rule37Analysis?.phase !== 'BUY_SIGNAL',
         }"
       >
         <div class="card-body gap-5 p-6">
@@ -98,8 +96,9 @@ const summary = computed(() => {
               <span
                 v-if="!itinerary.isActive"
                 class="badge gap-2 badge-soft px-3 py-3 badge-warning"
-                >已暫停</span
               >
+                已暫停
+              </span>
 
               <span v-else class="badge gap-2 badge-soft px-3 py-3 badge-success">
                 <span class="status status-success"></span> 追蹤中
@@ -200,9 +199,9 @@ const summary = computed(() => {
               v-else
               class="group-hover:border-base-400 rounded-lg border border-dashed border-base-300 px-4 py-4 text-center transition-colors group-hover:bg-base-200/30"
             >
-              <span class="text-sm font-medium text-base-content/60"
-                >未設定購票限期，無法分析購買時機</span
-              >
+              <span class="text-sm font-medium text-base-content/60">
+                未設定購票限期，無法分析購買時機
+              </span>
             </div>
           </div>
         </div>
@@ -214,8 +213,12 @@ const summary = computed(() => {
       class="tracker-panel hero rounded-lg border-2 border-dashed border-base-300 py-12 text-center sm:py-20"
     >
       <div class="hero-content flex-col">
-        <div class="placeholder avatar mb-6">
-          <div class="w-24 rounded-full bg-primary/10 text-5xl text-primary">✈️</div>
+        <div class="placeholder avatar mb-6 flex justify-center">
+          <div
+            class="flex h-24 w-24 items-center justify-center rounded-full bg-primary/10 text-5xl text-primary"
+          >
+            ✈️
+          </div>
         </div>
 
         <h3 class="mb-2 text-2xl font-bold text-base-content">尚未追蹤任何航班</h3>
