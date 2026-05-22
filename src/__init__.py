@@ -44,8 +44,8 @@ def create_app():
                     'id': 'scrape_fares',
                     'func': 'src.services.scheduler:scrape_fares',
                     'trigger': create_cron_trigger(
-                        os.getenv('PF_SCHEDULER_SCRAPE_CRON', '0 9 * * *'),
-                        int(os.getenv('PF_SCHEDULER_SCRAPE_JITTER_SECONDS', 1800)),
+                        os.getenv('PF_SCRAPE_CRON', '0 9 * * *'),
+                        int(os.getenv('PF_SCRAPE_JITTER', 1800)),
                     ),
                 },
                 {

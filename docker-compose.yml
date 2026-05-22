@@ -7,8 +7,11 @@ services:
     environment:
       TZ: UTC
       PF_DATABASE_URL: sqlite:////app/data/db.sqlite
-      PF_SCHEDULER_SCRAPE_CRON: '0 9 * * *'
-      PF_SCHEDULER_SCRAPE_JITTER_SECONDS: 1800
+      PF_SCRAPE_CRON: '0 9 * * *'
+      PF_SCRAPE_JITTER: 1800
+      PF_LOG_FILE: /app/data/app.log
+      PF_LOG_MAX_BYTES: 10485760
+      PF_LOG_LEVEL: INFO
       PUID: 1000
       PGID: 1000
     volumes:
