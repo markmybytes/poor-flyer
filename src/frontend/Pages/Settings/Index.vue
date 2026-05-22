@@ -552,25 +552,29 @@ function sendTestEmail() {
         </div>
 
         <div class="max-h-[65vh] space-y-4 overflow-y-auto p-6">
-          <div class="grid gap-3 md:grid-cols-2">
-            <div class="rounded-lg border border-base-300/70 bg-base-200/40 p-3 md:col-span-2">
+          <div class="flex items-center gap-3">
+            <div class="grow rounded-lg border border-base-300/70 bg-base-200/40 px-3 py-2">
               <p class="text-xs font-bold tracking-wider text-base-content/55 uppercase">
                 最後更新
               </p>
 
               <p class="mt-1 text-sm font-semibold text-base-content">{{ fxStatusTime }}</p>
             </div>
+
+            <div class="flex items-center justify-end">
+              <button
+                class="btn btn-neutral"
+                :disabled="ui.refreshingRates"
+                @click="refreshFxRates"
+              >
+                <span v-if="ui.refreshingRates" class="loading loading-sm loading-spinner"></span>
+                {{ ui.refreshingRates ? '刷新中...' : '抓取最新匯率' }}
+              </button>
+            </div>
           </div>
 
           <div v-if="fxStatusState.error" class="alert rounded-lg alert-warning">
             <span>{{ fxStatusState.error }}</span>
-          </div>
-
-          <div class="flex justify-end">
-            <button class="btn btn-neutral" :disabled="ui.refreshingRates" @click="refreshFxRates">
-              <span v-if="ui.refreshingRates" class="loading loading-sm loading-spinner"></span>
-              {{ ui.refreshingRates ? '刷新中...' : '抓取最新匯率' }}
-            </button>
           </div>
 
           <div class="overflow-x-auto rounded-xl border border-base-300/70">
