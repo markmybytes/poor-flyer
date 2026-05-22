@@ -1,16 +1,14 @@
 <script setup lang="ts">
 import AppLayout from '@/Layouts/AppLayout.vue'
 import { Link, router } from '@inertiajs/vue3'
-import { ref, watch } from 'vue'
-import { useToast } from 'vue-toast-notification'
-
 import { VueDatePicker } from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
 import { zhHK } from 'date-fns/locale'
+import { computed, ref, watch } from 'vue'
+import { useToast } from 'vue-toast-notification'
 
 const toast = useToast()
 
-// Swapped useForm for a standard reactive ref
 const form = ref({
   tripType: 'SINGLE',
   deadline: '',
@@ -19,57 +17,90 @@ const form = ref({
   processing: false,
 })
 
-// Handle trip type changes to automatically adjust flight legs
+const roundTripDates = computed({
+  get: () => [form.value.flights[0]?.flightDate, form.value.flights[1]?.flightDate].filter(Boolean),
+  set: (val) => {
+    if (form.value.flights[0]) form.value.flights[0].flightDate = val?.[0] || ''
+    if (form.value.flights[1]) form.value.flights[1].flightDate = val?.[1] || ''
+  },
+})
+
+const getStartDate = (index: number) => {
+  const prevDate = form.value.flights[index - 1]?.flightDate
+  return prevDate ? new Date(prevDate) : new Date()
+}
+
+const latestFlightDate = computed(() => {
+  const times = form.value.flights
+    .map((f) => f.flightDate)
+    .filter(Boolean)
+    .map((d) => new Date(d).getTime())
+  return times.length ? new Date(Math.max(...times)) : new Date()
+})
+
+const deadlineMarkers = computed(() =>
+  form.value.flights
+    .map((f, i) =>
+      f.flightDate
+        ? {
+            date: f.flightDate,
+            type: 'dot' as const,
+            color: '#10b981',
+            tooltip: [
+              {
+                text:
+                  form.value.tripType === 'ROUND_TRIP'
+                    ? i === 0
+                      ? '去程'
+                      : '回程'
+                    : `航段 ${i + 1}`,
+              },
+            ],
+          }
+        : null,
+    )
+    .filter(Boolean),
+)
+
 watch(
   () => form.value.tripType,
   (newVal) => {
     if (newVal === 'SINGLE') {
       form.value.flights = [
-        form.value.flights[0] ?? { origin: '', destination: '', flightDate: '' },
+        form.value.flights[0] || { origin: '', destination: '', flightDate: '' },
       ]
     } else if (newVal === 'ROUND_TRIP') {
       form.value.flights = [
-        form.value.flights[0],
-        {
-          origin: form.value.flights[0]?.destination || '',
-          destination: form.value.flights[0]?.origin || '',
-          flightDate: form.value.flights[1]?.flightDate || '',
-        },
+        form.value.flights[0] || { origin: '', destination: '', flightDate: '' },
+        { origin: '', destination: '', flightDate: '' },
       ]
     } else if (newVal === 'MULTI_CITY') {
       form.value.flights = [
-        form.value.flights[0],
-        form.value.flights[1] ?? { origin: '', destination: '', flightDate: '' },
+        form.value.flights[0] || { origin: '', destination: '', flightDate: '' },
+        form.value.flights[1] || { origin: '', destination: '', flightDate: '' },
       ]
     }
   },
-)
-
-// Auto-sync airports for the return leg if the user modifies the first leg during a ROUND_TRIP
-watch(
-  () => [form.value.flights[0]?.origin, form.value.flights[0]?.destination],
-  ([newOrigin, newDest]) => {
-    if (form.value.tripType === 'ROUND_TRIP' && form.value.flights.length > 1) {
-      form.value.flights[1].origin = newDest || ''
-      form.value.flights[1].destination = newOrigin || ''
-    }
-  },
-  { deep: true },
 )
 
 function submit() {
   form.value.processing = true
 
-  // Format the payload to match backend snake_case expectations
   const payload = {
     trip_type: form.value.tripType,
     deadline: form.value.deadline || null,
     is_active: form.value.isActive,
-    flights: form.value.flights.map((leg) => ({
-      origin: leg.origin,
-      destination: leg.destination,
-      flight_date: leg.flightDate,
-    })),
+    flights: form.value.flights.map((leg, i) => {
+      const isRoundTripReturn = form.value.tripType === 'ROUND_TRIP' && i === 1
+      return {
+        origin: (isRoundTripReturn ? form.value.flights[0].destination : leg.origin).toUpperCase(),
+        destination: (isRoundTripReturn
+          ? form.value.flights[0].origin
+          : leg.destination
+        ).toUpperCase(),
+        flight_date: leg.flightDate,
+      }
+    }),
   }
 
   fetch('/api/flights', {
@@ -83,9 +114,7 @@ function submit() {
           toast.error(data.message || '建立失敗，請檢查輸入內容')
           return
         }
-
         toast.success('航班追蹤已建立')
-        // Manually trigger Inertia navigation to the home page
         router.visit('/')
       }),
     )
@@ -131,8 +160,8 @@ function submit() {
 
           <ul class="list-inside list-disc space-y-1.5 pl-1">
             <li>
-              <span class="font-semibold text-base-content">觀察期</span>
-              （前 37% 時間）：收集數據，記錄出現過的最低票價格作為基準。
+              <span class="font-semibold text-base-content">觀察期</span>（前 37%
+              時間）：收集數據，記錄出現過的最低票價格作為基準。
             </li>
 
             <li>
@@ -189,92 +218,104 @@ function submit() {
           </fieldset>
 
           <div class="space-y-6">
-            <div
-              v-for="(leg, index) in form.flights"
-              :key="index"
-              class="relative rounded-xl border border-base-200 bg-base-200/20 p-5 transition-all hover:border-primary/30"
-            >
-              <div class="mb-5 flex items-center gap-3 border-b border-base-200 pb-3">
-                <div
-                  class="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary"
-                >
-                  {{ index + 1 }}
+            <div v-for="(leg, index) in form.flights" :key="index">
+              <div
+                v-if="form.tripType !== 'ROUND_TRIP' || index === 0"
+                class="relative rounded-xl border border-base-200 bg-base-200/20 p-5 transition-all hover:border-primary/30"
+              >
+                <div class="mb-5 flex items-center gap-3 border-b border-base-200 pb-3">
+                  <h4 class="font-bold text-base-content">
+                    {{
+                      form.tripType === 'MULTI_CITY' ? `航班資料 - 第 ${index + 1} 程` : '航班資料'
+                    }}
+                  </h4>
                 </div>
 
-                <h4 class="font-bold text-base-content">
-                  {{
-                    index === 0
-                      ? '去程航班'
-                      : form.tripType === 'ROUND_TRIP'
-                        ? '回程航班'
-                        : '第二航段'
-                  }}
-                </h4>
-              </div>
+                <div class="grid gap-6 md:grid-cols-3">
+                  <fieldset class="fieldset">
+                    <legend class="fieldset-legend text-sm font-bold">出發地機場代碼</legend>
 
-              <div class="grid gap-6 md:grid-cols-3">
-                <fieldset class="fieldset">
-                  <legend class="fieldset-legend text-sm font-bold">出發地機場代碼</legend>
+                    <input
+                      v-model="leg.origin"
+                      type="text"
+                      placeholder="如: HKG"
+                      class="input-bordered input w-full uppercase transition-colors focus:input-primary"
+                      required
+                      maxlength="3"
+                      :disabled="form.processing"
+                    />
+                  </fieldset>
 
-                  <input
-                    v-model="leg.origin"
-                    type="text"
-                    placeholder="如: HKG"
-                    class="input-bordered input w-full uppercase transition-colors focus:input-primary"
-                    :readonly="form.tripType === 'ROUND_TRIP' && index === 1"
-                    :class="{
-                      'bg-base-200 text-base-content/50':
-                        form.tripType === 'ROUND_TRIP' && index === 1,
-                    }"
-                    required
-                    maxlength="3"
-                    :disabled="form.processing"
-                  />
-                </fieldset>
+                  <fieldset class="fieldset">
+                    <legend class="fieldset-legend text-sm font-bold">目的地機場代碼</legend>
 
-                <fieldset class="fieldset">
-                  <legend class="fieldset-legend text-sm font-bold">目的地機場代碼</legend>
+                    <input
+                      v-model="leg.destination"
+                      type="text"
+                      placeholder="如: NRT"
+                      class="input-bordered input w-full uppercase transition-colors focus:input-primary"
+                      required
+                      maxlength="3"
+                      :disabled="form.processing"
+                    />
+                  </fieldset>
 
-                  <input
-                    v-model="leg.destination"
-                    type="text"
-                    placeholder="如: NRT"
-                    class="input-bordered input w-full uppercase transition-colors focus:input-primary"
-                    :readonly="form.tripType === 'ROUND_TRIP' && index === 1"
-                    :class="{
-                      'bg-base-200 text-base-content/50':
-                        form.tripType === 'ROUND_TRIP' && index === 1,
-                    }"
-                    required
-                    maxlength="3"
-                    :disabled="form.processing"
-                  />
-                </fieldset>
+                  <fieldset class="fieldset">
+                    <legend class="fieldset-legend text-sm font-bold">
+                      {{ form.tripType === 'ROUND_TRIP' ? '去回程日期' : '出發日期' }}
+                    </legend>
 
-                <fieldset class="fieldset">
-                  <legend class="fieldset-legend text-sm font-bold">目標出發日期</legend>
+                    <VueDatePicker
+                      v-if="form.tripType === 'ROUND_TRIP'"
+                      v-model="roundTripDates"
+                      range
+                      :enable-time-picker="false"
+                      :locale="zhHK"
+                      auto-apply
+                      model-type="yyyy-MM-dd"
+                      teleport="body"
+                    >
+                      <template #trigger>
+                        <input
+                          type="text"
+                          :value="
+                            roundTripDates.length === 2
+                              ? `${roundTripDates[0]} 至 ${roundTripDates[1]}`
+                              : ''
+                          "
+                          placeholder="選擇日期"
+                          class="input-bordered input w-full cursor-pointer transition-colors focus:input-primary"
+                          readonly
+                          required
+                          :disabled="form.processing"
+                        />
+                      </template>
+                    </VueDatePicker>
 
-                  <VueDatePicker
-                    v-model="leg.flightDate"
-                    :enable-time-picker="false"
-                    :locale="zhHK"
-                    auto-apply
-                    model-type="yyyy-MM-dd"
-                    teleport="body"
-                  >
-                    <template #trigger>
-                      <input
-                        type="text"
-                        :value="leg.flightDate"
-                        placeholder="選擇日期"
-                        class="input-bordered input w-full cursor-pointer transition-colors focus:input-primary"
-                        readonly
-                        required
-                        :disabled="form.processing"
-                      />
-                    </template>
-                  </VueDatePicker>
-                </fieldset>
+                    <VueDatePicker
+                      v-else
+                      v-model="leg.flightDate"
+                      :start-date="getStartDate(index)"
+                      :enable-time-picker="false"
+                      :locale="zhHK"
+                      auto-apply
+                      model-type="yyyy-MM-dd"
+                      teleport="body"
+                    >
+                      <template #trigger>
+                        <input
+                          type="text"
+                          :value="leg.flightDate"
+                          placeholder="選擇日期"
+                          class="input-bordered input w-full cursor-pointer transition-colors focus:input-primary"
+                          readonly
+                          required
+                          :disabled="form.processing"
+                        />
+                      </template>
+                    </VueDatePicker>
+                  </fieldset>
+                </div>
               </div>
             </div>
           </div>
@@ -289,6 +330,8 @@ function submit() {
 
               <VueDatePicker
                 v-model="form.deadline"
+                :start-date="latestFlightDate"
+                :markers="deadlineMarkers"
                 :enable-time-picker="false"
                 :locale="zhHK"
                 auto-apply
@@ -324,7 +367,7 @@ function submit() {
                 <div>
                   <span class="label-text block text-sm font-bold">啟用追蹤</span>
 
-                  <span class="label-text-alt text-base-content/60">建立後將自動收集票價</span>
+                  <span class="label-text-alt text-base-content/60">自動收集機票價格</span>
                 </div>
               </label>
             </fieldset>
