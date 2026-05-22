@@ -45,7 +45,7 @@ def get_bool(namespace: str, key: str, default: bool | None = None) -> bool | No
     val = get(namespace, key)
     if val is None:
         return default
-    return val.lower() in ('true', '1', 'yes', 'on')
+    return val.lower() in ('1', 'enable', 'enabled', 'true', 'yes', 'y', 'on')
 
 
 def set(namespace: str, key: str, value: str) -> None:
