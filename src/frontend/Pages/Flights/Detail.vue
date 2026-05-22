@@ -320,7 +320,8 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
             leave-from-class="opacity-100 translate-x-0"
             leave-to-class="opacity-0 translate-x-8"
           >
-            <div v-show="activeTab === 'graph'" class="col-start-1 row-start-1">
+            <!-- add min-w-0 combat grid's default (min-w-auto) for Chart.js to resize correctly -->
+            <div v-show="activeTab === 'graph'" class="col-start-1 row-start-1 min-w-0">
               <FareGraph :itinerary="itinerary" />
             </div>
           </Transition>

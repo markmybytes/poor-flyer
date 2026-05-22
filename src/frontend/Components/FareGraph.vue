@@ -129,17 +129,15 @@ onUnmounted(() => chart?.destroy())
 </script>
 
 <template>
-  <div>
-    <template v-if="itinerary.flights.length">
-      <div class="relative h-100 rounded-3xl bg-base-100 p-4 max-sm:h-80 md:p-6">
-        <canvas ref="chartCanvas"></canvas>
-      </div>
-    </template>
+  <template v-if="itinerary.flights.length">
+    <div class="relative h-100 rounded-3xl bg-base-100 p-4 max-sm:h-80 md:p-6">
+      <canvas ref="chartCanvas"></canvas>
+    </div>
+  </template>
 
-    <div v-else class="hero py-16 text-center">
-      <div class="hero-content">
-        <p class="font-medium text-base-content/50">暫無趨勢數據。</p>
-      </div>
+  <div v-else class="hero py-16 text-center">
+    <div class="hero-content">
+      <p class="font-medium text-base-content/50">暫無趨勢數據。</p>
     </div>
   </div>
 </template>
