@@ -51,9 +51,7 @@ def create_app():
                 {
                     'id': 'disable_departured_itineraries',
                     'func': 'src.services.scheduler:disable_departured_itineraries',
-                    'trigger': create_cron_trigger(
-                        os.getenv('PF_SCHEDULER_DISABLE_CRON', '0 0 * * *'),
-                    ),
+                    'trigger': create_cron_trigger('0 0 * * *'),
                 },
             ],
             'SQLALCHEMY_DATABASE_URI': os.getenv('PF_DATABASE_URL', DEFAULT_DATABASE_URL),
