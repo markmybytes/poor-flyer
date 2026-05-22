@@ -46,7 +46,7 @@ def _parse_entries(lines: list[str]) -> list[dict]:
 def read_logs(
     page: int = 1,
     per_page: int = 50,
-    level: str | None = None,
+    levels: list[str] | None = None,
     start_date: date | None = None,
     end_date: date | None = None,
 ) -> dict:
@@ -59,8 +59,9 @@ def read_logs(
     entries = _parse_entries(lines)
     entries.reverse()
 
-    if level:
-        entries = [e for e in entries if e['level'] == level]
+    if levels:
+        level_set = set(levels)
+        entries = [e for e in entries if e['level'] in level_set]
 
     if start_date or end_date:
         filtered = []

@@ -20,7 +20,7 @@ const props = defineProps<{
     perPage: number
   }
   filters: {
-    level: string
+    levels?: string[]
     startDate: string
     endDate: string
   }
@@ -30,9 +30,11 @@ const toast = useToast()
 const confirmModal = useTemplateRef<HTMLDialogElement>('confirmModal')
 const clearing = ref(false)
 
-const LOG_LEVELS = ['ALL', 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] as const
+const LOG_LEVELS = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] as const
 
-const selectedLevel = ref(props.filters.level || 'ALL')
+const selectedLevels = ref<string[]>(
+  props.filters.levels?.length ? [...props.filters.levels] : [...LOG_LEVELS],
+)
 
 const dateRange = ref<Date[] | null>(
   props.filters.startDate && props.filters.endDate
@@ -60,7 +62,7 @@ function levelBadgeClass(level: string): string {
 function navigate(page = 1) {
   const data: Record<string, string | number> = {
     page,
-    level: selectedLevel.value,
+    levels: selectedLevels.value.join(','),
   }
 
   if (Array.isArray(dateRange.value)) {
@@ -75,7 +77,24 @@ function navigate(page = 1) {
   router.visit('/logs/', { data, preserveState: true, replace: true })
 }
 
-watch([selectedLevel, dateRange], () => navigate(1))
+function toggleLevel(level: (typeof LOG_LEVELS)[number] | 'ALL') {
+  if (level === 'ALL') {
+    selectedLevels.value = [...LOG_LEVELS]
+    return
+  }
+
+  if (selectedLevels.value.includes(level)) {
+    selectedLevels.value = selectedLevels.value.filter((lvl) => lvl !== level)
+  } else {
+    selectedLevels.value = [...selectedLevels.value, level]
+  }
+
+  if (!selectedLevels.value.length) {
+    selectedLevels.value = [...LOG_LEVELS]
+  }
+}
+
+watch([selectedLevels, dateRange], () => navigate(1), { deep: true })
 
 const totalPages = computed(() => Math.ceil(props.pagination.total / props.pagination.perPage))
 
@@ -127,11 +146,25 @@ function clearLogs() {
 
           <div class="join flex flex-wrap gap-0">
             <button
+              class="btn join-item btn-xs"
+              :class="
+                LOG_LEVELS.every((lvl) => selectedLevels.includes(lvl))
+                  ? 'btn-primary'
+                  : 'border border-base-300 btn-ghost'
+              "
+              @click="toggleLevel('ALL')"
+            >
+              ALL
+            </button>
+
+            <button
               v-for="lvl in LOG_LEVELS"
               :key="lvl"
               class="btn join-item btn-xs"
-              :class="selectedLevel === lvl ? 'btn-primary' : 'border border-base-300 btn-ghost'"
-              @click="selectedLevel = lvl"
+              :class="
+                selectedLevels.includes(lvl) ? 'btn-primary' : 'border border-base-300 btn-ghost'
+              "
+              @click="toggleLevel(lvl)"
             >
               {{ lvl }}
             </button>
