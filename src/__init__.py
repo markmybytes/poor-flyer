@@ -41,8 +41,8 @@ def create_app():
             'INERTIA_TEMPLATE': 'base.html',
             'JOBS': [
                 {
-                    'id': 'daily_scrape',
-                    'func': 'src.services.scheduler:daily_scrape_job',
+                    'id': 'scrape_fares',
+                    'func': 'src.services.scheduler:scrape_fares',
                     'trigger': create_cron_trigger(
                         os.getenv('SCHEDULER_SCRAPE_CRON', '0 9 * * *'),
                         int(os.getenv('SCHEDULER_SCRAPE_JITTER_SECONDS', 1800)),

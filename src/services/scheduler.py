@@ -15,7 +15,7 @@ from src.utils.rule37 import Phase, compute_37_best
 logger = logging.getLogger(__name__)
 
 
-def daily_scrape_job():
+def scrape_fares():
     """Daily job to scrape flight prices and send notifications if buy signal triggered."""
     # Get the app context from current_app through the scheduler
     from src.extensions.scheduler import scheduler
