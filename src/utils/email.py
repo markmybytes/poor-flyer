@@ -4,7 +4,7 @@ from email.message import Message
 from email.mime.text import MIMEText
 from typing import TypedDict
 
-from src.services import config
+from src.services import setting
 
 logger = logging.getLogger(__name__)
 
@@ -20,14 +20,14 @@ class SMTPConfig(TypedDict):
 
 
 def get_smtp_config() -> SMTPConfig:
-    protocol = config.get('smtp', 'protocol') or 'STARTTLS'
+    protocol = setting.get('smtp', 'protocol') or 'STARTTLS'
     return {
-        'host': config.get('smtp', 'host') or '',
-        'port': config.get_int('smtp', 'port') or 587,
-        'user': config.get('smtp', 'user') or '',
-        'password': config.get('smtp', 'password') or '',
-        'sender_email': config.get('smtp', 'sender_email') or '',
-        'require_auth': config.get_bool('smtp', 'require_auth', True),
+        'host': setting.get('smtp', 'host') or '',
+        'port': setting.get_int('smtp', 'port') or 587,
+        'user': setting.get('smtp', 'user') or '',
+        'password': setting.get('smtp', 'password') or '',
+        'sender_email': setting.get('smtp', 'sender_email') or '',
+        'require_auth': setting.get_bool('smtp', 'require_auth', True),
         'protocol': protocol,
     }
 

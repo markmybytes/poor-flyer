@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, render_template, request
 
-from src.services import config
+from src.services import setting
 from src.services.fx_rates import (
     SUPPORTED_CURRENCIES,
     FXRatesError,
@@ -15,7 +15,7 @@ settings_bp = Blueprint('settings', __name__, url_prefix='/settings')
 @settings_bp.route('', methods=['GET'])
 def get_settings():
     try:
-        currency = config.get_all_masked('currency')
+        currency = setting.get_all_masked('currency')
         currency['base_currency'] = currency.get('base_currency') or 'HKD'
         currency['cache_ttl'] = currency.get('cache_ttl') or '86400'
         currency['fxrates_api_key'] = currency.get('fxrates_api_key') or ''
@@ -24,8 +24,8 @@ def get_settings():
             {
                 'success': True,
                 'data': {
-                    'smtp': config.get_all_masked('smtp'),
-                    'email': config.get_all_masked('email'),
+                    'smtp': setting.get_all_masked('smtp'),
+                    'email': setting.get_all_masked('email'),
                     'currency': currency,
                 },
             }
@@ -58,10 +58,10 @@ def update_settings():
             if smtp.get('password'):
                 smtp_settings['password'] = smtp['password']
 
-            config.set_many('smtp', smtp_settings)
+            setting.set_many('smtp', smtp_settings)
 
         if email := data.get('email', {}):
-            config.set_many('email', {'recipients': email.get('recipients', '')})
+            setting.set_many('email', {'recipients': email.get('recipients', '')})
 
         if currency := data.get('currency', {}):
             base_currency = (currency.get('base_currency') or 'HKD').strip().upper()
@@ -79,7 +79,7 @@ def update_settings():
                     {'success': False, 'message': 'Cache TTL must be greater than 0'}
                 ), 400
 
-            config.set_many(
+            setting.set_many(
                 'currency',
                 {
                     'base_currency': base_currency,
@@ -112,10 +112,10 @@ def patch_settings():
             )
             if smtp.get('password'):
                 cfg['password'] = smtp['password']
-            config.set_many('smtp', cfg)
+            setting.set_many('smtp', cfg)
 
         if 'email' in data and (email := data['email'] or {}):
-            config.set_many('email', {'recipients': email.get('recipients', '')})
+            setting.set_many('email', {'recipients': email.get('recipients', '')})
 
         if 'currency' in data and (currency := data['currency'] or {}):
             base = (currency.get('base_currency') or 'HKD').strip().upper()
@@ -130,7 +130,7 @@ def patch_settings():
                 return jsonify(
                     {'success': False, 'message': 'Cache TTL must be greater than 0'}
                 ), 400
-            config.set_many(
+            setting.set_many(
                 'currency',
                 {
                     'base_currency': base,

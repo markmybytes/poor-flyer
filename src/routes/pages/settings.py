@@ -1,7 +1,7 @@
 from flask import Blueprint
 from flask_inertia import render_inertia
 
-from src.services import config
+from src.services import setting
 from src.services.fx_rates import (
     SUPPORTED_CURRENCIES,
     FXRatesError,
@@ -34,7 +34,7 @@ def index():
             'error': str(exc),
         }
 
-    currency_settings = config.get_all_masked('currency')
+    currency_settings = setting.get_all_masked('currency')
     currency_settings['base_currency'] = currency_settings.get('base_currency', base_currency)
     currency_settings['cache_ttl'] = currency_settings.get('cache_ttl', '86400')
     currency_settings['fxrates_api_key'] = currency_settings.get('fxrates_api_key', '')
@@ -43,8 +43,8 @@ def index():
         'Settings/Index',
         props={
             'settings': {
-                'smtp': config.get_all_masked('smtp'),
-                'email': config.get_all_masked('email'),
+                'smtp': setting.get_all_masked('smtp'),
+                'email': setting.get_all_masked('email'),
                 'currency': currency_settings,
             },
             'supportedCurrencies': SUPPORTED_CURRENCIES,

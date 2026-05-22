@@ -6,7 +6,7 @@ from datetime import date
 from flask import render_template
 
 from src.extensions.database import FareSnapshot, Itinerary, db
-from src.services import config
+from src.services import setting
 from src.services.fx_rates import FXRatesError, convert_amount, get_configured_base_currency
 from src.services.scraper import FlightQuery, scrape_prices
 from src.utils.email import get_smtp_config, send_html_email
@@ -51,7 +51,7 @@ def daily_scrape_job():
             smtp_cfg = get_smtp_config()
             base_currency = get_configured_base_currency()
             recipients = [
-                r.strip() for r in config.get('email', 'recipients', '').split(',') if r.strip()
+                r.strip() for r in setting.get('email', 'recipients', '').split(',') if r.strip()
             ]
 
             all_active_legs = [

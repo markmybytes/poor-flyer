@@ -9,7 +9,7 @@ from typing import Any
 import httpx
 from flask import current_app
 
-from src.services.config import get, get_int
+from src.services.setting import get, get_int
 
 FX_RATES_BASE_URL = 'https://api.fxratesapi.com'
 SUPPORTED_CURRENCIES = [
