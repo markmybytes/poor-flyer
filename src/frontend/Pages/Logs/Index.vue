@@ -21,7 +21,7 @@ const props = defineProps<{
 const toast = useToast()
 const confirmModal = useTemplateRef<HTMLDialogElement>('confirmModal')
 const clearing = ref(false)
-const expandedRows = ref<number[]>([]) // Tracks expanded row indices
+const expandedRows = ref<number[]>([])
 
 const LOG_LEVELS = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] as const
 const selectedLevels = ref<string[]>(
@@ -33,6 +33,9 @@ const dateRange = ref<Date[] | null>(
     ? [new Date(props.filters.startDate), new Date(props.filters.endDate)]
     : null,
 )
+
+// NEW: Track items per page, initialize from backend props
+const itemsPerPage = ref(props.pagination.perPage || 50)
 
 const isAllLevelsSelected = computed(() =>
   LOG_LEVELS.every((lvl) => selectedLevels.value.includes(lvl)),
@@ -55,7 +58,6 @@ function formatLocalDate(date: Date): string {
 
 function toggleRow(i: number) {
   const idx = expandedRows.value.indexOf(i)
-
   if (idx > -1) {
     expandedRows.value.splice(idx, 1)
   } else {
@@ -64,8 +66,12 @@ function toggleRow(i: number) {
 }
 
 function navigate(page = 1) {
-  expandedRows.value = [] // Reset expansions on navigate
-  const data: Record<string, string | number> = { page, levels: selectedLevels.value.join(',') }
+  expandedRows.value = []
+  const data: Record<string, string | number> = {
+    page,
+    per_page: itemsPerPage.value, // <-- Added to API payload
+    levels: selectedLevels.value.join(','),
+  }
 
   if (Array.isArray(dateRange.value)) {
     if (dateRange.value[0]) data.start_date = formatLocalDate(dateRange.value[0])
@@ -101,18 +107,31 @@ watch(
 
 const totalPages = computed(() => Math.ceil(props.pagination.total / props.pagination.perPage))
 
+const startIndex = computed(() =>
+  props.pagination.total === 0 ? 0 : (props.pagination.page - 1) * props.pagination.perPage + 1,
+)
+const endIndex = computed(() =>
+  Math.min(props.pagination.page * props.pagination.perPage, props.pagination.total),
+)
+
 const pageNumbers = computed((): (number | '...')[] => {
   const { page } = props.pagination
   const total = totalPages.value
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
 
-  const pages: (number | '...')[] = [1]
-  if (page > 3) pages.push('...')
-  for (let i = Math.max(2, page - 1); i <= Math.min(total - 1, page + 1); i++) pages.push(i)
-  if (page < total - 2) pages.push('...')
+  // If total pages are 7 or less, just show them all
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1)
+  }
 
-  pages.push(total)
-  return pages
+  if (page <= 4) {
+    return [1, 2, 3, 4, 5, '...', total]
+  }
+
+  if (page >= total - 3) {
+    return [1, '...', total - 4, total - 3, total - 2, total - 1, total]
+  }
+
+  return [1, '...', page - 1, page, page + 1, '...', total]
 })
 
 function clearLogs() {
@@ -188,12 +207,6 @@ function clearLogs() {
           </button>
         </div>
       </div>
-    </div>
-
-    <div class="mb-4 flex items-center justify-between text-sm text-base-content/60">
-      <span>共 {{ pagination.total }} 筆記錄</span>
-
-      <span v-if="totalPages > 1">第 {{ pagination.page }} / {{ totalPages }} 頁</span>
     </div>
 
     <div class="tracker-panel overflow-hidden rounded-lg border border-base-200 shadow-sm">
@@ -298,35 +311,57 @@ function clearLogs() {
       </div>
     </div>
 
-    <div v-if="totalPages > 1" class="mt-6 flex items-center justify-center gap-1">
-      <button
-        class="btn btn-ghost btn-sm"
-        :disabled="pagination.page <= 1"
-        @click="navigate(pagination.page - 1)"
-      >
-        «
-      </button>
+    <div class="mt-6 flex flex-col items-center justify-between gap-4 sm:flex-row">
+      <div class="flex items-center gap-3 text-sm text-base-content/70">
+        <span>顯示 {{ startIndex }} - {{ endIndex }} 筆，共 {{ pagination.total }} 筆</span>
 
-      <template v-for="p in pageNumbers" :key="p">
-        <span v-if="p === '...'" class="px-1 text-base-content/40">…</span>
+        <select
+          v-model="itemsPerPage"
+          class="select-bordered select w-28 bg-base-100 select-sm"
+          @change="navigate(1)"
+        >
+          <option :value="20">20 筆 / 頁</option>
+
+          <option :value="50">50 筆 / 頁</option>
+
+          <option :value="100">100 筆 / 頁</option>
+
+          <option :value="500">500 筆 / 頁</option>
+        </select>
+      </div>
+
+      <div v-if="totalPages > 1" class="join">
+        <button
+          class="btn join-item min-w-9 p-0 btn-sm"
+          :disabled="pagination.page <= 1"
+          @click="navigate(pagination.page - 1)"
+        >
+          «
+        </button>
+
+        <template v-for="(p, idx) in pageNumbers" :key="'page-' + p + '-' + idx">
+          <button v-if="p === '...'" class="btn btn-disabled join-item min-w-9 p-0 btn-sm">
+            ...
+          </button>
+
+          <button
+            v-else
+            class="btn join-item min-w-9 p-0 btn-sm"
+            :class="p === pagination.page ? 'btn-active' : ''"
+            @click="navigate(p as number)"
+          >
+            {{ p }}
+          </button>
+        </template>
 
         <button
-          v-else
-          class="btn btn-sm"
-          :class="p === pagination.page ? 'btn-primary' : 'btn-ghost'"
-          @click="navigate(p as number)"
+          class="btn join-item min-w-9 p-0 btn-sm"
+          :disabled="pagination.page >= totalPages"
+          @click="navigate(pagination.page + 1)"
         >
-          {{ p }}
+          »
         </button>
-      </template>
-
-      <button
-        class="btn btn-ghost btn-sm"
-        :disabled="pagination.page >= totalPages"
-        @click="navigate(pagination.page + 1)"
-      >
-        »
-      </button>
+      </div>
     </div>
 
     <dialog ref="confirmModal" class="modal">
