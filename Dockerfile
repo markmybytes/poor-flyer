@@ -19,7 +19,6 @@ ARG S6_OVERLAY_ARCH="x86_64"
 
 WORKDIR /app
 
-ENV DATABASE_URL=sqlite:////app/data/db.sqlite
 ENV DISPLAY=:99
 
 VOLUME ["/app/data"]

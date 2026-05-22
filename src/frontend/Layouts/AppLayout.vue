@@ -53,6 +53,20 @@ import { Link } from '@inertiajs/vue3'
 
               <span class="sm:hidden">設定</span>
             </Link>
+
+            <Link
+              href="/logs/"
+              class="btn btn-sm sm:btn-md"
+              :class="
+                $page.url.startsWith('/logs')
+                  ? 'font-semibold btn-primary'
+                  : 'font-semibold btn-ghost'
+              "
+            >
+              <span class="hidden sm:inline">日誌</span>
+
+              <span class="sm:hidden">日誌</span>
+            </Link>
           </div>
         </div>
       </nav>

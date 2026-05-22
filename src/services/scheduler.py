@@ -4,89 +4,166 @@ import uuid
 from datetime import date
 
 from flask import render_template
+from sqlalchemy import func
 
-from src.extensions.database import Flight, FlightFareSnapshot, db
-from src.services.config import ConfigManager
-from src.services.email import get_smtp_config, send_html_email
-from src.services.rule37 import Phase, compute_37_best
-from src.services.scraper import scrape_prices
+from src.extensions.database import FareSnapshot, Flight, Itinerary, db
+from src.services import setting
+from src.services.fx_rates import FXRatesError, convert_amount, get_configured_base_currency
+from src.services.scraper import FlightQuery, scrape_prices
+from src.utils.email import get_smtp_config, send_html_email
+from src.utils.rule37 import Phase, compute_37_best
 
 logger = logging.getLogger(__name__)
 
 
-def daily_scrape_job():
+def scrape_fares():
     """Daily job to scrape flight prices and send notifications if buy signal triggered."""
-    try:
-        today = date.today()
-        flights = (
-            db.session.query(Flight).filter(Flight.is_active, Flight.flight_date >= today).all()
-        )
-        for flight in flights:
-            res = scrape_prices(flight.origin, flight.destination, flight.flight_date)
-            for r in res.results:
-                db.session.add(
-                    FlightFareSnapshot(
-                        id=str(uuid.uuid4()),
-                        flight_id=flight.id,
-                        fare=r.fare,
-                        flight_number=r.flight_number,
-                        departure_at=r.departure_at,
-                        arrival_at=r.arrival_at,
-                        scrape_status='success' if res.success else 'error',
-                        error_message=res.error_message,
-                    )
+    # Get the app context from current_app through the scheduler
+    from src.extensions.scheduler import scheduler
+
+    with scheduler.app.app_context():
+        try:
+            logger.info('Daily scrape job started')
+            today = date.today()
+            itineraries = db.session.query(Itinerary).filter(Itinerary.is_active).all()
+            logger.debug('Processing %d active itineraries', len(itineraries))
+
+            scraped_count = 0
+            for itinerary in itineraries:
+                if not (active_legs := [f for f in itinerary.flights if f.flight_date >= today]):
+                    continue
+
+                scraped_count += 1
+                results = scrape_prices(
+                    [FlightQuery(f.origin, f.destination, f.flight_date) for f in active_legs]
                 )
-        db.session.commit()
+                for flight, res in zip(active_legs, results, strict=False):
+                    for r in res.results:
+                        db.session.add(
+                            FareSnapshot(
+                                id=str(uuid.uuid4()),
+                                flight_id=flight.id,
+                                fare=r.fare,
+                                currency=r.currency,
+                                flight_number=r.flight_number,
+                                departure_at=r.departure_at,
+                                arrival_at=r.arrival_at,
+                                scrape_status='success' if res.success else 'error',
+                                error_message=res.error_message,
+                            )
+                        )
+            db.session.commit()
+            logger.info('Scraped prices for %d itineraries', scraped_count)
 
-        smtp_cfg = get_smtp_config()
-        recipients = [
-            r.strip()
-            for r in ConfigManager.get_str('email', 'recipients', '').split(',')
-            if r.strip()
-        ]
+            smtp_cfg = get_smtp_config()
+            base_currency = get_configured_base_currency()
+            recipients = [
+                r.strip() for r in setting.get('email', 'recipients', '').split(',') if r.strip()
+            ]
+            logger.debug('Email recipients count=%d', len(recipients))
 
-        for flight in (f for f in flights if f.notification_enabled and f.deadline):
-            r37 = compute_37_best(
-                flight.created_at.date(),
-                today,
-                flight.deadline,
-                {
-                    s.created_at.date(): float(s.fare)
-                    for s in flight.fare_snapshots
-                    if s.scrape_status == 'success'
-                },
+            all_active_legs = [
+                f
+                for itinerary in itineraries
+                if itinerary.deadline
+                for f in itinerary.flights
+                if f.flight_date >= today
+            ]
+
+            buy_signals_sent = 0
+            for flight in all_active_legs:
+                r37 = compute_37_best(
+                    flight.itinerary.created_at.date(),
+                    today,
+                    flight.itinerary.deadline,
+                    {
+                        s.created_at.date(): float(s.fare)
+                        for s in flight.fare_snapshots
+                        if s.scrape_status == 'success'
+                    },
+                )
+                if r37.phase != Phase.BUY_SIGNAL:
+                    continue
+
+                buy_signals_sent += 1
+                snap = max(
+                    (s for s in flight.fare_snapshots if s.scrape_status == 'success'),
+                    key=lambda s: s.created_at,
+                    default=None,
+                )
+                if not snap or not recipients:
+                    continue
+
+                src_currency = (snap.currency or base_currency).upper()
+                current_fare = float(snap.fare)
+                lowest_fare = float(r37.history_best_val or snap.fare)
+                try:
+                    current_fare = convert_amount(current_fare, src_currency, base_currency)
+                    lowest_fare = convert_amount(lowest_fare, src_currency, base_currency)
+                except FXRatesError:
+                    logger.warning(
+                        'Failed to convert fare for buy signal email: flight_id=%s',
+                        flight.id,
+                    )
+
+                flight_date_str = flight.flight_date.strftime('%Y-%m-%d')
+                subj = f'✈️ 購買信號 | {flight.origin} → {flight.destination} ({flight_date_str})'
+                body = render_template(
+                    'email/buy_signal.html',
+                    flight_origin=flight.origin,
+                    flight_destination=flight.destination,
+                    flight_date=flight_date_str,
+                    current_fare=current_fare,
+                    lowest_fare=lowest_fare,
+                    display_currency=base_currency,
+                )
+
+                for email in recipients:
+                    threading.Thread(
+                        target=send_html_email,
+                        args=(smtp_cfg, email, subj, body),
+                        daemon=True,
+                    ).start()
+
+            logger.info('Daily scrape job completed: buy_signals_sent=%d', buy_signals_sent)
+
+        except Exception:
+            logger.exception('Daily scrape job failed')
+            db.session.rollback()
+        finally:
+            db.session.remove()
+
+
+def disable_departured_itineraries():
+    """Daily job to disable itineraries with past departure dates."""
+    from src.extensions.scheduler import scheduler
+
+    if not setting.get_bool('itinerary', 'disable_departured_itineraries', False):
+        logger.debug('Skipping disable_departured_itineraries job since it is disabled in settings')
+        return
+
+    with scheduler.app.app_context():
+        try:
+            today = date.today()
+
+            past_itineraries_subquery = (
+                db.session.query(Flight.itinerary_id)
+                .group_by(Flight.itinerary_id)
+                .having(func.max(Flight.flight_date) < today)
+                .subquery()
             )
-            if r37.phase != Phase.BUY_SIGNAL:
-                continue
 
-            snap = max(
-                (s for s in flight.fare_snapshots if s.scrape_status == 'success'),
-                key=lambda s: s.created_at,
-                default=None,
-            )
-            if not snap or not recipients:
-                continue
-
-            flight_date_str = flight.flight_date.strftime('%Y-%m-%d')
-            subj = f'✈️ 購買信號 | {flight.origin} → {flight.destination} ({flight_date_str})'
-            body = render_template(
-                'email/buy_signal.html',
-                flight_origin=flight.origin,
-                flight_destination=flight.destination,
-                flight_date=flight_date_str,
-                current_fare=float(snap.fare),
-                lowest_fare=float(r37.history_best_val or snap.fare),
+            updated_count = (
+                db.session.query(Itinerary)
+                .filter(Itinerary.is_active)
+                .filter(Itinerary.id.in_(past_itineraries_subquery))
+                .update({Itinerary.is_active: False}, synchronize_session=False)
             )
 
-            for email in recipients:
-                threading.Thread(
-                    target=send_html_email,
-                    args=(smtp_cfg, email, subj, body),
-                    daemon=True,
-                ).start()
-
-    except Exception as exc:
-        logger.error(f'Scheduler job failed: {exc}', exc_info=True)
-        db.session.rollback()
-    finally:
-        db.session.remove()
+            db.session.commit()
+            logger.info('Disabled %d itineraries with past departure dates', updated_count)
+        except Exception:
+            logger.exception('Failed to disable past itineraries')
+            db.session.rollback()
+        finally:
+            db.session.remove()

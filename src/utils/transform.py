@@ -1,9 +1,14 @@
 import collections.abc
+import logging
 from dataclasses import asdict, is_dataclass
 from datetime import date, datetime
 
 from flask.json.provider import DefaultJSONProvider
 from sqlalchemy import inspect
+
+logger = logging.getLogger(__name__)
+
+logger = logging.getLogger(__name__)
 
 
 def to_camel(snake_str):

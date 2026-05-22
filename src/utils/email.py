@@ -4,7 +4,7 @@ from email.message import Message
 from email.mime.text import MIMEText
 from typing import TypedDict
 
-from src.services.config import ConfigManager
+from src.services import setting
 
 logger = logging.getLogger(__name__)
 
@@ -20,14 +20,14 @@ class SMTPConfig(TypedDict):
 
 
 def get_smtp_config() -> SMTPConfig:
-    protocol = ConfigManager.get_str('smtp', 'protocol') or 'STARTTLS'
+    protocol = setting.get('smtp', 'protocol') or 'STARTTLS'
     return {
-        'host': ConfigManager.get_str('smtp', 'host') or '',
-        'port': ConfigManager.get_int('smtp', 'port') or 587,
-        'user': ConfigManager.get_str('smtp', 'user') or '',
-        'password': ConfigManager.get_str('smtp', 'password') or '',
-        'sender_email': ConfigManager.get_str('smtp', 'sender_email') or '',
-        'require_auth': ConfigManager.get_bool('smtp', 'require_auth', True),
+        'host': setting.get('smtp', 'host') or '',
+        'port': setting.get_int('smtp', 'port') or 587,
+        'user': setting.get('smtp', 'user') or '',
+        'password': setting.get('smtp', 'password') or '',
+        'sender_email': setting.get('smtp', 'sender_email') or '',
+        'require_auth': setting.get_bool('smtp', 'require_auth', True),
         'protocol': protocol,
     }
 
@@ -37,20 +37,29 @@ def send_email(cfg: SMTPConfig, msg: Message) -> bool:
         protocol = cfg.get('protocol', 'STARTTLS')
         require_auth = cfg.get('require_auth', True)
 
+        logger.debug('Sending email via protocol=%s require_auth=%s', protocol, require_auth)
+
         if protocol == 'SMTP_SSL':
-            with smtplib.SMTP_SSL(cfg['host'], cfg['port']) as server:
+            with smtplib.SMTP_SSL(cfg['host'], cfg['port'], timeout=15) as server:
                 if require_auth:
                     server.login(cfg['user'], cfg['password'])
                 server.send_message(msg)
         else:  # STARTTLS (default)
-            with smtplib.SMTP(cfg['host'], cfg['port']) as server:
+            with smtplib.SMTP(cfg['host'], cfg['port'], timeout=15) as server:
                 server.starttls()
                 if require_auth:
                     server.login(cfg['user'], cfg['password'])
                 server.send_message(msg)
+        logger.info('Email sent successfully')
         return True
-    except Exception as e:
-        logger.error(f'SMTP error: {e}')
+    except smtplib.SMTPAuthenticationError:
+        logger.error('SMTP authentication failed: invalid credentials')
+        return False
+    except smtplib.SMTPException:
+        logger.exception('SMTP error occurred')
+        return False
+    except Exception:
+        logger.exception('Unexpected error sending email')
         return False
 
 

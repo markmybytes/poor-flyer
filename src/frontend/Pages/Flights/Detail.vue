@@ -1,177 +1,55 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
+import FareGraph from '@/Components/FareGraph.vue'
+import FaretList from '@/Components/FareList.vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
-import type { FareSnapshot, Flight } from '@/types'
-import { fmtDate, fmtFare, fmtTime, fmtTz, getFlightStats } from '@/utils'
+import type { Itinerary } from '@/types'
+import { fmtDate, fmtFare, fmtItineraryName } from '@/utils'
 import { router } from '@inertiajs/vue3'
-import Chart from 'chart.js/auto'
-import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
+import { ref } from 'vue'
 import { useToast } from 'vue-toast-notification'
 
-const props = defineProps<{ flight: Flight }>()
-
+const props = defineProps<{ itinerary: Itinerary; baseCurrency: string }>()
 const toast = useToast()
 
-const chartCanvas = useTemplateRef<HTMLCanvasElement>('chartCanvas')
-const activeTab = ref<'table' | 'graph'>('table')
-const expandedGroups = ref(new Set<number>())
-const loading = ref({ loading: null as 'toggle' | 'scrape' | 'delete' | null })
-const detailPanel = ref<'analysis' | 'summary'>(props.flight.deadline ? 'analysis' : 'summary')
+const activeTab = ref('0')
+const loading = ref<string | null>(null)
 
-let chart: Chart | null = null
+const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
+  if (action === 'delete' && !confirm('確認刪除此航班追蹤？')) {
+    return
+  }
+  loading.value = action
 
-const today = new Date().toISOString().split('T')[0]
-
-const flightStats = computed(() => getFlightStats(props.flight.fareSnapshots))
-
-const dailyGroups = computed(() => {
-  const byDate = new Map<string, FareSnapshot[]>()
-  for (const s of props.flight.fareSnapshots) {
-    const d = s.createdAt.split('T')[0]
-    if (!byDate.has(d)) byDate.set(d, [])
-    byDate.get(d)!.push(s)
+  const opts: RequestInit = {
+    method: action === 'toggle' ? 'PATCH' : action === 'scrape' ? 'POST' : 'DELETE',
+  }
+  if (action === 'toggle') {
+    opts.headers = { 'Content-Type': 'application/json' }
+    opts.body = JSON.stringify({ is_active: !props.itinerary.isActive })
   }
 
-  return [...byDate.entries()]
-    .sort(([a], [b]) => b.localeCompare(a))
-    .map(([date, snapshots]) => {
-      const low =
-        snapshots
-          .filter((s) => s.scrapeStatus === 'success' && s.fare != null)
-          .sort((a, b) => (a.fare as number) - (b.fare as number))[0] ?? null
-      return {
-        date,
-        lowestFare: low?.fare ?? null,
-        lowestSnapshot: low ? { flightNumber: low.flightNumber, fare: low.fare } : null,
-        snapshots: [...snapshots].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-      }
-    })
-})
+  try {
+    const res = await fetch(
+      `/api/flights/${props.itinerary.id}${action === 'scrape' ? '/scrape' : ''}`,
+      opts,
+    )
+    if (!res.ok) {
+      throw new Error()
+    }
 
-// Explicit fetch functions for JSON API
-function toggleEntry() {
-  loading.value.loading = 'toggle'
-  fetch(`/api/flights/${props.flight.id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ is_active: !props.flight.isActive }),
-  })
-    .then((res) => {
-      if (res.ok) {
-        router.reload()
-      } else {
-        toast.error('操作失敗，請稍後再試')
-      }
-    })
-    .catch(() => toast.error('操作失敗，請稍後再試'))
-    .finally(() => {
-      loading.value.loading = null
-    })
-}
-
-function scrapeEntry() {
-  loading.value.loading = 'scrape'
-  fetch(`/api/flights/${props.flight.id}/scrape`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-  })
-    .then((res) => {
-      if (res.ok) {
-        router.reload()
-      } else {
-        toast.error('擷取失敗，請稍後再試')
-      }
-    })
-    .catch(() => toast.error('擷取失敗，請稍後再試'))
-    .finally(() => {
-      loading.value.loading = null
-    })
-}
-
-function deleteEntry() {
-  if (!confirm('確認刪除此航班追蹤？')) return
-  loading.value.loading = 'delete'
-  fetch(`/api/flights/${props.flight.id}`, {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-  })
-    .then((res) => {
-      if (res.ok) {
-        router.visit('/flights/')
-      } else {
-        toast.error('刪除失敗，請稍後再試')
-      }
-    })
-    .catch(() => toast.error('刪除失敗，請稍後再試'))
-    .finally(() => {
-      loading.value.loading = null
-    })
-}
-
-function initChart() {
-  if (!chartCanvas.value || !dailyGroups.value?.length) return
-  if (chart) chart.destroy()
-
-  const dateMap = new Map(dailyGroups.value.map((g) => [g.date, g.lowestFare]))
-  const dates = dailyGroups.value.map((g) => g.date).sort()
-  const start = new Date(dates[0]).getTime()
-  const end = new Date(dates[dates.length - 1]).getTime()
-
-  const labels: string[] = []
-  const fareData: (number | null)[] = []
-
-  for (let t = start; t <= end; t += 86400000) {
-    const iso = new Date(t).toISOString().split('T')[0]
-    labels.push(iso)
-    fareData.push(dateMap.get(iso) ?? null)
-  }
-
-  chart = new Chart(chartCanvas.value, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: '最低票價',
-          data: fareData,
-          borderColor: '#2563eb',
-          backgroundColor: 'rgba(37, 99, 235, 0.1)',
-          borderWidth: 2.5,
-          tension: 0.4,
-          pointBackgroundColor: '#2563eb',
-          pointBorderColor: '#fff',
-          pointBorderWidth: 1,
-          pointRadius: 3.5,
-          pointHoverRadius: 7,
-          fill: true,
-          spanGaps: false,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false }, tooltip: { padding: 12, cornerRadius: 8 } },
-      scales: {
-        y: { beginAtZero: false, grid: { color: '#f3f4f6' } },
-        x: { grid: { display: false } },
-      },
-      interaction: { intersect: false, mode: 'index' },
-    },
-  })
-}
-
-function switchTab(t: 'table' | 'graph') {
-  activeTab.value = t
-  if (t === 'graph') {
-    nextTick(() => initChart())
+    if (action === 'delete') {
+      router.visit('/flights/')
+    } else {
+      router.reload()
+    }
+  } catch {
+    toast.error(
+      `${action === 'scrape' ? '擷取' : action === 'delete' ? '刪除' : '操作'}失敗，請稍後再試`,
+    )
+  } finally {
+    loading.value = null
   }
 }
-
-watch(dailyGroups, () => {
-  if (activeTab.value === 'graph') initChart()
-})
-
-onMounted(() => activeTab.value === 'graph' && initChart())
-onUnmounted(() => chart?.destroy())
 </script>
 
 <template>
@@ -181,22 +59,21 @@ onUnmounted(() => chart?.destroy())
         <div class="border-b border-base-300/70 px-6 py-5">
           <div class="flex items-start justify-between gap-4">
             <div>
-              <h3 class="text-base font-bold text-base-content">
-                {{ flight.origin }} → {{ flight.destination }}
+              <h3 class="flex items-center gap-2 text-base font-bold text-base-content">
+                {{ fmtItineraryName(itinerary) }}
               </h3>
 
               <p class="mt-0.5 text-sm font-medium text-base-content/60">
-                出發日期：{{ fmtDate(flight.flightDate) }}
-                <span v-if="flight.deadline" class="mx-2 text-base-content/30">|</span>
+                出發日期：{{ fmtDate(itinerary.flights[0].flightDate) }}
+                <span v-if="itinerary.deadline" class="mx-2 text-base-content/30">|</span>
 
-                <span v-if="flight.deadline">限期：{{ fmtDate(flight.deadline) }}</span>
+                <span v-if="itinerary.deadline">限期：{{ fmtDate(itinerary.deadline) }}</span>
               </p>
             </div>
 
             <div class="flex shrink-0 flex-wrap gap-2">
-              <span v-if="flight.isActive" class="badge badge-soft px-3 py-3 badge-success">
-                <span class="status status-success"></span>
-                追蹤中
+              <span v-if="itinerary.isActive" class="badge badge-soft px-3 py-3 badge-success">
+                <span class="status status-success"></span> 追蹤中
               </span>
 
               <span v-else class="badge badge-soft px-3 py-3 badge-warning">已暫停</span>
@@ -208,37 +85,28 @@ onUnmounted(() => chart?.destroy())
           <div class="join gap-2">
             <button
               class="btn join-item btn-sm"
-              :disabled="loading.loading === 'toggle'"
-              @click="toggleEntry"
+              :disabled="loading === 'toggle'"
+              @click="runAction('toggle')"
             >
-              <span
-                v-if="loading.loading === 'toggle'"
-                class="loading loading-xs loading-spinner"
-              ></span>
-              {{ flight.isActive ? '停止追蹤' : '開啟追蹤' }}
+              <span v-if="loading === 'toggle'" class="loading loading-xs loading-spinner"></span>
+              {{ itinerary.isActive ? '停止追蹤' : '開啟追蹤' }}
             </button>
 
             <button
               class="btn join-item btn-sm btn-primary"
-              :disabled="loading.loading === 'scrape'"
-              @click="scrapeEntry"
+              :disabled="loading === 'scrape'"
+              @click="runAction('scrape')"
             >
-              <span
-                v-if="loading.loading === 'scrape'"
-                class="loading loading-xs loading-spinner"
-              ></span>
-              {{ loading.loading === 'scrape' ? '擷取中...' : '擷取最新價格' }}
+              <span v-if="loading === 'scrape'" class="loading loading-xs loading-spinner"></span>
+              {{ loading === 'scrape' ? '擷取中...' : '擷取最新價格' }}
             </button>
 
             <button
               class="btn join-item btn-soft btn-sm btn-error"
-              :disabled="loading.loading === 'delete'"
-              @click="deleteEntry"
+              :disabled="loading === 'delete'"
+              @click="runAction('delete')"
             >
-              <span
-                v-if="loading.loading === 'delete'"
-                class="loading loading-xs loading-spinner"
-              ></span>
+              <span v-if="loading === 'delete'" class="loading loading-xs loading-spinner"></span>
               刪除
             </button>
           </div>
@@ -247,348 +115,216 @@ onUnmounted(() => chart?.destroy())
     </div>
 
     <div
-      class="tracker-panel mb-8 rounded-lg border px-6 py-6"
+      class="tracker-panel mb-8 overflow-hidden rounded-xl border transition-all"
       :class="{
-        'bg-success/10':
-          detailPanel === 'analysis' && flight.rule37Analysis?.phase === 'BUY_SIGNAL',
-        'bg-info/10': detailPanel === 'analysis' && flight.rule37Analysis?.phase === 'WAITING',
-        'bg-neutral/10': detailPanel === 'analysis' && flight.rule37Analysis?.phase === 'OBSERVING',
+        'border-success/30 bg-success/5': itinerary.rule37Analysis?.phase === 'BUY_SIGNAL',
+        'border-info/30 bg-info/5': itinerary.rule37Analysis?.phase === 'WAITING',
+        'border-base-300 bg-base-200/30': itinerary.rule37Analysis?.phase === 'OBSERVING',
+        'border-base-200 bg-base-100': !itinerary.rule37Analysis?.phase,
       }"
     >
-      <div class="join mb-5">
-        <button
-          class="btn join-item btn-xs"
-          :class="detailPanel === 'analysis' ? 'btn-neutral' : 'opacity-50 btn-ghost'"
-          @click="detailPanel = 'analysis'"
-        >
-          購買時機分析
-        </button>
+      <div class="flex flex-col lg:flex-row lg:items-stretch">
+        <div class="flex flex-1 flex-col justify-center p-5 sm:p-6">
+          <template v-if="itinerary.deadline && itinerary.rule37Analysis?.phase">
+            <div class="flex items-center gap-3">
+              <span
+                class="status status-lg shadow-sm"
+                :class="{
+                  'animate-pulse status-success': itinerary.rule37Analysis.phase === 'BUY_SIGNAL',
+                  'status-neutral': itinerary.rule37Analysis.phase === 'OBSERVING',
+                  'status-info': itinerary.rule37Analysis.phase === 'WAITING',
+                }"
+              ></span>
 
-        <button
-          class="btn join-item btn-xs"
-          :class="detailPanel === 'summary' ? 'btn-neutral' : 'opacity-50 btn-ghost'"
-          @click="detailPanel = 'summary'"
-        >
-          價格摘要
-        </button>
-      </div>
+              <span
+                class="text-xl font-extrabold tracking-tight"
+                :class="{
+                  'text-success': itinerary.rule37Analysis.phase === 'BUY_SIGNAL',
+                  'text-neutral': itinerary.rule37Analysis.phase === 'OBSERVING',
+                  'text-info': itinerary.rule37Analysis.phase === 'WAITING',
+                }"
+              >
+                {{
+                  itinerary.rule37Analysis.phase === 'BUY_SIGNAL'
+                    ? '購買信號 (最佳時機)'
+                    : itinerary.rule37Analysis.phase === 'OBSERVING'
+                      ? '觀察期'
+                      : '等待中'
+                }}
+              </span>
 
-      <div class="grid">
-        <!-- Analysis panel -->
-        <div
-          class="col-start-1 row-start-1 transition-opacity duration-150"
-          :class="detailPanel !== 'analysis' ? 'pointer-events-none invisible' : ''"
-        >
-          <div
-            v-if="flight.rule37Analysis && flight.rule37Analysis.latestVal !== null"
-            class="space-y-4"
-          >
-            <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div class="flex items-center gap-3">
-                <template v-if="flight.rule37Analysis.phase === 'BUY_SIGNAL'">
-                  <span class="status status-lg status-success"></span>
-
-                  <span class="text-lg font-bold text-success">購買信號 (最佳時機)</span>
-                </template>
-
-                <template v-else-if="flight.rule37Analysis.phase === 'OBSERVING'">
-                  <span class="status status-lg status-neutral"></span>
-
-                  <span class="text-lg font-bold text-neutral">觀察期</span>
-
-                  <span class="badge px-2 py-1 text-xs font-medium badge-warning">
-                    {{
-                      Math.ceil(
-                        (new Date(flight.rule37Analysis.cutoffDate).getTime() -
-                          new Date(today).getTime()) /
-                          86400000,
-                      )
-                    }}
-                    天後結束
-                  </span>
-                </template>
-
-                <template v-else>
-                  <span class="status status-lg status-info"></span>
-
-                  <span class="text-lg font-bold text-info">等待中</span>
-                </template>
-              </div>
-
-              <div class="space-y-1 text-xs text-base-content/70">
-                <p>
-                  <span class="font-medium">決策期開始：</span>
-                  {{ fmtDate(flight.rule37Analysis.cutoffDate) }}
-                </p>
-
-                <p>
-                  <span class="font-medium">門檻：</span>
-                  {{ fmtFare(flight.rule37Analysis.historyBestVal) }}
-                </p>
-              </div>
+              <span
+                v-if="itinerary.rule37Analysis.phase === 'OBSERVING'"
+                class="badge badge-outline px-2 badge-sm font-semibold"
+              >
+                {{
+                  Math.ceil(
+                    (new Date(itinerary.rule37Analysis.cutoffDate).getTime() - Date.now()) /
+                      86400000,
+                  )
+                }}
+                天後結束
+              </span>
             </div>
 
-            <div class="grid grid-cols-2 gap-3">
-              <div class="rounded-lg bg-base-100/60 px-4 py-3">
-                <p class="text-xs font-bold tracking-widest uppercase opacity-55">最新票價</p>
+            <p class="mt-2 text-xs font-medium text-base-content/60">
+              <span v-if="itinerary.rule37Analysis.phase === 'BUY_SIGNAL'">
+                價格低於門檻，為購入的最佳時機。
+              </span>
 
-                <p class="mt-1 text-base font-bold">
-                  {{ fmtFare(flight.rule37Analysis.latestVal) }}
-                </p>
-              </div>
+              <span v-else-if="itinerary.rule37Analysis.phase === 'OBSERVING'">
+                收集基準數據中。決策期將於
+                <span class="font-bold">{{ fmtDate(itinerary.rule37Analysis.cutoffDate) }}</span>
+                開始。
+              </span>
 
-              <div class="rounded-lg bg-base-100/60 px-4 py-3">
-                <p class="text-xs font-bold tracking-widest uppercase opacity-55">歷史最低</p>
+              <span v-else>已進入決策期。若價格低於觸發門檻，系統將提示購買。</span>
+            </p>
+          </template>
 
-                <p class="mt-1 text-base font-bold text-success">
-                  {{ fmtFare(flight.rule37Analysis.allTimeLow) }}
-                </p>
-              </div>
+          <template v-else-if="itinerary.deadline">
+            <div class="flex items-center gap-3">
+              <span class="status status-lg status-warning shadow-sm"></span>
+
+              <span class="text-xl font-extrabold tracking-tight text-warning">收集數據中</span>
             </div>
-          </div>
 
-          <div v-else-if="flight.rule37Analysis" class="py-4 text-center">
-            <p class="text-sm font-medium text-base-content/60">
-              數據不足，尚無法分析最佳購買時機。
+            <p class="mt-2 text-sm font-medium text-base-content/60">
+              尚無足夠的歷史數據以進行購買時機分析。
             </p>
-          </div>
+          </template>
 
-          <div v-else class="py-4 text-center">
-            <p class="text-sm font-medium text-base-content/60">
-              未設定購票限期，無法分析購買時機。
+          <template v-else>
+            <div class="flex items-center gap-3">
+              <span class="status status-lg status-neutral opacity-40"></span>
+
+              <span class="text-xl font-extrabold tracking-tight text-base-content/40">
+                無購票限期
+              </span>
+            </div>
+
+            <p class="mt-2 text-sm font-medium text-base-content/40">
+              設定限期以啟用購買時機分析。
             </p>
-          </div>
+          </template>
         </div>
 
-        <!-- Summary panel -->
         <div
-          class="col-start-1 row-start-1 transition-opacity duration-150"
-          :class="detailPanel !== 'summary' ? 'pointer-events-none invisible' : ''"
+          class="grid shrink-0 grid-cols-2 gap-px bg-base-300/60 sm:grid-cols-4 lg:w-120 xl:w-140"
         >
-          <div class="stats w-full stats-vertical rounded-lg bg-base-200/60 lg:stats-horizontal">
-            <div class="stat px-5 py-4">
-              <div class="stat-title text-base-content/55">最新票價</div>
-
-              <div class="stat-value text-2xl text-primary">{{ fmtFare(flightStats.latest) }}</div>
+          <div
+            class="col-span-2 flex flex-col justify-center bg-base-100 p-4 transition-colors sm:p-5"
+          >
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-bold tracking-widest text-base-content/50 uppercase">
+                最新總價
+              </span>
             </div>
 
-            <div class="stat px-5 py-4">
-              <div class="stat-title text-base-content/55">歷史最低</div>
-
-              <div class="stat-value text-2xl text-success">{{ fmtFare(flightStats.lowest) }}</div>
+            <div class="mt-1 flex items-baseline gap-2">
+              <span class="text-3xl font-black text-primary lg:text-4xl">
+                {{ fmtFare(itinerary.statistics?.latestVal ?? null, baseCurrency) }}
+              </span>
             </div>
 
-            <div class="stat px-5 py-4">
-              <div class="stat-title text-base-content/55">歷史最高</div>
+            <div class="mt-1.5 text-xs font-medium text-base-content/40">
+              <template v-if="itinerary.rule37Analysis?.historyBestVal">
+                門檻：{{ fmtFare(itinerary.rule37Analysis.historyBestVal, baseCurrency) }}
+              </template>
 
-              <div class="stat-value text-2xl text-error">{{ fmtFare(flightStats.highest) }}</div>
+              <template v-else-if="itinerary.deadline">觀察中...</template>
             </div>
+          </div>
+
+          <div class="flex flex-col justify-center bg-base-100 p-4 transition-colors sm:p-5">
+            <span class="text-[10px] font-bold tracking-widest text-base-content/50 uppercase">
+              歷史最低
+            </span>
+
+            <span class="mt-1 text-xl font-black text-success lg:text-2xl">
+              {{ fmtFare(itinerary.statistics?.allTimeLow ?? null, baseCurrency) }}
+            </span>
+          </div>
+
+          <div class="flex flex-col justify-center bg-base-100 p-4 transition-colors sm:p-5">
+            <span class="text-[10px] font-bold tracking-widest text-base-content/50 uppercase">
+              歷史最高
+            </span>
+
+            <span class="mt-1 text-xl font-black text-error lg:text-2xl">
+              {{ fmtFare(itinerary.statistics?.allTimeHigh ?? null, baseCurrency) }}
+            </span>
           </div>
         </div>
       </div>
     </div>
 
     <div class="tracker-panel card rounded-lg">
-      <div class="card-body p-4 md:p-6">
-        <div class="tabs-box tabs bg-base-200/70 p-1">
+      <div class="card-body gap-6 p-4 md:p-6">
+        <div class="tabs-box tabs flex-nowrap overflow-x-auto bg-base-200/70 p-1 whitespace-nowrap">
           <button
-            class="tab h-12 flex-1 text-sm font-bold"
-            :class="activeTab === 'table' ? 'tab-active' : ''"
-            @click="switchTab('table')"
+            v-if="itinerary.tripType === 'SINGLE'"
+            class="tab h-12 shrink-0 px-6 text-sm font-bold"
+            :class="activeTab === '0' ? 'tab-active' : ''"
+            @click="activeTab = '0'"
           >
             詳細數據列表
           </button>
 
+          <template v-else>
+            <button
+              v-for="(f, i) in itinerary.flights"
+              :key="f.id"
+              class="tab h-12 shrink-0 px-6 text-sm font-bold"
+              :class="activeTab === String(i) ? 'tab-active' : ''"
+              @click="activeTab = String(i)"
+            >
+              {{ f.origin }} → {{ f.destination }}
+            </button>
+          </template>
+
           <button
-            class="tab h-12 flex-1 text-sm font-bold"
+            class="tab h-12 shrink-0 px-6 text-sm font-bold"
             :class="activeTab === 'graph' ? 'tab-active' : ''"
-            @click="switchTab('graph')"
+            @click="activeTab = 'graph'"
           >
             價格趨勢圖表
           </button>
         </div>
 
-        <div v-show="activeTab === 'table'" class="pt-5">
-          <template v-if="dailyGroups.length">
-            <div
-              v-for="(group, index) in dailyGroups"
-              :key="group.date"
-              class="collapse-plus collapse mb-3 border border-base-300/70 bg-base-100 last:mb-0"
-              :class="expandedGroups.has(index) ? 'collapse-open' : 'collapse-close'"
-            >
-              <button
-                class="collapse-title flex w-full items-center justify-between pr-14 pl-5 text-left transition-colors hover:bg-base-200/40"
-                :class="{
-                  'bg-success/10': group.lowestSnapshot?.fare === flightStats.lowest,
-                  'bg-primary/10':
-                    flight.rule37Analysis?.phase &&
-                    group.date >= flight.rule37Analysis.cutoffDate &&
-                    group.lowestSnapshot?.fare === flight.rule37Analysis.historyBestVal,
-                }"
-                @click="
-                  expandedGroups.has(index)
-                    ? expandedGroups.delete(index)
-                    : expandedGroups.add(index)
-                "
-              >
-                <div class="flex flex-1 items-center gap-4">
-                  <div>
-                    <p class="leading-tight font-bold text-base-content">
-                      {{ fmtDate(group.date) }}
-                      <span class="ml-1 text-xs font-medium text-base-content/55">
-                        （{{
-                          ['日', '一', '二', '三', '四', '五', '六'][new Date(group.date).getDay()]
-                        }}）
-                      </span>
-                    </p>
-
-                    <p class="text-xs font-medium text-base-content/60">
-                      <template v-if="group.lowestSnapshot">
-                        當日最低：<span class="font-bold text-base-content">{{
-                          fmtFare(group.lowestFare)
-                        }}</span>
-
-                        <template v-if="group.lowestSnapshot.flightNumber">
-                          · {{ group.lowestSnapshot.flightNumber }}
-                        </template>
-                      </template>
-
-                      <span v-else class="text-error">無有效價格數據</span>
-                    </p>
-                  </div>
-                </div>
-
-                <div
-                  class="badge shrink-0 badge-outline px-3 py-3 text-xs font-semibold badge-primary"
-                >
-                  {{ group.snapshots.length }} 筆紀錄
-                </div>
-              </button>
-
-              <div
-                v-if="
-                  flight.rule37Analysis?.phase && group.date === flight.rule37Analysis.cutoffDate
-                "
-                class="border-y border-warning/20 bg-warning/15 px-5 py-1.5 text-center"
-              >
-                <p class="text-[11px] font-bold tracking-widest text-warning-content">
-                  ▴ 購買時機分析 · 決策期 ▴
-                </p>
-              </div>
-
-              <div
-                v-show="expandedGroups.has(index)"
-                class="collapse-content border-t border-base-300/70 bg-base-200/40 px-5 py-4"
-              >
-                <div
-                  class="overflow-x-auto rounded-[1.25rem] border border-base-300/70 bg-base-100"
-                >
-                  <table class="table table-zebra text-sm">
-                    <thead>
-                      <tr>
-                        <th class="text-xs font-bold tracking-wider text-base-content/55 uppercase">
-                          航班編號
-                        </th>
-
-                        <th class="text-xs font-bold tracking-wider text-base-content/55 uppercase">
-                          起飛時間
-                        </th>
-
-                        <th class="text-xs font-bold tracking-wider text-base-content/55 uppercase">
-                          降落時間
-                        </th>
-
-                        <th
-                          class="text-right text-xs font-bold tracking-wider text-base-content/55 uppercase"
-                        >
-                          票價
-                        </th>
-                      </tr>
-                    </thead>
-
-                    <tbody>
-                      <tr
-                        v-for="snap in group.snapshots.toSorted(
-                          (a, b) => a.flightNumber?.localeCompare(b.flightNumber ?? '') ?? 0,
-                        )"
-                        :key="snap.id"
-                        :class="{ 'bg-error/10': snap.scrapeStatus === 'error' }"
-                      >
-                        <td class="font-semibold text-base-content">
-                          {{ snap.flightNumber ?? '—' }}
-                        </td>
-
-                        <td class="text-base-content/70">
-                          {{ fmtTime(snap.departureAt) }}
-                          <span class="text-[10px] text-base-content/40">{{
-                            fmtTz(snap.departureAt)
-                          }}</span>
-                        </td>
-
-                        <td class="text-base-content/70">
-                          {{ fmtTime(snap.arrivalAt) }}
-                          <span class="text-[10px] text-base-content/40">{{
-                            fmtTz(snap.arrivalAt)
-                          }}</span>
-                        </td>
-
-                        <td class="text-right font-bold text-base-content">
-                          <template v-if="snap.scrapeStatus === 'success' && snap.fare !== null">
-                            <div class="flex items-center justify-end gap-2">
-                              <div class="flex gap-1">
-                                <span
-                                  v-if="snap.fare === flightStats.lowest"
-                                  class="badge badge-soft badge-xs badge-success"
-                                >
-                                  歷史低位
-                                </span>
-
-                                <span
-                                  v-if="
-                                    flight.rule37Analysis?.phase &&
-                                    snap.fare === flight.rule37Analysis.historyBestVal &&
-                                    (snap.departureAt?.slice(0, 10) ?? '') >=
-                                      flight.rule37Analysis.cutoffDate
-                                  "
-                                  class="badge badge-soft badge-xs badge-primary"
-                                >
-                                  最佳選擇
-                                </span>
-                              </div>
-
-                              <span>{{ fmtFare(snap.fare) }}</span>
-                            </div>
-                          </template>
-
-                          <span v-else class="text-xs text-error">擷取失敗</span>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+        <div class="grid overflow-hidden">
+          <Transition
+            v-for="(f, i) in itinerary.flights"
+            :key="f.id"
+            enter-active-class="transition-all duration-300 ease-out"
+            enter-from-class="opacity-0 -translate-x-8"
+            enter-to-class="opacity-100 translate-x-0"
+            leave-active-class="transition-all duration-200 ease-in"
+            leave-from-class="opacity-100 translate-x-0"
+            leave-to-class="opacity-0 -translate-x-8"
+          >
+            <div v-show="activeTab === String(i)" class="col-start-1 row-start-1">
+              <FaretList
+                :flight="f"
+                :rule37-analysis="itinerary.rule37Analysis"
+                :display-currency="baseCurrency"
+              />
             </div>
-          </template>
+          </Transition>
 
-          <div v-else class="hero py-16 text-center">
-            <div class="hero-content">
-              <p class="font-medium text-base-content/50">暫無價格數據。</p>
+          <Transition
+            enter-active-class="transition-all duration-300 ease-out"
+            enter-from-class="opacity-0 translate-x-8"
+            enter-to-class="opacity-100 translate-x-0"
+            leave-active-class="transition-all duration-200 ease-in"
+            leave-from-class="opacity-100 translate-x-0"
+            leave-to-class="opacity-0 translate-x-8"
+          >
+            <!-- add min-w-0 combat grid's default (min-w-auto) for Chart.js to resize correctly -->
+            <div v-show="activeTab === 'graph'" class="col-start-1 row-start-1 min-w-0">
+              <FareGraph :itinerary="itinerary" />
             </div>
-          </div>
-        </div>
-
-        <div v-show="activeTab === 'graph'" class="pt-5">
-          <template v-if="dailyGroups.length">
-            <div class="rounded-3xl bg-base-100 p-4 md:p-6">
-              <canvas ref="chartCanvas" height="100"></canvas>
-            </div>
-          </template>
-
-          <div v-else class="hero py-16 text-center">
-            <div class="hero-content">
-              <p class="font-medium text-base-content/50">暫無趨勢數據。</p>
-            </div>
-          </div>
+          </Transition>
         </div>
       </div>
     </div>

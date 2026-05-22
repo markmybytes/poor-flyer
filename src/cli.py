@@ -1,3 +1,4 @@
+import logging
 import subprocess
 import sys
 import threading
@@ -9,12 +10,16 @@ from flask.cli import with_appcontext
 
 from src.extensions.scheduler import start_scheduler, stop_scheduler
 
+logger = logging.getLogger(__name__)
+
 
 def _terminate_process(proc: subprocess.Popen, label: str) -> None:
     try:
         proc.wait(timeout=3)
+        logger.debug('Process terminated gracefully: label=%s', label)
     except subprocess.TimeoutExpired:
         click.echo(click.style(f'Force stopping {label}...', fg='yellow'))
+        logger.warning('Force terminating process: label=%s', label)
         proc.terminate()
         proc.wait(timeout=5)
 
@@ -34,6 +39,7 @@ def _stream_prefixed_output(proc: subprocess.Popen, label: str, color: str | Non
 def dev():
     """Run Vite dev server, Flask dev server, and scheduler simultaneously."""
     click.echo(click.style('Starting development environment...', fg='cyan'))
+    logger.info('Development environment startup initiated')
 
     hot_file = Path(current_app.config['VITE_HOT_FILE'])
     hot_file.unlink(missing_ok=True)
@@ -76,8 +82,10 @@ def dev():
             raise subprocess.CalledProcessError(server_exit_code, processes['server'].args)
     except KeyboardInterrupt:
         click.echo(click.style('\nShutting down development services...', fg='yellow'))
+        logger.info('Development environment shutdown: triggered_by=user_interrupt')
     except subprocess.CalledProcessError as exc:
         click.echo(click.style(f'Error starting Flask dev server: {exc}', fg='red'))
+        logger.exception('Flask dev server exited with error')
     finally:
         for label, process in processes.items():
             if process.poll() is None:
@@ -88,6 +96,7 @@ def dev():
             thread.join(timeout=1)
 
         hot_file.unlink(missing_ok=True)
+        logger.info('Development environment shutdown completed')
         sys.exit(0)
 
 

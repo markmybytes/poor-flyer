@@ -1,7 +1,44 @@
-import type { FareSnapshot } from '@/types'
+import type { Itinerary } from '@/types'
 
-export function fmtFare(fare: number | null) {
-  return fare !== null ? `$${Math.round(fare)}` : '—'
+const CURRENCY_SIGNS: Record<string, string> = {
+  HKD: '$',
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+  JPY: '¥',
+  AUD: '$',
+  CAD: '$',
+  SGD: '$',
+  CNY: '¥',
+  KRW: '₩',
+  TWD: '$',
+  NZD: '$',
+  CHF: 'Fr.',
+  THB: '฿',
+  MYR: 'RM',
+  IDR: 'Rp',
+  PHP: '₱',
+  INR: '₹',
+  AED: 'د.إ',
+  SAR: '﷼',
+  ZAR: 'R',
+  MXN: '$',
+  BRL: 'R$',
+  TRY: '₺',
+}
+
+export function getCurrencySign(code: string): string {
+  return !code ? '$' : CURRENCY_SIGNS[code.toUpperCase()] || '$'
+}
+export function fmtFare(amount: number | null, currencyCode: string | null = null) {
+  if (amount === null || amount === undefined) {
+    return '—'
+  }
+
+  const formatted = new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: 0,
+  }).format(amount)
+  return `${getCurrencySign(currencyCode)}${formatted}`
 }
 
 export function fmtDate(iso: string | null) {
@@ -22,14 +59,14 @@ export function fmtTz(iso: string | null) {
   return iso ? (iso.match(/([+-]\d{2}:\d{2}|Z)$/) || [''])[0] : ''
 }
 
-export function getFlightStats(snapshots: FareSnapshot[]) {
-  const validFares = (snapshots || [])
-    .filter((s) => s.scrapeStatus === 'success' && s.fare != null)
-    .map((s) => s.fare as number)
-
-  return {
-    latest: validFares.length ? validFares[validFares.length - 1] : null,
-    lowest: validFares.length ? Math.min(...validFares) : null,
-    highest: validFares.length ? Math.max(...validFares) : null,
+export function fmtItineraryName(itinerary: Itinerary) {
+  if (!itinerary.flights || itinerary.flights.length === 0) {
+    return ''
   }
+  if (itinerary.tripType === 'SINGLE') {
+    return `${itinerary.flights[0].origin} → ${itinerary.flights[0].destination}`
+  } else if (itinerary.tripType === 'ROUND_TRIP') {
+    return `${itinerary.flights[0].origin} ⇄ ${itinerary.flights[0].destination}`
+  }
+  return itinerary.flights.map((f) => `${f.origin} → ${f.destination}`).join(' | ')
 }
