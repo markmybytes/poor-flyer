@@ -6,6 +6,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import selectinload
 
 from src.extensions.database import FareSnapshot, Flight, Itinerary, db
+from src.services.fx_rates import FXRatesError, convert_amount, get_configured_base_currency
 from src.services.scraper import FlightQuery, scrape_prices
 
 flights_bp = Blueprint('flights', __name__, url_prefix='/flights')
@@ -52,16 +53,51 @@ def create_flight():
 @flights_bp.route('/<flight_id>', methods=['GET'])
 def get_flight(flight_id):
     try:
+        base_currency = get_configured_base_currency()
         entry = db.session.execute(
             select(Itinerary)
-            .options(selectinload(Itinerary.flights))
+            .options(selectinload(Itinerary.flights).selectinload(Flight.fare_snapshots))
             .where(Itinerary.id == flight_id)
         ).scalar_one_or_none()
 
         if not entry:
             return jsonify({'success': False, 'message': 'Entry not found'}), 404
 
-        return jsonify({'success': True, 'message': 'Entry retrieved', 'data': entry.id})
+        latest_success: FareSnapshot | None = None
+        for flight in entry.flights:
+            for snapshot in flight.fare_snapshots:
+                if snapshot.scrape_status != 'success' or snapshot.fare is None:
+                    continue
+                if latest_success is None or snapshot.created_at > latest_success.created_at:
+                    latest_success = snapshot
+
+        converted_preview = None
+        if latest_success is not None:
+            src_currency = (latest_success.currency or base_currency).strip().upper()
+            converted_value = float(latest_success.fare)
+            try:
+                converted_value = convert_amount(converted_value, src_currency, base_currency)
+            except FXRatesError:
+                pass
+
+            converted_preview = {
+                'amount': converted_value,
+                'currency': base_currency,
+                'source_currency': src_currency,
+                'created_at': latest_success.created_at,
+            }
+
+        return jsonify(
+            {
+                'success': True,
+                'message': 'Entry retrieved',
+                'data': {
+                    'id': entry.id,
+                    'base_currency': base_currency,
+                    'latest_converted_fare': converted_preview,
+                },
+            }
+        )
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
 

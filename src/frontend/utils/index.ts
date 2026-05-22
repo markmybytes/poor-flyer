@@ -1,19 +1,44 @@
 import type { Itinerary } from '@/types'
 
-export function fmtFare(amount: number | null, currencyCode: string = null) {
+const CURRENCY_SIGNS: Record<string, string> = {
+  HKD: '$',
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+  JPY: '¥',
+  AUD: '$',
+  CAD: '$',
+  SGD: '$',
+  CNY: '¥',
+  KRW: '₩',
+  TWD: '$',
+  NZD: '$',
+  CHF: 'Fr.',
+  THB: '฿',
+  MYR: 'RM',
+  IDR: 'Rp',
+  PHP: '₱',
+  INR: '₹',
+  AED: 'د.إ',
+  SAR: '﷼',
+  ZAR: 'R',
+  MXN: '$',
+  BRL: 'R$',
+  TRY: '₺',
+}
+
+export function getCurrencySign(code: string): string {
+  return !code ? '$' : CURRENCY_SIGNS[code.toUpperCase()] || '$'
+}
+export function fmtFare(amount: number | null, currencyCode: string | null = null) {
   if (amount === null || amount === undefined) {
     return '—'
   }
 
-  if (currencyCode === null) {
-    return `$${amount.toString()}`
-  }
-
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currencyCode,
+  const formatted = new Intl.NumberFormat('en-US', {
     maximumFractionDigits: 0,
   }).format(amount)
+  return `${getCurrencySign(currencyCode)}${formatted}`
 }
 
 export function fmtDate(iso: string | null) {

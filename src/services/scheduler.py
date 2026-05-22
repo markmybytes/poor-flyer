@@ -7,6 +7,7 @@ from flask import render_template
 
 from src.extensions.database import FareSnapshot, Itinerary, db
 from src.services import config
+from src.services.fx_rates import FXRatesError, convert_amount, get_configured_base_currency
 from src.services.scraper import FlightQuery, scrape_prices
 from src.utils.email import get_smtp_config, send_html_email
 from src.utils.rule37 import Phase, compute_37_best
@@ -48,6 +49,7 @@ def daily_scrape_job():
             db.session.commit()
 
             smtp_cfg = get_smtp_config()
+            base_currency = get_configured_base_currency()
             recipients = [
                 r.strip() for r in config.get_str('email', 'recipients', '').split(',') if r.strip()
             ]
@@ -81,6 +83,19 @@ def daily_scrape_job():
                 if not snap or not recipients:
                     continue
 
+                src_currency = (snap.currency or base_currency).upper()
+                current_fare = float(snap.fare)
+                lowest_fare = float(r37.history_best_val or snap.fare)
+                try:
+                    current_fare = convert_amount(current_fare, src_currency, base_currency)
+                    lowest_fare = convert_amount(lowest_fare, src_currency, base_currency)
+                except FXRatesError as exc:
+                    logger.warning(
+                        'Unable to convert scheduler email fares for %s: %s',
+                        flight.id,
+                        exc,
+                    )
+
                 flight_date_str = flight.flight_date.strftime('%Y-%m-%d')
                 subj = f'✈️ 購買信號 | {flight.origin} → {flight.destination} ({flight_date_str})'
                 body = render_template(
@@ -88,8 +103,9 @@ def daily_scrape_job():
                     flight_origin=flight.origin,
                     flight_destination=flight.destination,
                     flight_date=flight_date_str,
-                    current_fare=float(snap.fare),
-                    lowest_fare=float(r37.history_best_val or snap.fare),
+                    current_fare=current_fare,
+                    lowest_fare=lowest_fare,
+                    display_currency=base_currency,
                 )
 
                 for email in recipients:

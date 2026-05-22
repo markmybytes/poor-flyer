@@ -1,6 +1,12 @@
 from flask import Blueprint, jsonify, render_template, request
 
 from src.services import config
+from src.services.fx_rates import (
+    SUPPORTED_CURRENCIES,
+    FXRatesError,
+    get_configured_base_currency,
+    get_rates,
+)
 from src.utils.email import get_smtp_config, send_html_email
 
 settings_bp = Blueprint('settings', __name__, url_prefix='/settings')
@@ -9,10 +15,19 @@ settings_bp = Blueprint('settings', __name__, url_prefix='/settings')
 @settings_bp.route('', methods=['GET'])
 def get_settings():
     try:
+        currency = config.get_all_masked('currency')
+        currency['base_currency'] = currency.get('base_currency') or 'HKD'
+        currency['cache_ttl'] = currency.get('cache_ttl') or '86400'
+        currency['fxrates_api_key'] = currency.get('fxrates_api_key') or ''
+
         return jsonify(
             {
                 'success': True,
-                'data': {ns: config.get_all_masked(ns) for ns in ['smtp', 'email']},
+                'data': {
+                    'smtp': config.get_all_masked('smtp'),
+                    'email': config.get_all_masked('email'),
+                    'currency': currency,
+                },
             }
         )
     except Exception as e:
@@ -48,7 +63,109 @@ def update_settings():
         if email := data.get('email', {}):
             config.set_many('email', {'recipients': email.get('recipients', '')})
 
+        if currency := data.get('currency', {}):
+            base_currency = (currency.get('base_currency') or 'HKD').strip().upper()
+            if base_currency not in SUPPORTED_CURRENCIES:
+                return jsonify({'success': False, 'message': 'Unsupported base currency'}), 400
+
+            cache_ttl_raw = currency.get('cache_ttl', 86400)
+            try:
+                cache_ttl = int(cache_ttl_raw)
+            except (TypeError, ValueError):
+                return jsonify({'success': False, 'message': 'Cache TTL must be an integer'}), 400
+
+            if cache_ttl <= 0:
+                return jsonify(
+                    {'success': False, 'message': 'Cache TTL must be greater than 0'}
+                ), 400
+
+            config.set_many(
+                'currency',
+                {
+                    'base_currency': base_currency,
+                    'cache_ttl': str(cache_ttl),
+                    'fxrates_api_key': (currency.get('fxrates_api_key') or '').strip(),
+                },
+            )
+
         return jsonify({'success': True, 'message': 'Settings updated successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+
+@settings_bp.route('', methods=['PATCH'])
+def patch_settings():
+    try:
+        data = request.get_json(silent=True) or {}
+
+        if 'smtp' in data and (smtp := data['smtp'] or {}):
+            try:
+                port = int(smtp.get('port', 587))
+            except (TypeError, ValueError):
+                return jsonify({'success': False, 'message': 'SMTP port must be an integer'}), 400
+            cfg = {k: smtp.get(k, '') for k in ['host', 'user', 'sender_email', 'protocol']}
+            cfg.update(
+                {
+                    'port': str(port),
+                    'require_auth': 'true' if smtp.get('require_auth', True) else 'false',
+                }
+            )
+            if smtp.get('password'):
+                cfg['password'] = smtp['password']
+            config.set_many('smtp', cfg)
+
+        if 'email' in data and (email := data['email'] or {}):
+            config.set_many('email', {'recipients': email.get('recipients', '')})
+
+        if 'currency' in data and (currency := data['currency'] or {}):
+            base = (currency.get('base_currency') or 'HKD').strip().upper()
+            if base not in SUPPORTED_CURRENCIES:
+                return jsonify({'success': False, 'message': 'Unsupported base currency'}), 400
+            try:
+                ttl = int(currency.get('cache_ttl', 86400))
+            except (TypeError, ValueError):
+                return jsonify({'success': False, 'message': 'Cache TTL must be an integer'}), 400
+
+            if ttl <= 0:
+                return jsonify(
+                    {'success': False, 'message': 'Cache TTL must be greater than 0'}
+                ), 400
+            config.set_many(
+                'currency',
+                {
+                    'base_currency': base,
+                    'cache_ttl': str(ttl),
+                    'fxrates_api_key': (currency.get('fxrates_api_key') or '').strip(),
+                },
+            )
+
+        return jsonify({'success': True, 'message': 'Settings updated successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+
+@settings_bp.route('/fx-rates/refresh', methods=['POST'])
+def refresh_fx_rates():
+    try:
+        payload = request.get_json(silent=True) or {}
+        base_currency = (
+            (payload.get('base_currency') or get_configured_base_currency()).strip().upper()
+        )
+        rates = get_rates(base_currency, force_refresh=True)
+        return jsonify(
+            {
+                'success': True,
+                'message': 'Latest FX rates fetched successfully',
+                'data': {
+                    'base_currency': rates.get('base', base_currency),
+                    'last_updated': rates.get('last_updated'),
+                    'source': rates.get('source'),
+                    'rates': rates.get('rates', {}),
+                },
+            }
+        )
+    except FXRatesError as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
 

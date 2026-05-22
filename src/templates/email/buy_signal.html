@@ -42,20 +42,20 @@
           <tr style="border-top: 1px solid #e5e7eb">
             <td style="padding: 8px 0; font-weight: bold; color: #6b7280">當前票價：</td>
             <td style="padding: 8px 0; font-size: 18px; font-weight: bold; color: #ef4444">
-              HK${{ current_fare|round(2) }}
+              {{ '%.2f'|format(current_fare) }} {{ display_currency }}
             </td>
           </tr>
           <tr>
             <td style="padding: 8px 0; font-weight: bold; color: #6b7280">歷史最低：</td>
             <td style="padding: 8px 0; font-size: 18px; font-weight: bold; color: #22c55e">
-              HK${{ lowest_fare|round(2) }}
+              {{ '%.2f'|format(lowest_fare) }} {{ display_currency }}
             </td>
           </tr>
           <tr>
             <td style="padding: 8px 0; font-weight: bold; color: #6b7280">可節省：</td>
             <td style="padding: 8px 0; font-size: 16px; font-weight: bold; color: #22c55e">
-              HK${{ (current_fare - lowest_fare)|round(2) }} ({{ ((current_fare - lowest_fare) /
-              lowest_fare * 100)|round(1) }}%)
+              {{ '%.2f'|format(current_fare - lowest_fare) }} {{ display_currency }} ({{
+              ((current_fare - lowest_fare) / lowest_fare * 100)|round(1) }}%)
             </td>
           </tr>
         </table>

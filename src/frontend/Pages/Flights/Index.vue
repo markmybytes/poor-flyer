@@ -5,7 +5,7 @@ import { fmtDate, fmtFare, fmtItineraryName } from '@/utils'
 import { Link } from '@inertiajs/vue3'
 import { computed } from 'vue'
 
-const props = defineProps<{ itineraries: Itinerary[] }>()
+const props = defineProps<{ itineraries: Itinerary[]; baseCurrency: string }>()
 
 const summary = computed(() => {
   const its = props.itineraries || []
@@ -76,7 +76,7 @@ const summary = computed(() => {
           'border-success/40 hover:border-success/70':
             itinerary.isActive && itinerary.rule37Analysis?.phase === 'BUY_SIGNAL',
           'border-base-200': itinerary.isActive && itinerary.rule37Analysis?.phase !== 'BUY_SIGNAL',
-          'border-base-200 opacity-75 grayscale-[25%] hover:opacity-100 hover:grayscale-0':
+          'border-base-200 opacity-75 grayscale-25 hover:opacity-100 hover:grayscale-0':
             !itinerary.isActive,
         }"
       >
@@ -121,7 +121,7 @@ const summary = computed(() => {
                     : 'text-primary'
                 "
               >
-                {{ fmtFare(itinerary.statistics?.latestVal ?? null) }}
+                {{ fmtFare(itinerary.statistics?.latestVal ?? null, baseCurrency) }}
               </div>
             </div>
 
@@ -129,7 +129,7 @@ const summary = computed(() => {
               <div class="stat-title text-base-content/55">歷史最低</div>
 
               <div class="stat-value text-2xl text-success">
-                {{ fmtFare(itinerary.statistics?.allTimeLow ?? null) }}
+                {{ fmtFare(itinerary.statistics?.allTimeLow ?? null, baseCurrency) }}
               </div>
             </div>
 
@@ -137,7 +137,7 @@ const summary = computed(() => {
               <div class="stat-title text-base-content/55">歷史最高</div>
 
               <div class="stat-value text-2xl text-error">
-                {{ fmtFare(itinerary.statistics?.allTimeHigh ?? null) }}
+                {{ fmtFare(itinerary.statistics?.allTimeHigh ?? null, baseCurrency) }}
               </div>
             </div>
           </div>
@@ -175,7 +175,8 @@ const summary = computed(() => {
                     <span class="status status-lg status-info"></span>
 
                     <span class="text-sm font-bold text-info">
-                      等待中（門檻: {{ fmtFare(itinerary.rule37Analysis.historyBestVal ?? null) }}）
+                      等待中（門檻:
+                      {{ fmtFare(itinerary.rule37Analysis.historyBestVal ?? null, baseCurrency) }}）
                     </span>
                   </template>
                 </div>

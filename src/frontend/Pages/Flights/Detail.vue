@@ -8,7 +8,7 @@ import { router } from '@inertiajs/vue3'
 import { ref } from 'vue'
 import { useToast } from 'vue-toast-notification'
 
-const props = defineProps<{ itinerary: Itinerary }>()
+const props = defineProps<{ itinerary: Itinerary; baseCurrency: string }>()
 const toast = useToast()
 
 const activeTab = ref('0')
@@ -223,13 +223,13 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
 
             <div class="mt-1 flex items-baseline gap-2">
               <span class="text-3xl font-black text-primary lg:text-4xl">
-                {{ fmtFare(itinerary.statistics?.latestVal ?? null) }}
+                {{ fmtFare(itinerary.statistics?.latestVal ?? null, baseCurrency) }}
               </span>
             </div>
 
             <div class="mt-1.5 text-xs font-medium text-base-content/40">
               <template v-if="itinerary.rule37Analysis?.historyBestVal">
-                門檻：{{ fmtFare(itinerary.rule37Analysis.historyBestVal) }}
+                門檻：{{ fmtFare(itinerary.rule37Analysis.historyBestVal, baseCurrency) }}
               </template>
 
               <template v-else-if="itinerary.deadline">觀察中...</template>
@@ -242,7 +242,7 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
             </span>
 
             <span class="mt-1 text-xl font-black text-success lg:text-2xl">
-              {{ fmtFare(itinerary.statistics?.allTimeLow ?? null) }}
+              {{ fmtFare(itinerary.statistics?.allTimeLow ?? null, baseCurrency) }}
             </span>
           </div>
 
@@ -252,7 +252,7 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
             </span>
 
             <span class="mt-1 text-xl font-black text-error lg:text-2xl">
-              {{ fmtFare(itinerary.statistics?.allTimeHigh ?? null) }}
+              {{ fmtFare(itinerary.statistics?.allTimeHigh ?? null, baseCurrency) }}
             </span>
           </div>
         </div>
@@ -304,7 +304,11 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
             leave-to-class="opacity-0 -translate-x-8"
           >
             <div v-show="activeTab === String(i)" class="col-start-1 row-start-1">
-              <FaretList :flight="f" :rule37-analysis="itinerary.rule37Analysis" />
+              <FaretList
+                :flight="f"
+                :rule37-analysis="itinerary.rule37Analysis"
+                :display-currency="baseCurrency"
+              />
             </div>
           </Transition>
 

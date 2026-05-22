@@ -3,7 +3,11 @@ import type { Flight, Rule37Analysis } from '@/types'
 import { fmtDate, fmtFare, fmtTime, fmtTz } from '@/utils'
 import { computed, ref } from 'vue'
 
-const props = defineProps<{ flight: Flight; rule37Analysis?: Rule37Analysis | null }>()
+const props = defineProps<{
+  flight: Flight
+  rule37Analysis?: Rule37Analysis | null
+  displayCurrency?: string | null
+}>()
 
 const expandedGroups = ref(new Set<number>())
 
@@ -40,6 +44,7 @@ const dailySnapshots = computed(() => {
       return {
         date,
         lowestFare: low?.fare ?? null,
+        lowestCurrency: low?.currency ?? props.displayCurrency ?? null,
         lowestSnapshot: low ? { flightNumber: low.flightNumber, fare: low.fare } : null,
         snapshots: snaps!.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
       }
@@ -99,7 +104,7 @@ const dailySnapshots = computed(() => {
               <p class="text-xs font-medium text-base-content/60">
                 <template v-if="group.lowestSnapshot">
                   當日最低：<span class="font-bold text-base-content">{{
-                    fmtFare(group.lowestFare)
+                    fmtFare(group.lowestFare, group.lowestCurrency)
                   }}</span>
 
                   <template v-if="group.lowestSnapshot.flightNumber">
