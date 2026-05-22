@@ -20,13 +20,13 @@ class SMTPConfig(TypedDict):
 
 
 def get_smtp_config() -> SMTPConfig:
-    protocol = config.get_str('smtp', 'protocol') or 'STARTTLS'
+    protocol = config.get('smtp', 'protocol') or 'STARTTLS'
     return {
-        'host': config.get_str('smtp', 'host') or '',
+        'host': config.get('smtp', 'host') or '',
         'port': config.get_int('smtp', 'port') or 587,
-        'user': config.get_str('smtp', 'user') or '',
-        'password': config.get_str('smtp', 'password') or '',
-        'sender_email': config.get_str('smtp', 'sender_email') or '',
+        'user': config.get('smtp', 'user') or '',
+        'password': config.get('smtp', 'password') or '',
+        'sender_email': config.get('smtp', 'sender_email') or '',
         'require_auth': config.get_bool('smtp', 'require_auth', True),
         'protocol': protocol,
     }

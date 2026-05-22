@@ -9,7 +9,7 @@ from typing import Any
 import httpx
 from flask import current_app
 
-from src.services.config import get_int, get_str
+from src.services.config import get, get_int
 
 FX_RATES_BASE_URL = 'https://api.fxratesapi.com'
 SUPPORTED_CURRENCIES = [
@@ -122,7 +122,7 @@ def get_rates(base_currency: str, force_refresh: bool = False) -> dict[str, Any]
     ):
         return {**c_data, 'source': 'Local Cache'}
     try:
-        return _fetch_live_rates(nb, get_str('currency', 'fxrates_api_key'))
+        return _fetch_live_rates(nb, get('currency', 'fxrates_api_key'))
     except (httpx.HTTPError, FXRatesError, ValueError) as e:
         if c_data and c_data.get('base') == nb:
             logger.warning('Falling back to stale FX cache due to refresh failure: %s', e)
@@ -146,5 +146,5 @@ def convert_amount(amount: float | int, src: str, tgt: str) -> float:
 
 
 def get_configured_base_currency() -> str:
-    b = _normalize_currency(get_str('currency', 'base_currency', 'HKD'), 'HKD')
+    b = _normalize_currency(get('currency', 'base_currency', 'HKD'), 'HKD')
     return b if b in SUPPORTED_CURRENCIES else 'HKD'

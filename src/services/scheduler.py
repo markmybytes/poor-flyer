@@ -51,7 +51,7 @@ def daily_scrape_job():
             smtp_cfg = get_smtp_config()
             base_currency = get_configured_base_currency()
             recipients = [
-                r.strip() for r in config.get_str('email', 'recipients', '').split(',') if r.strip()
+                r.strip() for r in config.get('email', 'recipients', '').split(',') if r.strip()
             ]
 
             all_active_legs = [
