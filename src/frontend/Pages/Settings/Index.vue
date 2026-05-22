@@ -76,6 +76,7 @@ const ui = reactive({
   testLoading: false,
   lastSaved: null as string | null,
   refreshingRates: false,
+  fxModalOpen: false,
 })
 
 const displayedRates = computed(() => {
@@ -314,82 +315,15 @@ function sendTestEmail() {
                 {{ ui.saving ? '保存中...' : '保存設定' }}
               </button>
 
+              <button type="button" class="btn btn-outline" @click="ui.fxModalOpen = true">
+                查看目前匯率
+              </button>
+
               <p v-if="ui.lastSaved" class="text-xs font-medium text-success">
                 ✓ 最後保存於 {{ ui.lastSaved }}
               </p>
             </div>
           </form>
-        </div>
-      </div>
-
-      <div class="tracker-panel card rounded-lg">
-        <div class="card-body p-0">
-          <div class="border-b border-base-300/70 px-6 py-5">
-            <h3 class="text-base font-bold text-base-content">匯率狀態</h3>
-
-            <p class="mt-0.5 text-sm font-medium text-base-content/60">
-              目前使用 {{ fxStatusState.base_currency }} 作為換算基準
-            </p>
-          </div>
-
-          <div class="space-y-4 p-6">
-            <div class="grid gap-3 md:grid-cols-3">
-              <div class="rounded-lg border border-base-300/70 bg-base-200/40 p-3">
-                <p class="text-xs font-bold tracking-wider text-base-content/55 uppercase">來源</p>
-
-                <p class="mt-1 text-sm font-semibold text-base-content">
-                  {{ fxStatusState.source ?? '—' }}
-                </p>
-              </div>
-
-              <div class="rounded-lg border border-base-300/70 bg-base-200/40 p-3 md:col-span-2">
-                <p class="text-xs font-bold tracking-wider text-base-content/55 uppercase">
-                  最後更新
-                </p>
-
-                <p class="mt-1 text-sm font-semibold text-base-content">{{ fxStatusTime }}</p>
-              </div>
-            </div>
-
-            <div v-if="fxStatusState.error" class="alert rounded-lg alert-warning">
-              <span>{{ fxStatusState.error }}</span>
-            </div>
-
-            <div class="flex justify-end">
-              <button
-                class="btn btn-neutral"
-                :disabled="ui.refreshingRates"
-                @click="refreshFxRates"
-              >
-                <span v-if="ui.refreshingRates" class="loading loading-sm loading-spinner"></span>
-                {{ ui.refreshingRates ? '刷新中...' : '抓取最新匯率' }}
-              </button>
-            </div>
-
-            <div class="overflow-x-auto rounded-xl border border-base-300/70">
-              <table class="table w-full table-zebra text-sm">
-                <thead>
-                  <tr>
-                    <th>貨幣</th>
-
-                    <th class="text-right">1 {{ fxStatusState.base_currency }} =</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  <tr v-if="displayedRates.length === 0">
-                    <td colspan="2" class="text-center text-base-content/55">暫無匯率資料</td>
-                  </tr>
-
-                  <tr v-for="item in displayedRates" :key="item.code">
-                    <td class="font-semibold">{{ item.code }}</td>
-
-                    <td class="text-right">{{ Number(item.value).toFixed(6) }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -598,6 +532,85 @@ function sendTestEmail() {
           </form>
         </div>
       </div>
+    </div>
+
+    <div :class="['modal', { 'modal-open': ui.fxModalOpen }]" role="dialog">
+      <div class="modal-box max-w-2xl overflow-hidden rounded-lg border border-base-300 p-0">
+        <div class="flex items-center justify-between border-b border-base-300/70 px-6 py-5">
+          <div>
+            <h3 class="text-base font-bold text-base-content">匯率狀態</h3>
+
+            <p class="mt-0.5 text-sm font-medium text-base-content/60">
+              目前使用 {{ fxStatusState.base_currency }} 作為換算基準
+            </p>
+          </div>
+
+          <button
+            type="button"
+            class="btn btn-circle btn-ghost btn-sm"
+            @click="ui.fxModalOpen = false"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div class="max-h-[65vh] space-y-4 overflow-y-auto p-6">
+          <div class="grid gap-3 md:grid-cols-3">
+            <div class="rounded-lg border border-base-300/70 bg-base-200/40 p-3">
+              <p class="text-xs font-bold tracking-wider text-base-content/55 uppercase">來源</p>
+
+              <p class="mt-1 text-sm font-semibold text-base-content">
+                {{ fxStatusState.source ?? '—' }}
+              </p>
+            </div>
+
+            <div class="rounded-lg border border-base-300/70 bg-base-200/40 p-3 md:col-span-2">
+              <p class="text-xs font-bold tracking-wider text-base-content/55 uppercase">
+                最後更新
+              </p>
+
+              <p class="mt-1 text-sm font-semibold text-base-content">{{ fxStatusTime }}</p>
+            </div>
+          </div>
+
+          <div v-if="fxStatusState.error" class="alert rounded-lg alert-warning">
+            <span>{{ fxStatusState.error }}</span>
+          </div>
+
+          <div class="flex justify-end">
+            <button class="btn btn-neutral" :disabled="ui.refreshingRates" @click="refreshFxRates">
+              <span v-if="ui.refreshingRates" class="loading loading-sm loading-spinner"></span>
+              {{ ui.refreshingRates ? '刷新中...' : '抓取最新匯率' }}
+            </button>
+          </div>
+
+          <div class="overflow-x-auto rounded-xl border border-base-300/70">
+            <table class="table w-full table-zebra text-sm">
+              <thead>
+                <tr>
+                  <th>貨幣</th>
+
+                  <th class="text-right">1 {{ fxStatusState.base_currency }} =</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                <tr v-if="displayedRates.length === 0">
+                  <td colspan="2" class="text-center text-base-content/55">暫無匯率資料</td>
+                </tr>
+
+                <tr v-for="item in displayedRates" :key="item.code">
+                  <td class="font-semibold">{{ item.code }}</td>
+
+                  <td class="text-right">{{ Number(item.value).toFixed(6) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-backdrop" @click="ui.fxModalOpen = false"></div>
     </div>
   </AppLayout>
 </template>
