@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, render_template, request
 
 from src.services import config
-from src.services.email import get_smtp_config, send_html_email
+from src.utils.email import get_smtp_config, send_html_email
 
 settings_bp = Blueprint('settings', __name__, url_prefix='/settings')
 

@@ -7,9 +7,9 @@ from flask import render_template
 
 from src.extensions.database import FareSnapshot, Itinerary, db
 from src.services import config
-from src.services.email import get_smtp_config, send_html_email
-from src.services.rule37 import Phase, compute_37_best
 from src.services.scraper import FlightQuery, scrape_prices
+from src.utils.email import get_smtp_config, send_html_email
+from src.utils.rule37 import Phase, compute_37_best
 
 logger = logging.getLogger(__name__)
 
