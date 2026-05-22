@@ -1,4 +1,6 @@
+import logging
 import os
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from flask import Flask, current_app
@@ -51,6 +53,9 @@ def create_app():
                 'VITE_HOT_FILE',
                 str(Path(app.static_folder).joinpath('dist', 'hot')),
             ),
+            'LOG_FILE': os.getenv('LOG_FILE', str(base_dir.joinpath('data', 'app.log'))),
+            'LOG_MAX_BYTES': int(os.getenv('LOG_MAX_BYTES', str(10 * 1024 * 1024))),
+            'LOG_LEVEL': os.getenv('LOG_LEVEL', 'INFO'),
         }
     )
 
@@ -60,6 +65,22 @@ def create_app():
         app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'connect_args': {'check_same_thread': False}}
 
     init_extensions(app)
+
+    log_path = Path(app.config['LOG_FILE'])
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    file_handler = RotatingFileHandler(
+        log_path,
+        maxBytes=app.config['LOG_MAX_BYTES'],
+        backupCount=1,
+    )
+    file_handler.setFormatter(
+        logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+    )
+    file_handler.setLevel(app.config['LOG_LEVEL'])
+    app.logger.addHandler(file_handler)
+    app.logger.setLevel(app.config['LOG_LEVEL'])
+    logging.getLogger('src').addHandler(file_handler)
+    logging.getLogger('src').setLevel(app.config['LOG_LEVEL'])
 
     app.register_blueprint(pages_bp)
     app.register_blueprint(api_bp)
