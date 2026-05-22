@@ -30,7 +30,6 @@ const props = defineProps<{
   fxStatus: {
     baseCurrency?: string
     lastUpdated?: string | null
-    source?: string | null
     rates?: Record<string, number>
     error?: string | null
   }
@@ -65,7 +64,6 @@ const form = reactive({
 const fxStatusState = reactive({
   base_currency: props.fxStatus?.baseCurrency ?? form.currency.base_currency,
   last_updated: props.fxStatus?.lastUpdated ?? null,
-  source: props.fxStatus?.source ?? null,
   rates: props.fxStatus?.rates ?? ({} as Record<string, number>),
   error: props.fxStatus?.error ?? null,
 })
@@ -157,7 +155,6 @@ function refreshFxRates() {
       Object.assign(fxStatusState, {
         base_currency: d.base_currency ?? form.currency.base_currency,
         last_updated: d.last_updated ?? null,
-        source: d.source ?? null,
         rates: d.rates ?? {},
         error: null,
       })
@@ -555,15 +552,7 @@ function sendTestEmail() {
         </div>
 
         <div class="max-h-[65vh] space-y-4 overflow-y-auto p-6">
-          <div class="grid gap-3 md:grid-cols-3">
-            <div class="rounded-lg border border-base-300/70 bg-base-200/40 p-3">
-              <p class="text-xs font-bold tracking-wider text-base-content/55 uppercase">來源</p>
-
-              <p class="mt-1 text-sm font-semibold text-base-content">
-                {{ fxStatusState.source ?? '—' }}
-              </p>
-            </div>
-
+          <div class="grid gap-3 md:grid-cols-2">
             <div class="rounded-lg border border-base-300/70 bg-base-200/40 p-3 md:col-span-2">
               <p class="text-xs font-bold tracking-wider text-base-content/55 uppercase">
                 最後更新

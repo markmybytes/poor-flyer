@@ -26,7 +26,6 @@ def index():
             fx_status = {
                 'base_currency': rates_snapshot.get('base', base_currency),
                 'last_updated': rates_snapshot.get('last_updated'),
-                'source': rates_snapshot.get('source'),
                 'rates': rates_snapshot.get('rates', {}),
                 'error': None,
             }
@@ -35,7 +34,6 @@ def index():
             fx_status = {
                 'base_currency': base_currency,
                 'last_updated': None,
-                'source': None,
                 'rates': {},
                 'error': str(exc),
             }

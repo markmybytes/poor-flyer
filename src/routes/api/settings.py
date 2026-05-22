@@ -205,7 +205,6 @@ def refresh_fx_rates():
                 'data': {
                     'base_currency': rates.get('base', base_currency),
                     'last_updated': rates.get('last_updated'),
-                    'source': rates.get('source'),
                     'rates': rates.get('rates', {}),
                 },
             }

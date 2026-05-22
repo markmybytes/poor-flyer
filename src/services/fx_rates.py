@@ -118,7 +118,6 @@ def _fetch_live_rates(base: str, api_key: str | None) -> dict[str, Any]:
         'base': nb,
         'rates': {k.upper(): float(v) for k, v in rates.items()},
         'last_updated': data.get('date') or datetime.now(UTC).isoformat(),
-        'source': 'Live API',
     }
     _write_cache(res)
     logger.info(
@@ -136,7 +135,7 @@ def get_rates(base_currency: str, force_refresh: bool = False) -> dict[str, Any]
         and _is_cache_fresh(c_data, get_int('currency', 'cache_ttl', 86400) or 86400, nb)
     ):
         logger.debug('Using cached FX rates: base=%s', nb)
-        return {**c_data, 'source': 'Local Cache'}
+        return {**c_data}
     try:
         return _fetch_live_rates(nb, get('currency', 'fxrates_api_key'))
     except (httpx.HTTPError, FXRatesError, ValueError) as e:
@@ -144,7 +143,7 @@ def get_rates(base_currency: str, force_refresh: bool = False) -> dict[str, Any]
             logger.warning(
                 'Falling back to stale FX cache: base=%s error_type=%s', nb, type(e).__name__
             )
-            return {**c_data, 'source': 'Local Cache'}
+            return {**c_data}
         logger.error('Unable to load FX rates from API and no local cache available')
         raise FXRatesError(
             'Unable to load FX rates from API and no local cache is available'
