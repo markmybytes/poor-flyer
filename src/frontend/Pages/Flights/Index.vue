@@ -141,7 +141,7 @@ const summary = computed(() => {
             </div>
           </div>
 
-          <div class="mt-auto">
+          <div class="my-auto">
             <div
               v-if="itinerary.rule37Analysis && itinerary.statistics?.latestVal !== null"
               class="rounded-lg border px-4 py-4 transition-colors"
@@ -189,10 +189,24 @@ const summary = computed(() => {
             </div>
 
             <div
-              v-else-if="itinerary.rule37Analysis"
-              class="group-hover:border-base-400 rounded-lg border border-dashed border-base-300 px-4 py-4 text-center transition-colors group-hover:bg-base-200/30"
+              v-else-if="itinerary.deadline && itinerary.statistics?.latestVal == null"
+              class="bg-base-50/50 group-hover:border-base-400 rounded-lg border border-dashed border-base-300 px-4 py-5 text-center transition-all group-hover:bg-base-200/20"
             >
-              <span class="text-sm font-medium text-base-content/60">收集數據中</span>
+              <div class="flex flex-col items-center justify-center space-y-2">
+                <div class="space-y-0.5">
+                  <span class="text-sm font-bold text-base-content/80">正在收集價格數據</span>
+                </div>
+
+                <div class="my-1 w-full border-t border-base-200/60"></div>
+
+                <div class="flex items-center justify-center gap-1 text-xs text-base-content/60">
+                  <span class="font-medium opacity-70">購票限期：</span>
+
+                  <span>
+                    {{ fmtDate(itinerary.deadline) }}
+                  </span>
+                </div>
+              </div>
             </div>
 
             <div
