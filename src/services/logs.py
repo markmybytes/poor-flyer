@@ -3,7 +3,8 @@ Log file reading, filtering, and management service.
 """
 
 import re
-from datetime import date, datetime
+from collections.abc import Iterator
+from datetime import date
 from pathlib import Path
 
 from flask import current_app
@@ -18,70 +19,60 @@ def _log_path() -> Path:
     return Path(current_app.config['LOG_FILE'])
 
 
-def _parse_entries(lines: list[str]) -> list[dict]:
-    entries: list[dict] = []
-    current: dict | None = None
-    for line in lines:
-        match = _LOG_ENTRY_RE.match(line)
-        if match:
-            if current is not None:
-                entries.append(current)
-            ts, level, logger_name, message = match.groups()
-            current = {
-                'timestamp': ts,
-                'level': level,
-                'logger': logger_name,
-                'message': message,
-                'traceback': None,
-            }
-        elif current is not None:
-            current['traceback'] = (
-                line if current['traceback'] is None else current['traceback'] + '\n' + line
-            )
-    if current is not None:
-        entries.append(current)
-    return entries
+def _iter_log_entries(path: Path) -> Iterator[dict]:
+    """Generator that yields parsed log entries one by one to save memory."""
+    with path.open(encoding='utf-8', errors='replace') as f:
+        current: dict | None = None
+        for line in f:
+            line = line.rstrip('\n')
+
+            if (match := _LOG_ENTRY_RE.match(line)) is not None:
+                if current is not None:
+                    yield current
+
+                current = dict(
+                    zip(('timestamp', 'level', 'logger', 'message'), match.groups(), strict=True),
+                    traceback=None,
+                )
+            elif current is not None:
+                current['traceback'] = (
+                    line if current['traceback'] is None else current['traceback'] + '\n' + line
+                )
+
+        if current is not None:
+            yield current
 
 
 def read_logs(
-    page: int = 1,
-    per_page: int = 50,
     levels: list[str] | None = None,
     start_date: date | None = None,
     end_date: date | None = None,
-) -> dict:
-    if not (path := _log_path()).exists():
-        return {'entries': [], 'total': 0, 'page': page, 'per_page': per_page}
+) -> list[dict]:
+    path = _log_path()
+    if not path.exists():
+        return []
 
-    with path.open(encoding='utf-8', errors='replace') as f:
-        lines = [line.rstrip('\n') for line in f]
+    level_set = set(levels) if levels else None
+    start_str = start_date.isoformat() if start_date else None
+    end_str = end_date.isoformat() if end_date else None
 
-    entries = _parse_entries(lines)
-    entries.reverse()
+    filtered_entries = []
 
-    if levels:
-        level_set = set(levels)
-        entries = [e for e in entries if e['level'] in level_set]
+    for entry in _iter_log_entries(path):
+        if level_set and entry['level'] not in level_set:
+            continue
 
-    if start_date or end_date:
-        filtered = []
-        for e in entries:
-            entry_date = datetime.strptime(e['timestamp'][:10], '%Y-%m-%d').date()
-            if start_date and entry_date < start_date:
-                continue
-            if end_date and entry_date > end_date:
-                continue
-            filtered.append(e)
-        entries = filtered
+        entry_date_str = entry['timestamp'][:10]
+        if start_str and entry_date_str < start_str:
+            continue
+        if end_str and entry_date_str > end_str:
+            continue
 
-    total = len(entries)
-    start_idx = (page - 1) * per_page
-    return {
-        'entries': entries[start_idx : start_idx + per_page],
-        'total': total,
-        'page': page,
-        'per_page': per_page,
-    }
+        filtered_entries.append(entry)
+
+    filtered_entries.reverse()
+
+    return filtered_entries
 
 
 def clear_logs() -> None:

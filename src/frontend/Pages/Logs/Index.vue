@@ -14,24 +14,16 @@ const props = defineProps<{
     message: string
     traceback: string | null
   }[]
-  pagination: {
-    total: number
-    page: number
-    perPage: number
-  }
-  filters: {
-    levels?: string[]
-    startDate: string
-    endDate: string
-  }
+  pagination: { total: number; page: number; perPage: number }
+  filters: { levels?: string[]; startDate: string; endDate: string }
 }>()
 
 const toast = useToast()
 const confirmModal = useTemplateRef<HTMLDialogElement>('confirmModal')
 const clearing = ref(false)
+const expandedRows = ref<number[]>([]) // Tracks expanded row indices
 
 const LOG_LEVELS = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] as const
-
 const selectedLevels = ref<string[]>(
   props.filters.levels?.length ? [...props.filters.levels] : [...LOG_LEVELS],
 )
@@ -42,51 +34,54 @@ const dateRange = ref<Date[] | null>(
     : null,
 )
 
+const isAllLevelsSelected = computed(() =>
+  LOG_LEVELS.every((lvl) => selectedLevels.value.includes(lvl)),
+)
+
 function levelBadgeClass(level: string): string {
-  switch (level) {
-    case 'DEBUG':
-      return 'badge-ghost'
-    case 'INFO':
-      return 'badge-info'
-    case 'WARNING':
-      return 'badge-warning'
-    case 'ERROR':
-      return 'badge-error'
-    case 'CRITICAL':
-      return 'badge-error badge-outline'
-    default:
-      return 'badge-ghost'
+  const classes: Record<string, string> = {
+    DEBUG: 'badge-ghost',
+    INFO: 'badge-info',
+    WARNING: 'badge-warning',
+    ERROR: 'badge-error',
+    CRITICAL: 'badge-error badge-outline',
+  }
+  return classes[level] || 'badge-ghost'
+}
+
+function formatLocalDate(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function toggleRow(i: number) {
+  const idx = expandedRows.value.indexOf(i)
+
+  if (idx > -1) {
+    expandedRows.value.splice(idx, 1)
+  } else {
+    expandedRows.value.push(i)
   }
 }
 
 function navigate(page = 1) {
-  const data: Record<string, string | number> = {
-    page,
-    levels: selectedLevels.value.join(','),
-  }
+  expandedRows.value = [] // Reset expansions on navigate
+  const data: Record<string, string | number> = { page, levels: selectedLevels.value.join(',') }
 
   if (Array.isArray(dateRange.value)) {
-    if (dateRange.value[0]) {
-      data.start_date = (dateRange.value[0] as Date).toISOString().slice(0, 10)
-    }
-    if (dateRange.value[1]) {
-      data.end_date = (dateRange.value[1] as Date).toISOString().slice(0, 10)
-    }
+    if (dateRange.value[0]) data.start_date = formatLocalDate(dateRange.value[0])
+    if (dateRange.value[1]) data.end_date = formatLocalDate(dateRange.value[1])
   }
 
-  router.visit('/logs/', { data, preserveState: true, replace: true })
+  router.get('/logs/', data, { preserveState: true, preserveScroll: true, replace: true })
 }
 
 function toggleLevel(level: (typeof LOG_LEVELS)[number] | 'ALL') {
-  if (level === 'ALL') {
-    selectedLevels.value = [...LOG_LEVELS]
-    return
-  }
+  if (level === 'ALL') return (selectedLevels.value = [...LOG_LEVELS])
 
   if (selectedLevels.value.includes(level)) {
     selectedLevels.value = selectedLevels.value.filter((lvl) => lvl !== level)
   } else {
-    selectedLevels.value = [...selectedLevels.value, level]
+    selectedLevels.value.push(level)
   }
 
   if (!selectedLevels.value.length) {
@@ -94,22 +89,28 @@ function toggleLevel(level: (typeof LOG_LEVELS)[number] | 'ALL') {
   }
 }
 
-watch([selectedLevels, dateRange], () => navigate(1), { deep: true })
+let timeoutId: ReturnType<typeof setTimeout>
+watch(
+  [selectedLevels, dateRange],
+  () => {
+    clearTimeout(timeoutId)
+    timeoutId = setTimeout(() => navigate(1), 500)
+  },
+  { deep: true },
+)
 
 const totalPages = computed(() => Math.ceil(props.pagination.total / props.pagination.perPage))
 
 const pageNumbers = computed((): (number | '...')[] => {
   const { page } = props.pagination
   const total = totalPages.value
-  if (total <= 7) {
-    return Array.from({ length: total }, (_, i) => i + 1)
-  }
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+
   const pages: (number | '...')[] = [1]
   if (page > 3) pages.push('...')
-  for (let i = Math.max(2, page - 1); i <= Math.min(total - 1, page + 1); i++) {
-    pages.push(i)
-  }
+  for (let i = Math.max(2, page - 1); i <= Math.min(total - 1, page + 1); i++) pages.push(i)
   if (page < total - 2) pages.push('...')
+
   pages.push(total)
   return pages
 })
@@ -147,11 +148,7 @@ function clearLogs() {
           <div class="join flex flex-wrap gap-0">
             <button
               class="btn join-item btn-xs"
-              :class="
-                LOG_LEVELS.every((lvl) => selectedLevels.includes(lvl))
-                  ? 'btn-primary'
-                  : 'border border-base-300 btn-ghost'
-              "
+              :class="isAllLevelsSelected ? 'btn-primary' : 'border border-base-300 btn-ghost'"
               @click="toggleLevel('ALL')"
             >
               ALL
@@ -210,28 +207,34 @@ function clearLogs() {
         <table class="table w-full table-sm">
           <thead>
             <tr class="bg-base-200/60 text-xs uppercase">
-              <th class="w-44">時間戳記</th>
+              <th class="hidden w-44 md:table-cell">時間戳記</th>
 
               <th class="w-20">級別</th>
 
               <th class="hidden w-48 md:table-cell">來源</th>
 
               <th>訊息</th>
+
+              <th class="w-8"></th>
             </tr>
           </thead>
 
           <tbody>
             <template v-for="(entry, i) in logs" :key="i">
-              <tr v-if="!entry.traceback" class="hover:bg-base-200/40">
-                <td class="font-mono text-xs whitespace-nowrap text-base-content/60">
-                  <!-- strip out the submillisecond part -->
+              <tr
+                class="cursor-pointer transition-colors hover:bg-base-200/40"
+                @click="toggleRow(i)"
+              >
+                <td
+                  class="hidden font-mono text-xs whitespace-nowrap text-base-content/60 md:table-cell"
+                >
                   {{ entry.timestamp.split(',')[0] }}
                 </td>
 
                 <td>
-                  <span class="badge badge-sm" :class="levelBadgeClass(entry.level)">
-                    {{ entry.level }}
-                  </span>
+                  <span class="badge badge-sm" :class="levelBadgeClass(entry.level)">{{
+                    entry.level
+                  }}</span>
                 </td>
 
                 <td
@@ -241,40 +244,52 @@ function clearLogs() {
                 </td>
 
                 <td class="text-sm break-all">{{ entry.message }}</td>
+
+                <td class="text-right align-middle">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="inline-block h-4 w-4 opacity-50 transition-transform duration-200"
+                    :class="[
+                      expandedRows.includes(i) ? 'rotate-180' : '',
+                      !entry.traceback ? 'md:hidden' : '',
+                    ]"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                </td>
               </tr>
 
-              <tr v-else class="p-0 hover:bg-base-200/40">
-                <td colspan="4" class="p-0">
-                  <details class="collapse-arrow collapse">
-                    <summary
-                      class="collapse-title grid min-h-0 cursor-pointer items-center gap-2 px-4 py-3 text-sm"
-                      style="grid-template-columns: 11rem 5rem 1fr"
-                    >
-                      <span class="font-mono text-xs whitespace-nowrap text-base-content/60">
-                        <!-- strip out the submillisecond part -->
-                        {{ entry.timestamp.split(',')[0] }}
-                      </span>
+              <tr v-if="expandedRows.includes(i)" class="bg-base-200/20">
+                <td colspan="5" class="p-0">
+                  <div class="border-b border-base-200/50 px-4 py-3">
+                    <div class="mb-3 flex flex-col gap-1 md:hidden">
+                      <div class="text-xs">
+                        <span class="mr-1 font-semibold text-base-content/70">時間:</span>
 
-                      <span>
-                        <span class="badge badge-sm" :class="levelBadgeClass(entry.level)">
-                          {{ entry.level }}
-                        </span>
-                      </span>
-
-                      <span class="break-all">{{ entry.message }}</span>
-                    </summary>
-
-                    <div class="collapse-content">
-                      <div class="mb-1 hidden font-mono text-xs text-base-content/50 md:block">
-                        {{ entry.logger }}
+                        <span class="font-mono text-base-content/60">{{
+                          entry.timestamp.split(',')[0]
+                        }}</span>
                       </div>
 
-                      <pre
-                        class="rounded bg-base-200 p-3 font-mono text-xs break-all whitespace-pre-wrap text-error/80"
-                        >{{ entry.traceback }}</pre
-                      >
+                      <div class="text-xs">
+                        <span class="mr-1 font-semibold text-base-content/70">來源:</span>
+
+                        <span class="font-mono text-base-content/50">{{ entry.logger }}</span>
+                      </div>
                     </div>
-                  </details>
+
+                    <pre
+                      v-if="entry.traceback"
+                      class="m-0 rounded bg-base-200 p-3 font-mono text-xs break-all whitespace-pre-wrap text-error/80"
+                      >{{ entry.traceback }}</pre
+                    >
+                  </div>
                 </td>
               </tr>
             </template>
@@ -332,9 +347,7 @@ function clearLogs() {
         </div>
       </div>
 
-      <form method="dialog" class="modal-backdrop">
-        <button>close</button>
-      </form>
+      <form method="dialog" class="modal-backdrop"><button>close</button></form>
     </dialog>
   </AppLayout>
 </template>
