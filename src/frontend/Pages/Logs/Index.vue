@@ -224,7 +224,8 @@ function clearLogs() {
             <template v-for="(entry, i) in logs" :key="i">
               <tr v-if="!entry.traceback" class="hover:bg-base-200/40">
                 <td class="font-mono text-xs whitespace-nowrap text-base-content/60">
-                  {{ entry.timestamp }}
+                  <!-- strip out the submillisecond part -->
+                  {{ entry.timestamp.split(',')[0] }}
                 </td>
 
                 <td>
@@ -250,7 +251,8 @@ function clearLogs() {
                       style="grid-template-columns: 11rem 5rem 1fr"
                     >
                       <span class="font-mono text-xs whitespace-nowrap text-base-content/60">
-                        {{ entry.timestamp }}
+                        <!-- strip out the submillisecond part -->
+                        {{ entry.timestamp.split(',')[0] }}
                       </span>
 
                       <span>
