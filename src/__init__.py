@@ -13,6 +13,8 @@ from src.routes.api import api_bp
 from src.routes.pages import pages_bp
 from src.utils.transform import CamelCaseJSONProvider
 
+logger = logging.getLogger(__name__)
+
 
 def _inject_vite_url():
     """Context processor to inject vite_dev_url into Jinja templates."""
@@ -26,6 +28,7 @@ def _inject_vite_url():
 
 
 def create_app():
+    logger.info('Initializing Flask application')
     base_dir = Path(__file__).resolve().parent.parent
     app = Flask(
         __name__,
@@ -65,9 +68,11 @@ def create_app():
         app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'connect_args': {'check_same_thread': False}}
 
     init_extensions(app)
+    logger.info('Extensions initialized')
 
     log_path = Path(app.config['LOG_FILE'])
     log_path.parent.mkdir(parents=True, exist_ok=True)
+    logger.debug('Log file path: %s', log_path)
     file_handler = RotatingFileHandler(
         log_path,
         maxBytes=app.config['LOG_MAX_BYTES'],

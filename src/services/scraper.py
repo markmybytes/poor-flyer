@@ -1,3 +1,4 @@
+import logging
 import random
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -6,6 +7,8 @@ from pathlib import Path
 import httpx
 from fake_useragent import UserAgent
 from patchright.sync_api import sync_playwright
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -77,6 +80,9 @@ def _parse_hkexpress_response(data: dict) -> list[ScrapeResult]:
 def scrape_prices_advanced(
     queries: list[FlightQuery], currency_code: str = 'HKD'
 ) -> list[ScrapeResult]:
+    logger.info(
+        'Starting advanced scrape for %d routes with currency=%s', len(queries), currency_code
+    )
     try:
         with sync_playwright() as p:
             ctx = p.chromium.launch_persistent_context(
@@ -160,12 +166,16 @@ def scrape_prices_advanced(
             finally:
                 ctx.close()
     except Exception as exc:
+        logger.exception('Advanced scrape failed: routes=%d', len(queries))
         return [ScrapeResult(success=False, error_message=f'Playwright Error: {exc}')] * len(
             queries
         )
 
 
 def scrape_prices(queries: list[FlightQuery], currency_code: str = 'HKD') -> list[ScrapeResult]:
+    logger.info(
+        'Starting flight scrape for %d routes with currency %s', len(queries), currency_code
+    )
     try:
         with httpx.Client(timeout=30) as client:
             resp = client.post(
@@ -205,14 +215,21 @@ def scrape_prices(queries: list[FlightQuery], currency_code: str = 'HKD') -> lis
 
         if resp.status_code != 200:
             msg = f'HTTP {resp.status_code}: {resp.text[:200]}'
+            logger.warning('HKExpress API returned error: %s', msg)
             return [ScrapeResult(success=False, error_message=msg)] * len(queries)
 
+        logger.debug('HKExpress API response received, parsing results')
         results = _parse_hkexpress_response(resp.json())
         # Pad with error entries if the API returned fewer trips than expected
         while len(results) < len(queries):
             results.append(ScrapeResult(success=False, error_message='No data returned for leg.'))
+
+        successful_results = sum(1 for r in results if r.success)
+        logger.info(
+            'Flight scrape completed: %d/%d routes successful', successful_results, len(queries)
+        )
         return results[: len(queries)]
 
     except Exception as exc:
-        print(exc, flush=True)
+        logger.exception('Flight scrape failed with exception')
         return [ScrapeResult(success=False, error_message=f'HTTPX Error: {exc}')] * len(queries)

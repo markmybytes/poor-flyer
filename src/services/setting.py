@@ -37,7 +37,7 @@ def get_int(namespace: str, key: str, default: int | None = None) -> int | None:
     try:
         return int(val)
     except ValueError:
-        logger.warning(f'Config {namespace}.{key} is not a valid integer: {val}')
+        logger.warning('Invalid integer value for %s.%s: val=%s', namespace, key, val)
         return default
 
 
@@ -66,10 +66,10 @@ def set_many(namespace: str, settings: dict[str, str]) -> None:
         db.session.commit()
         for key in settings:
             cache.delete_memoized(_fetch, namespace, key)
-        logger.info(f'Bulk updated {len(settings)} settings in {namespace}')
-    except Exception as e:
+        logger.info('Updated %d configuration settings in namespace=%s', len(settings), namespace)
+    except Exception:
         db.session.rollback()
-        logger.error(f'Failed to bulk update config in {namespace}: {e}')
+        logger.exception('Failed to update configuration in namespace=%s', namespace)
         raise
 
 

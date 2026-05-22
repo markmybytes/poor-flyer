@@ -1,8 +1,9 @@
-﻿from collections import defaultdict
+﻿import logging
+from collections import defaultdict
 from dataclasses import asdict
 from datetime import date, datetime
 
-from flask import Blueprint, current_app, redirect
+from flask import Blueprint, redirect
 from flask_inertia import render_inertia
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -16,6 +17,8 @@ from src.services.fx_rates import (
 from src.utils.rule37 import compute_37_best, compute_price_stats
 from src.utils.transform import model_to_dict
 
+logger = logging.getLogger(__name__)
+
 flights_bp = Blueprint('flights', __name__, url_prefix='/flights')
 
 
@@ -28,11 +31,10 @@ def _serialize_snapshot(snapshot: FareSnapshot, currency: str) -> dict:
                 currency,
             )
             snapshot.currency = currency
-        except FXRatesError as exc:
-            current_app.logger.warning(
-                'Failed to convert fare snapshot %s: %s',
+        except FXRatesError:
+            logger.warning(
+                'Failed to convert fare snapshot: snapshot_id=%s',
                 snapshot.id,
-                exc,
             )
 
     return model_to_dict(snapshot)
@@ -46,11 +48,10 @@ def _get_combined_totals(itinerary: Itinerary, currency: str) -> dict[date, floa
                 src_currency = (s.currency or currency).upper()
                 try:
                     fare_value = convert_amount(s.fare, src_currency, currency)
-                except FXRatesError as exc:
-                    current_app.logger.warning(
-                        'Failed to convert itinerary fare snapshot %s: %s',
+                except FXRatesError:
+                    logger.warning(
+                        'Failed to convert itinerary fare snapshot: snapshot_id=%s',
                         s.id,
-                        exc,
                     )
                     continue
 
@@ -121,6 +122,7 @@ def index():
         .unique()
         .all()
     )
+    logger.debug('Rendered flights index: itineraries=%d', len(itineraries))
 
     return render_inertia(
         'Flights/Index',
@@ -138,21 +140,26 @@ def create():
 
 @flights_bp.route('/<flight_id>')
 def show(flight_id):
-    base_currency = get_configured_base_currency()
+    try:
+        base_currency = get_configured_base_currency()
 
-    itinerary = db.session.execute(
-        select(Itinerary)
-        .options(selectinload(Itinerary.flights).selectinload(Flight.fare_snapshots))
-        .where(Itinerary.id == flight_id)
-    ).scalar_one_or_none()
+        itinerary = db.session.execute(
+            select(Itinerary)
+            .options(selectinload(Itinerary.flights).selectinload(Flight.fare_snapshots))
+            .where(Itinerary.id == flight_id)
+        ).scalar_one_or_none()
 
-    if not itinerary:
+        if not itinerary:
+            logger.debug('Itinerary not found: id=%s', flight_id)
+            return redirect('/flights/')
+
+        return render_inertia(
+            'Flights/Detail',
+            props={
+                'itinerary': _serialize_itinerary(itinerary, base_currency),
+                'base_currency': base_currency,
+            },
+        )
+    except Exception:
+        logger.exception('Error rendering flights detail page: id=%s', flight_id)
         return redirect('/flights/')
-
-    return render_inertia(
-        'Flights/Detail',
-        props={
-            'itinerary': _serialize_itinerary(itinerary, base_currency),
-            'base_currency': base_currency,
-        },
-    )

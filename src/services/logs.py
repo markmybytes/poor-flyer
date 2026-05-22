@@ -2,12 +2,15 @@
 Log file reading, filtering, and management service.
 """
 
+import logging
 import re
 from collections.abc import Iterator
 from datetime import date
 from pathlib import Path
 
 from flask import current_app
+
+logger = logging.getLogger(__name__)
 
 _LOG_ENTRY_RE = re.compile(
     r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})'
@@ -50,6 +53,7 @@ def read_logs(
 ) -> list[dict]:
     path = _log_path()
     if not path.exists():
+        logger.debug('Log file not found: path=%s', path)
         return []
 
     level_set = set(levels) if levels else None
@@ -72,9 +76,20 @@ def read_logs(
 
     filtered_entries.reverse()
 
+    logger.debug(
+        'Read logs: total_entries=%d levels=%s start_date=%s end_date=%s',
+        len(filtered_entries),
+        levels,
+        start_date,
+        end_date,
+    )
     return filtered_entries
 
 
 def clear_logs() -> None:
-    if (path := _log_path()).exists():
-        path.write_text('', encoding='utf-8')
+    try:
+        if (path := _log_path()).exists():
+            path.write_text('', encoding='utf-8')
+            logger.info('Application logs cleared')
+    except Exception:
+        logger.exception('Error clearing logs')

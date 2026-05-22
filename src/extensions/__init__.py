@@ -1,5 +1,6 @@
 """Flask extensions initialization module."""
 
+import logging
 from pathlib import Path
 
 from flask import Flask
@@ -9,6 +10,8 @@ from flask_migrate import Migrate
 from src.extensions.cache import cache
 from src.extensions.database import db
 from src.extensions.scheduler import scheduler
+
+logger = logging.getLogger(__name__)
 
 inertia = Inertia()
 migrate = Migrate()

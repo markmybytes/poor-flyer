@@ -1,4 +1,5 @@
-﻿import uuid
+﻿import logging
+import uuid
 from datetime import UTC, date, datetime
 
 from flask import Blueprint, jsonify, request
@@ -8,6 +9,8 @@ from sqlalchemy.orm import selectinload
 from src.extensions.database import FareSnapshot, Flight, Itinerary, db
 from src.services.fx_rates import FXRatesError, convert_amount, get_configured_base_currency
 from src.services.scraper import FlightQuery, scrape_prices
+
+logger = logging.getLogger(__name__)
 
 flights_bp = Blueprint('flights', __name__, url_prefix='/flights')
 
@@ -44,9 +47,11 @@ def create_flight():
             session.add(flight)
 
         session.commit()
+        logger.info('Created itinerary: id=%s flights=%d', itinerary.id, len(flights_data))
         return jsonify({'success': True, 'message': 'Entry created', 'data': itinerary.id})
     except Exception as e:
         session.rollback()
+        logger.exception('Error creating itinerary')
         return jsonify({'success': False, 'message': str(e)}), 400
 
 
@@ -61,6 +66,7 @@ def get_flight(flight_id):
         ).scalar_one_or_none()
 
         if not entry:
+            logger.debug('Itinerary not found: id=%s', flight_id)
             return jsonify({'success': False, 'message': 'Entry not found'}), 404
 
         latest_success: FareSnapshot | None = None
@@ -78,6 +84,7 @@ def get_flight(flight_id):
             try:
                 converted_value = convert_amount(converted_value, src_currency, base_currency)
             except FXRatesError:
+                logger.warning('Failed to convert fare: itinerary_id=%s', flight_id)
                 pass
 
             converted_preview = {
@@ -99,6 +106,8 @@ def get_flight(flight_id):
             }
         )
     except Exception as e:
+        session.rollback()
+        logger.exception('Error retrieving itinerary: id=%s', flight_id)
         return jsonify({'success': False, 'message': str(e)}), 400
 
 
@@ -111,17 +120,20 @@ def update_flight(flight_id):
         ).scalar_one_or_none()
 
         if not entry:
+            logger.debug('Itinerary not found for update: %s', flight_id)
             return jsonify({'success': False, 'message': 'Entry not found'}), 404
 
         data = request.get_json(silent=True) or request.form.to_dict()
 
         if 'is_active' in data:
             entry.is_active = data['is_active']
+            logger.info('Updated itinerary: id=%s is_active=%s', flight_id, data['is_active'])
 
         session.commit()
         return jsonify({'success': True, 'message': 'Entry updated', 'data': entry.id})
     except Exception as e:
         session.rollback()
+        logger.exception('Error updating itinerary: id=%s', flight_id)
         return jsonify({'success': False, 'message': str(e)}), 400
 
 
@@ -134,13 +146,16 @@ def delete_flight(flight_id):
         ).scalar_one_or_none()
 
         if not entry:
+            logger.debug('Itinerary not found for deletion: %s', flight_id)
             return jsonify({'success': False, 'message': 'Entry not found'}), 404
 
         session.delete(entry)
         session.commit()
+        logger.info('Deleted itinerary: id=%s', flight_id)
         return jsonify({'success': True, 'message': 'Entry deleted', 'data': None})
     except Exception as e:
         session.rollback()
+        logger.exception('Error deleting itinerary: id=%s', flight_id)
         return jsonify({'success': False, 'message': str(e)}), 400
 
 
@@ -155,6 +170,7 @@ def scrape_flight(flight_id):
         ).scalar_one_or_none()
 
         if not itinerary:
+            logger.debug('Itinerary not found for scraping: %s', flight_id)
             return jsonify({'success': False, 'message': 'Entry not found'}), 404
 
         today = date.today()
@@ -172,6 +188,7 @@ def scrape_flight(flight_id):
         any_scraped_or_attempted = False
         if active_flights := [f for f in itinerary.flights if f.flight_date >= today]:
             any_scraped_or_attempted = True
+            logger.info('Scraping %d flights for itinerary %s', len(active_flights), flight_id)
 
             results = scrape_prices(
                 [FlightQuery(f.origin, f.destination, f.flight_date) for f in active_flights]
@@ -196,12 +213,15 @@ def scrape_flight(flight_id):
 
         if not any_scraped_or_attempted:
             session.rollback()
+            logger.warning('No active flights to scrape: itinerary_id=%s', flight_id)
             return jsonify(
                 {'success': False, 'message': 'Cannot scrape: flight date has passed for all legs'}
             ), 400
 
         session.commit()
+        logger.info('Scrape completed: itinerary_id=%s', flight_id)
         return jsonify({'success': True, 'message': 'Scrape completed', 'data': itinerary.id})
     except Exception as e:
         session.rollback()
+        logger.exception('Error scraping itinerary: id=%s', flight_id)
         return jsonify({'success': False, 'message': str(e)}), 400

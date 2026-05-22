@@ -1,3 +1,5 @@
+import logging
+
 from flask import Blueprint, jsonify, render_template, request
 
 from src.services import setting
@@ -8,6 +10,8 @@ from src.services.fx_rates import (
     get_rates,
 )
 from src.utils.email import get_smtp_config, send_html_email
+
+logger = logging.getLogger(__name__)
 
 settings_bp = Blueprint('settings', __name__, url_prefix='/settings')
 
@@ -44,6 +48,7 @@ def update_settings():
             try:
                 port = int(port)
             except (TypeError, ValueError):
+                logger.warning('Invalid SMTP port provided: port=%s', port)
                 return jsonify({'success': False, 'message': 'SMTP port must be an integer'}), 400
 
             smtp_settings = {
@@ -59,22 +64,27 @@ def update_settings():
                 smtp_settings['password'] = smtp['password']
 
             setting.set_many('smtp', smtp_settings)
+            logger.info('Updated SMTP settings')
 
         if email := data.get('email', {}):
             setting.set_many('email', {'recipients': email.get('recipients', '')})
+            logger.info('Updated email recipients')
 
         if currency := data.get('currency', {}):
             base_currency = (currency.get('base_currency') or 'HKD').strip().upper()
             if base_currency not in SUPPORTED_CURRENCIES:
+                logger.warning('Unsupported base currency requested: currency=%s', base_currency)
                 return jsonify({'success': False, 'message': 'Unsupported base currency'}), 400
 
             cache_ttl_raw = currency.get('cache_ttl', 86400)
             try:
                 cache_ttl = int(cache_ttl_raw)
             except (TypeError, ValueError):
+                logger.warning('Invalid cache TTL provided: ttl=%s', cache_ttl_raw)
                 return jsonify({'success': False, 'message': 'Cache TTL must be an integer'}), 400
 
             if cache_ttl <= 0:
+                logger.warning('Invalid cache TTL: must be greater than 0')
                 return jsonify(
                     {'success': False, 'message': 'Cache TTL must be greater than 0'}
                 ), 400
@@ -87,9 +97,13 @@ def update_settings():
                     'fxrates_api_key': (currency.get('fxrates_api_key') or '').strip(),
                 },
             )
+            logger.info(
+                'Updated currency settings: base_currency=%s cache_ttl=%d', base_currency, cache_ttl
+            )
 
         return jsonify({'success': True, 'message': 'Settings updated successfully'})
     except Exception as e:
+        logger.exception('Error updating settings')
         return jsonify({'success': False, 'message': str(e)}), 400
 
 
@@ -102,6 +116,7 @@ def patch_settings():
             try:
                 port = int(smtp.get('port', 587))
             except (TypeError, ValueError):
+                logger.warning('Invalid SMTP port in patch request: %s', smtp.get('port'))
                 return jsonify({'success': False, 'message': 'SMTP port must be an integer'}), 400
             cfg = {k: smtp.get(k, '') for k in ['host', 'user', 'sender_email', 'protocol']}
             cfg.update(
@@ -113,20 +128,25 @@ def patch_settings():
             if smtp.get('password'):
                 cfg['password'] = smtp['password']
             setting.set_many('smtp', cfg)
+            logger.info('SMTP settings patched')
 
         if 'email' in data and (email := data['email'] or {}):
             setting.set_many('email', {'recipients': email.get('recipients', '')})
+            logger.info('Email recipients patched')
 
         if 'currency' in data and (currency := data['currency'] or {}):
             base = (currency.get('base_currency') or 'HKD').strip().upper()
             if base not in SUPPORTED_CURRENCIES:
+                logger.warning('Unsupported base currency in patch: %s', base)
                 return jsonify({'success': False, 'message': 'Unsupported base currency'}), 400
             try:
                 ttl = int(currency.get('cache_ttl', 86400))
             except (TypeError, ValueError):
+                logger.warning('Invalid cache TTL in patch: %s', currency.get('cache_ttl'))
                 return jsonify({'success': False, 'message': 'Cache TTL must be an integer'}), 400
 
             if ttl <= 0:
+                logger.warning('Cache TTL must be positive')
                 return jsonify(
                     {'success': False, 'message': 'Cache TTL must be greater than 0'}
                 ), 400
@@ -138,9 +158,11 @@ def patch_settings():
                     'fxrates_api_key': (currency.get('fxrates_api_key') or '').strip(),
                 },
             )
+            logger.info('Currency settings patched to base_currency=%s', base)
 
         return jsonify({'success': True, 'message': 'Settings updated successfully'})
     except Exception as e:
+        logger.exception('Error patching settings')
         return jsonify({'success': False, 'message': str(e)}), 400
 
 
@@ -151,7 +173,9 @@ def refresh_fx_rates():
         base_currency = (
             (payload.get('base_currency') or get_configured_base_currency()).strip().upper()
         )
+        logger.info('FX rates refresh requested for %s', base_currency)
         rates = get_rates(base_currency, force_refresh=True)
+        logger.info('FX rates successfully refreshed for %s', base_currency)
         return jsonify(
             {
                 'success': True,
@@ -165,8 +189,10 @@ def refresh_fx_rates():
             }
         )
     except FXRatesError as e:
+        logger.warning('FX rates refresh failed: %s', e)
         return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
+        logger.exception('Unexpected error refreshing FX rates')
         return jsonify({'success': False, 'message': str(e)}), 400
 
 
@@ -177,10 +203,12 @@ def test_email():
         recipient = data.get('recipient', '').strip()
 
         if not recipient:
+            logger.warning('Test email requested without recipient')
             return jsonify(
                 {'success': False, 'message': 'Recipient email address is required'}
             ), 400
 
+        logger.info('Sending test email to %s', recipient)
         success = send_html_email(
             get_smtp_config(),
             recipient,
@@ -189,7 +217,9 @@ def test_email():
         )
 
         if success:
+            logger.info('Test email successfully sent to %s', recipient)
             return jsonify({'success': True, 'message': f'Test email sent to {recipient}'})
+        logger.warning('Failed to send test email to %s', recipient)
         return jsonify(
             {
                 'success': False,
@@ -197,4 +227,5 @@ def test_email():
             }
         ), 400
     except Exception as e:
+        logger.exception('Error sending test email')
         return jsonify({'success': False, 'message': str(e)}), 400

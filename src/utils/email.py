@@ -37,20 +37,29 @@ def send_email(cfg: SMTPConfig, msg: Message) -> bool:
         protocol = cfg.get('protocol', 'STARTTLS')
         require_auth = cfg.get('require_auth', True)
 
+        logger.debug('Sending email via protocol=%s require_auth=%s', protocol, require_auth)
+
         if protocol == 'SMTP_SSL':
-            with smtplib.SMTP_SSL(cfg['host'], cfg['port']) as server:
+            with smtplib.SMTP_SSL(cfg['host'], cfg['port'], timeout=15) as server:
                 if require_auth:
                     server.login(cfg['user'], cfg['password'])
                 server.send_message(msg)
         else:  # STARTTLS (default)
-            with smtplib.SMTP(cfg['host'], cfg['port']) as server:
+            with smtplib.SMTP(cfg['host'], cfg['port'], timeout=15) as server:
                 server.starttls()
                 if require_auth:
                     server.login(cfg['user'], cfg['password'])
                 server.send_message(msg)
+        logger.info('Email sent successfully')
         return True
-    except Exception as e:
-        logger.error(f'SMTP error: {e}')
+    except smtplib.SMTPAuthenticationError:
+        logger.error('SMTP authentication failed: invalid credentials')
+        return False
+    except smtplib.SMTPException:
+        logger.exception('SMTP error occurred')
+        return False
+    except Exception:
+        logger.exception('Unexpected error sending email')
         return False
 
 

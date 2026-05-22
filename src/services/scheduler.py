@@ -22,12 +22,17 @@ def daily_scrape_job():
 
     with scheduler.app.app_context():
         try:
+            logger.info('Daily scrape job started')
             today = date.today()
             itineraries = db.session.query(Itinerary).filter(Itinerary.is_active).all()
+            logger.debug('Processing %d active itineraries', len(itineraries))
+
+            scraped_count = 0
             for itinerary in itineraries:
                 if not (active_legs := [f for f in itinerary.flights if f.flight_date >= today]):
                     continue
 
+                scraped_count += 1
                 results = scrape_prices(
                     [FlightQuery(f.origin, f.destination, f.flight_date) for f in active_legs]
                 )
@@ -47,12 +52,14 @@ def daily_scrape_job():
                             )
                         )
             db.session.commit()
+            logger.info('Scraped prices for %d itineraries', scraped_count)
 
             smtp_cfg = get_smtp_config()
             base_currency = get_configured_base_currency()
             recipients = [
                 r.strip() for r in setting.get('email', 'recipients', '').split(',') if r.strip()
             ]
+            logger.debug('Email recipients count=%d', len(recipients))
 
             all_active_legs = [
                 f
@@ -61,6 +68,8 @@ def daily_scrape_job():
                 for f in itinerary.flights
                 if f.flight_date >= today
             ]
+
+            buy_signals_sent = 0
             for flight in all_active_legs:
                 r37 = compute_37_best(
                     flight.itinerary.created_at.date(),
@@ -75,6 +84,7 @@ def daily_scrape_job():
                 if r37.phase != Phase.BUY_SIGNAL:
                     continue
 
+                buy_signals_sent += 1
                 snap = max(
                     (s for s in flight.fare_snapshots if s.scrape_status == 'success'),
                     key=lambda s: s.created_at,
@@ -89,11 +99,10 @@ def daily_scrape_job():
                 try:
                     current_fare = convert_amount(current_fare, src_currency, base_currency)
                     lowest_fare = convert_amount(lowest_fare, src_currency, base_currency)
-                except FXRatesError as exc:
+                except FXRatesError:
                     logger.warning(
-                        'Unable to convert scheduler email fares for %s: %s',
+                        'Failed to convert fare for buy signal email: flight_id=%s',
                         flight.id,
-                        exc,
                     )
 
                 flight_date_str = flight.flight_date.strftime('%Y-%m-%d')
@@ -115,8 +124,10 @@ def daily_scrape_job():
                         daemon=True,
                     ).start()
 
-        except Exception as exc:
-            logger.error(f'Scheduler job failed: {exc}', exc_info=True)
+            logger.info('Daily scrape job completed: buy_signals_sent=%d', buy_signals_sent)
+
+        except Exception:
+            logger.exception('Daily scrape job failed')
             db.session.rollback()
         finally:
             db.session.remove()
