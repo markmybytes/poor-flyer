@@ -106,7 +106,20 @@ onMounted(() => {
         legend: { display: props.itinerary.tripType !== 'SINGLE' },
         tooltip: { padding: 12, cornerRadius: 8 },
       },
-      scales: { y: { grid: { color: '#f3f4f6' } }, x: { grid: { display: false } } },
+      scales: {
+        y: { grid: { color: '#f3f4f6' } },
+        x: {
+          grid: { display: false },
+          ticks: {
+            callback: function (_, index) {
+              if (labels.length <= 30) {
+                return this.getLabelForValue(index)
+              }
+              return index % 4 === 0 ? this.getLabelForValue(index) : ''
+            },
+          },
+        },
+      },
       interaction: { intersect: false, mode: 'index' },
     },
   })
@@ -118,7 +131,7 @@ onUnmounted(() => chart?.destroy())
 <template>
   <div>
     <template v-if="itinerary.flights.length">
-      <div class="rounded-3xl bg-base-100 p-4 md:p-6" style="height: 400px; position: relative">
+      <div class="relative h-100 rounded-3xl bg-base-100 p-4 max-sm:h-80 md:p-6">
         <canvas ref="chartCanvas"></canvas>
       </div>
     </template>
