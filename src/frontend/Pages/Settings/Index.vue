@@ -593,7 +593,10 @@ function sendTestEmail() {
                   <td colspan="2" class="text-center text-base-content/55">暫無匯率資料</td>
                 </tr>
 
-                <tr v-for="item in displayedRates" :key="item.code">
+                <tr
+                  v-for="item in displayedRates.toSorted((a, b) => a.code.localeCompare(b.code))"
+                  :key="item.code"
+                >
                   <td class="font-semibold">{{ item.code }}</td>
 
                   <td class="text-right">{{ Number(item.value).toFixed(6) }}</td>
