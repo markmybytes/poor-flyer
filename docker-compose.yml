@@ -6,9 +6,9 @@ services:
       - '8000:8000'
     environment:
       TZ: UTC
-      DATABASE_URL: sqlite:////app/data/db.sqlite
-      SCHEDULER_SCRAPE_CRON: '0 9 * * *'
-      SCHEDULER_SCRAPE_JITTER_SECONDS: 1800
+      PF_DATABASE_URL: sqlite:////app/data/db.sqlite
+      PF_SCHEDULER_SCRAPE_CRON: '0 9 * * *'
+      PF_SCHEDULER_SCRAPE_JITTER_SECONDS: 1800
       PUID: 1000
       PGID: 1000
     volumes:

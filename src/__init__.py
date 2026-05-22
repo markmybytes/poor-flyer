@@ -44,28 +44,28 @@ def create_app():
                     'id': 'scrape_fares',
                     'func': 'src.services.scheduler:scrape_fares',
                     'trigger': create_cron_trigger(
-                        os.getenv('SCHEDULER_SCRAPE_CRON', '0 9 * * *'),
-                        int(os.getenv('SCHEDULER_SCRAPE_JITTER_SECONDS', 1800)),
+                        os.getenv('PF_SCHEDULER_SCRAPE_CRON', '0 9 * * *'),
+                        int(os.getenv('PF_SCHEDULER_SCRAPE_JITTER_SECONDS', 1800)),
                     ),
                 },
                 {
                     'id': 'disable_departured_itineraries',
                     'func': 'src.services.scheduler:disable_departured_itineraries',
                     'trigger': create_cron_trigger(
-                        os.getenv('SCHEDULER_DISABLE_CRON', '0 0 * * *'),
+                        os.getenv('PF_SCHEDULER_DISABLE_CRON', '0 0 * * *'),
                     ),
                 },
             ],
-            'SQLALCHEMY_DATABASE_URI': os.getenv('DATABASE_URL', DEFAULT_DATABASE_URL),
+            'SQLALCHEMY_DATABASE_URI': os.getenv('PF_DATABASE_URL', DEFAULT_DATABASE_URL),
             'SQLALCHEMY_TRACK_MODIFICATIONS': False,
             'SCHEDULER_API_ENABLED': False,
             'VITE_HOT_FILE': os.getenv(
-                'VITE_HOT_FILE',
+                'PF_VITE_HOT_FILE',
                 str(Path(app.static_folder).joinpath('dist', 'hot')),
             ),
-            'LOG_FILE': os.getenv('LOG_FILE', str(base_dir.joinpath('data', 'app.log'))),
-            'LOG_MAX_BYTES': int(os.getenv('LOG_MAX_BYTES', str(10 * 1024 * 1024))),
-            'LOG_LEVEL': os.getenv('LOG_LEVEL', 'INFO'),
+            'LOG_FILE': os.getenv('PF_LOG_FILE', str(base_dir.joinpath('data', 'app.log'))),
+            'LOG_MAX_BYTES': int(os.getenv('PF_LOG_MAX_BYTES', str(10 * 1024 * 1024))),
+            'LOG_LEVEL': os.getenv('PF_LOG_LEVEL', 'INFO'),
         }
     )
 
