@@ -8,11 +8,47 @@ import { router } from '@inertiajs/vue3'
 import { ref } from 'vue'
 import { useToast } from 'vue-toast-notification'
 
+import { VueDatePicker } from '@vuepic/vue-datepicker'
+import '@vuepic/vue-datepicker/dist/main.css'
+import { zhHK } from 'date-fns/locale'
+
 const props = defineProps<{ itinerary: Itinerary; baseCurrency: string }>()
 const toast = useToast()
 
 const activeTab = ref('0')
 const loading = ref<string | null>(null)
+
+const showModal = ref(false)
+const deadlineValue = ref(props.itinerary.deadline || '')
+
+const openEditModal = () => {
+  deadlineValue.value = props.itinerary.deadline || ''
+  showModal.value = true
+}
+
+const submitDeadline = async (clear = false) => {
+  loading.value = 'update_deadline'
+  const targetDeadline = clear ? null : deadlineValue.value || null
+
+  try {
+    const res = await fetch(`/api/flights/${props.itinerary.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deadline: targetDeadline }),
+    })
+    if (!res.ok) {
+      throw new Error()
+    }
+
+    toast.success(clear ? '已移除購票限期' : '購票限期已更新')
+    showModal.value = false
+    router.reload()
+  } catch {
+    toast.error('更新限期失敗，請稍後再試')
+  } finally {
+    loading.value = null
+  }
+}
 
 const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
   if (action === 'delete' && !confirm('確認刪除此航班追蹤？')) {
@@ -90,6 +126,14 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
             >
               <span v-if="loading === 'toggle'" class="loading loading-xs loading-spinner"></span>
               {{ itinerary.isActive ? '停止追蹤' : '開啟追蹤' }}
+            </button>
+
+            <button
+              class="btn join-item btn-sm"
+              :disabled="loading !== null"
+              @click="openEditModal"
+            >
+              修改限期
             </button>
 
             <button
@@ -203,8 +247,11 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
               </span>
             </div>
 
-            <p class="mt-2 text-sm font-medium text-base-content/40">
-              設定限期以啟用購買時機分析。
+            <p class="mt-2 text-sm font-medium text-base-content/60">
+              <button class="inline-block link font-bold link-primary" @click="openEditModal">
+                設定限期
+              </button>
+              以啟用購買時機分析。
             </p>
           </template>
         </div>
@@ -320,7 +367,6 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
             leave-from-class="opacity-100 translate-x-0"
             leave-to-class="opacity-0 translate-x-8"
           >
-            <!-- add min-w-0 combat grid's default (min-w-auto) for Chart.js to resize correctly -->
             <div v-show="activeTab === 'graph'" class="col-start-1 row-start-1 min-w-0">
               <FareGraph :itinerary="itinerary" />
             </div>
@@ -328,5 +374,75 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
         </div>
       </div>
     </div>
+
+    <dialog class="modal" :class="{ 'modal-open': showModal }">
+      <div class="modal-box max-w-sm rounded-2xl border border-base-200 bg-base-100 shadow-xl">
+        <h3 class="mb-4 text-lg font-extrabold text-base-content">修改購票限期</h3>
+
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend mb-2 text-sm font-bold">購票限期</legend>
+
+          <VueDatePicker
+            v-model="deadlineValue"
+            :enable-time-picker="false"
+            :locale="zhHK"
+            auto-apply
+            model-type="yyyy-MM-dd"
+            teleport="body"
+          >
+            <template #trigger>
+              <input
+                type="text"
+                :value="deadlineValue"
+                placeholder="選擇日期"
+                class="input-bordered input w-full cursor-pointer transition-colors focus:input-primary"
+                readonly
+              />
+            </template>
+          </VueDatePicker>
+
+          <p class="mt-2 text-xs leading-relaxed text-base-content/50">
+            變更此參數將會依據您歷史儲存的價格數據，動態重新計算 37% 觀察期與決策期。
+          </p>
+        </fieldset>
+
+        <div
+          class="modal-action mt-6 flex items-center justify-between border-t border-base-200 pt-4"
+        >
+          <div>
+            <button
+              v-if="itinerary.deadline"
+              type="button"
+              class="btn btn-soft btn-sm btn-error"
+              :disabled="loading === 'update_deadline'"
+              @click="submitDeadline(true)"
+            >
+              移除限期
+            </button>
+          </div>
+
+          <div class="flex gap-2">
+            <button type="button" class="btn btn-ghost btn-sm" @click="showModal = false">
+              取消
+            </button>
+
+            <button
+              type="button"
+              class="btn px-5 shadow-sm btn-sm btn-primary"
+              :disabled="loading === 'update_deadline'"
+              @click="submitDeadline(false)"
+            >
+              <span
+                v-if="loading === 'update_deadline'"
+                class="loading loading-xs loading-spinner"
+              ></span>
+              儲存變更
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-backdrop bg-black/30 backdrop-blur-sm" @click="showModal = false"></div>
+    </dialog>
   </AppLayout>
 </template>

@@ -125,9 +125,19 @@ def update_flight(flight_id):
 
         data = request.get_json(silent=True) or request.form.to_dict()
 
+        # Handle tracking toggle state
         if 'is_active' in data:
             entry.is_active = data['is_active']
             logger.info('Updated itinerary: id=%s is_active=%s', flight_id, data['is_active'])
+
+        # Handle updating or removing purchase deadlines
+        if 'deadline' in data:
+            deadline_str = data['deadline']
+            if deadline_str:
+                entry.deadline = datetime.strptime(deadline_str, '%Y-%m-%d').date()
+            else:
+                entry.deadline = None
+            logger.info('Updated itinerary: id=%s deadline=%s', flight_id, entry.deadline)
 
         session.commit()
         return jsonify({'success': True, 'message': 'Entry updated', 'data': entry.id})
