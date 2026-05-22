@@ -5,6 +5,17 @@ import { useToast } from 'vue-toast-notification'
 
 const props = defineProps<{
   settings: {
+    currency?: {
+      baseCurrency?: string
+      fxratesApiKey?: string
+      cacheTtl?: string | number
+    }
+    email?: {
+      recipients?: string
+    }
+    itinerary?: {
+      disableDeparturedItineraries?: string
+    }
     smtp?: {
       host?: string
       port?: string | number
@@ -13,14 +24,6 @@ const props = defineProps<{
       senderEmail?: string
       requireAuth?: string
       protocol?: string
-    }
-    email?: {
-      recipients?: string
-    }
-    currency?: {
-      baseCurrency?: string
-      fxratesApiKey?: string
-      cacheTtl?: string | number
     }
   }
   supportedCurrencies: string[]
@@ -36,6 +39,18 @@ const props = defineProps<{
 const toast = useToast()
 
 const form = reactive({
+  currency: {
+    base_currency: props.settings.currency?.baseCurrency ?? 'HKD',
+    fxrates_api_key: props.settings.currency?.fxratesApiKey ?? '',
+    cache_ttl: Number(props.settings.currency?.cacheTtl ?? 86400),
+  },
+  email: {
+    recipients: props.settings.email?.recipients ?? '',
+  },
+  itinerary: {
+    disable_departured_itineraries:
+      props.settings.itinerary?.disableDeparturedItineraries !== 'false',
+  },
   smtp: {
     host: props.settings.smtp?.host ?? '',
     port: Number(props.settings.smtp?.port ?? 587),
@@ -44,14 +59,6 @@ const form = reactive({
     sender_email: props.settings.smtp?.senderEmail ?? '',
     require_auth: props.settings.smtp?.requireAuth !== 'false',
     protocol: props.settings.smtp?.protocol ?? 'STARTTLS',
-  },
-  email: {
-    recipients: props.settings.email?.recipients ?? '',
-  },
-  currency: {
-    base_currency: props.settings.currency?.baseCurrency ?? 'HKD',
-    fxrates_api_key: props.settings.currency?.fxratesApiKey ?? '',
-    cache_ttl: Number(props.settings.currency?.cacheTtl ?? 86400),
   },
 })
 
@@ -88,7 +95,7 @@ const fxStatusTime = computed(() => {
     : parsed.toLocaleString('zh-HK')
 })
 
-function saveSettings(sec: 'smtp' | 'email' | 'currency') {
+function saveSettings(sec: 'email' | 'currency' | 'smtp' | 'itinerary') {
   ui.saving = true
   const payloads = {
     smtp: {
@@ -105,6 +112,9 @@ function saveSettings(sec: 'smtp' | 'email' | 'currency') {
       base_currency: form.currency.base_currency,
       fxrates_api_key: form.currency.fxrates_api_key,
       cache_ttl: form.currency.cache_ttl,
+    },
+    itinerary: {
+      disable_departured_itineraries: form.itinerary.disable_departured_itineraries,
     },
   }
 
@@ -198,6 +208,50 @@ function sendTestEmail() {
     </div>
 
     <div class="space-y-6">
+      <div class="tracker-panel card rounded-lg">
+        <div class="card-body p-0">
+          <div class="border-b border-base-300/70 px-6 py-5">
+            <h3 class="text-base font-bold text-base-content">行程設定</h3>
+
+            <p class="mt-0.5 text-sm font-medium text-base-content/60">管理行程相關設定</p>
+          </div>
+
+          <form class="space-y-5 p-6" @submit.prevent="saveSettings('itinerary')">
+            <label
+              class="label cursor-pointer justify-start gap-4 rounded-lg border border-base-300/70 bg-base-200/40 px-4 py-4"
+            >
+              <input
+                v-model="form.itinerary.disable_departured_itineraries"
+                type="checkbox"
+                class="toggle toggle-primary"
+              />
+
+              <div>
+                <p class="text-sm font-bold text-base-content">停止追蹤過期航線</p>
+
+                <p class="text-xs font-medium text-base-content/55">
+                  自動在航線出發日期過後，停止追蹤機票價格。<br />
+                  以最後出發的航班日期作為準。
+                </p>
+              </div>
+            </label>
+
+            <div
+              class="flex flex-col items-start gap-3 border-t border-base-300/70 pt-4 sm:flex-row sm:items-center"
+            >
+              <button type="submit" :disabled="ui.saving" class="btn btn-primary">
+                <span v-if="ui.saving" class="loading loading-sm loading-spinner"></span>
+                {{ ui.saving ? '保存中...' : '保存設定' }}
+              </button>
+
+              <p v-if="ui.lastSaved" class="text-xs font-medium text-success">
+                ✓ 最後保存於 {{ ui.lastSaved }}
+              </p>
+            </div>
+          </form>
+        </div>
+      </div>
+
       <div class="tracker-panel card rounded-lg">
         <div class="card-body p-0">
           <div class="border-b border-base-300/70 px-6 py-5">

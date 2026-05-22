@@ -49,9 +49,10 @@ def index():
             'Settings/Index',
             props={
                 'settings': {
-                    'smtp': setting.get_all_masked('smtp'),
-                    'email': setting.get_all_masked('email'),
                     'currency': currency_settings,
+                    'email': setting.get_all_masked('email'),
+                    'itinerary': setting.get_all_masked('itinerary'),
+                    'smtp': setting.get_all_masked('smtp'),
                 },
                 'supportedCurrencies': SUPPORTED_CURRENCIES,
                 'fxStatus': fx_status,

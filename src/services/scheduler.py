@@ -4,8 +4,9 @@ import uuid
 from datetime import date
 
 from flask import render_template
+from sqlalchemy import func
 
-from src.extensions.database import FareSnapshot, Itinerary, db
+from src.extensions.database import FareSnapshot, Flight, Itinerary, db
 from src.services import setting
 from src.services.fx_rates import FXRatesError, convert_amount, get_configured_base_currency
 from src.services.scraper import FlightQuery, scrape_prices
@@ -128,6 +129,41 @@ def scrape_fares():
 
         except Exception:
             logger.exception('Daily scrape job failed')
+            db.session.rollback()
+        finally:
+            db.session.remove()
+
+
+def disable_departured_itineraries():
+    """Daily job to disable itineraries with past departure dates."""
+    from src.extensions.scheduler import scheduler
+
+    if not setting.get_bool('itinerary', 'disable_departured_itineraries', False):
+        logger.debug('Skipping disable_departured_itineraries job since it is disabled in settings')
+        return
+
+    with scheduler.app.app_context():
+        try:
+            today = date.today()
+
+            past_itineraries_subquery = (
+                db.session.query(Flight.itinerary_id)
+                .group_by(Flight.itinerary_id)
+                .having(func.max(Flight.flight_date) < today)
+                .subquery()
+            )
+
+            updated_count = (
+                db.session.query(Itinerary)
+                .filter(Itinerary.is_active)
+                .filter(Itinerary.id.in_(past_itineraries_subquery))
+                .update({Itinerary.is_active: False}, synchronize_session=False)
+            )
+
+            db.session.commit()
+            logger.info('Disabled %d itineraries with past departure dates', updated_count)
+        except Exception:
+            logger.exception('Failed to disable past itineraries')
             db.session.rollback()
         finally:
             db.session.remove()

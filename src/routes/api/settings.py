@@ -43,33 +43,6 @@ def update_settings():
     try:
         data = request.get_json(silent=True) or request.form.to_dict()
 
-        if smtp := data.get('smtp', {}):
-            port = smtp.get('port', 587)
-            try:
-                port = int(port)
-            except (TypeError, ValueError):
-                logger.warning('Invalid SMTP port provided: port=%s', port)
-                return jsonify({'success': False, 'message': 'SMTP port must be an integer'}), 400
-
-            smtp_settings = {
-                'host': smtp.get('host', ''),
-                'port': str(port),
-                'user': smtp.get('user', ''),
-                'sender_email': smtp.get('sender_email', ''),
-                'require_auth': 'true' if smtp.get('require_auth', True) else 'false',
-                'protocol': smtp.get('protocol', 'STARTTLS'),
-            }
-
-            if smtp.get('password'):
-                smtp_settings['password'] = smtp['password']
-
-            setting.set_many('smtp', smtp_settings)
-            logger.info('Updated SMTP settings')
-
-        if email := data.get('email', {}):
-            setting.set_many('email', {'recipients': email.get('recipients', '')})
-            logger.info('Updated email recipients')
-
         if currency := data.get('currency', {}):
             base_currency = (currency.get('base_currency') or 'HKD').strip().upper()
             if base_currency not in SUPPORTED_CURRENCIES:
@@ -101,6 +74,44 @@ def update_settings():
                 'Updated currency settings: base_currency=%s cache_ttl=%d', base_currency, cache_ttl
             )
 
+        if email := data.get('email', {}):
+            setting.set_many('email', {'recipients': email.get('recipients', '')})
+            logger.info('Updated email recipients')
+
+        if itinerary := data.get('itinerary', {}):
+            setting.set_many(
+                'itinerary',
+                {
+                    'disable_departured_itineraries': 'true'
+                    if itinerary.get('disable_departured_itineraries', False)
+                    else 'false',
+                },
+            )
+            logger.info('Updated itinerary settings')
+
+        if smtp := data.get('smtp', {}):
+            port = smtp.get('port', 587)
+            try:
+                port = int(port)
+            except (TypeError, ValueError):
+                logger.warning('Invalid SMTP port provided: port=%s', port)
+                return jsonify({'success': False, 'message': 'SMTP port must be an integer'}), 400
+
+            smtp_settings = {
+                'host': smtp.get('host', ''),
+                'port': str(port),
+                'user': smtp.get('user', ''),
+                'sender_email': smtp.get('sender_email', ''),
+                'require_auth': 'true' if smtp.get('require_auth', True) else 'false',
+                'protocol': smtp.get('protocol', 'STARTTLS'),
+            }
+
+            if smtp.get('password'):
+                smtp_settings['password'] = smtp['password']
+
+            setting.set_many('smtp', smtp_settings)
+            logger.info('Updated SMTP settings')
+
         return jsonify({'success': True, 'message': 'Settings updated successfully'})
     except Exception as e:
         logger.exception('Error updating settings')
@@ -111,28 +122,6 @@ def update_settings():
 def patch_settings():
     try:
         data = request.get_json(silent=True) or {}
-
-        if 'smtp' in data and (smtp := data['smtp'] or {}):
-            try:
-                port = int(smtp.get('port', 587))
-            except (TypeError, ValueError):
-                logger.warning('Invalid SMTP port in patch request: %s', smtp.get('port'))
-                return jsonify({'success': False, 'message': 'SMTP port must be an integer'}), 400
-            cfg = {k: smtp.get(k, '') for k in ['host', 'user', 'sender_email', 'protocol']}
-            cfg.update(
-                {
-                    'port': str(port),
-                    'require_auth': 'true' if smtp.get('require_auth', True) else 'false',
-                }
-            )
-            if smtp.get('password'):
-                cfg['password'] = smtp['password']
-            setting.set_many('smtp', cfg)
-            logger.info('SMTP settings patched')
-
-        if 'email' in data and (email := data['email'] or {}):
-            setting.set_many('email', {'recipients': email.get('recipients', '')})
-            logger.info('Email recipients patched')
 
         if 'currency' in data and (currency := data['currency'] or {}):
             base = (currency.get('base_currency') or 'HKD').strip().upper()
@@ -159,6 +148,39 @@ def patch_settings():
                 },
             )
             logger.info('Currency settings patched to base_currency=%s', base)
+
+        if 'email' in data and (email := data['email'] or {}):
+            setting.set_many('email', {'recipients': email.get('recipients', '')})
+            logger.info('Email recipients patched')
+
+        if 'itinerary' in data and (itinerary := data['itinerary'] or {}):
+            setting.set_many(
+                'itinerary',
+                {
+                    'disable_departured_itineraries': 'true'
+                    if itinerary.get('disable_departured_itineraries', False)
+                    else 'false',
+                },
+            )
+            logger.info('Itinerary settings patched')
+
+        if 'smtp' in data and (smtp := data['smtp'] or {}):
+            try:
+                port = int(smtp.get('port', 587))
+            except (TypeError, ValueError):
+                logger.warning('Invalid SMTP port in patch request: %s', smtp.get('port'))
+                return jsonify({'success': False, 'message': 'SMTP port must be an integer'}), 400
+            cfg = {k: smtp.get(k, '') for k in ['host', 'user', 'sender_email', 'protocol']}
+            cfg.update(
+                {
+                    'port': str(port),
+                    'require_auth': 'true' if smtp.get('require_auth', True) else 'false',
+                }
+            )
+            if smtp.get('password'):
+                cfg['password'] = smtp['password']
+            setting.set_many('smtp', cfg)
+            logger.info('SMTP settings patched')
 
         return jsonify({'success': True, 'message': 'Settings updated successfully'})
     except Exception as e:

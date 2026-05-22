@@ -47,7 +47,14 @@ def create_app():
                         os.getenv('SCHEDULER_SCRAPE_CRON', '0 9 * * *'),
                         int(os.getenv('SCHEDULER_SCRAPE_JITTER_SECONDS', 1800)),
                     ),
-                }
+                },
+                {
+                    'id': 'disable_departured_itineraries',
+                    'func': 'src.services.scheduler:disable_departured_itineraries',
+                    'trigger': create_cron_trigger(
+                        os.getenv('SCHEDULER_DISABLE_CRON', '0 0 * * *'),
+                    ),
+                },
             ],
             'SQLALCHEMY_DATABASE_URI': os.getenv('DATABASE_URL', DEFAULT_DATABASE_URL),
             'SQLALCHEMY_TRACK_MODIFICATIONS': False,
