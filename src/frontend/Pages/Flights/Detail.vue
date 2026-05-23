@@ -8,6 +8,7 @@ import { router } from '@inertiajs/vue3'
 import { ref } from 'vue'
 import { useToast } from 'vue-toast-notification'
 
+import { Icon } from '@iconify/vue'
 import { VueDatePicker } from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
 import { zhHK } from 'date-fns/locale'
@@ -124,16 +125,28 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
               :disabled="loading === 'toggle'"
               @click="runAction('toggle')"
             >
-              <span v-if="loading === 'toggle'" class="loading loading-xs loading-spinner"></span>
               {{ itinerary.isActive ? '停止追蹤' : '開啟追蹤' }}
             </button>
 
             <button
+              title="修改限期"
               class="btn join-item btn-sm"
               :disabled="loading !== null"
               @click="openEditModal"
             >
-              修改限期
+              <Icon icon="mdi:calendar-edit" />
+            </button>
+
+            <button
+              title="刪除"
+              class="btn join-item btn-soft btn-sm btn-error"
+              :disabled="loading === 'delete'"
+              @click="runAction('delete')"
+            >
+              <Icon
+                :icon="loading === 'delete' ? 'mdi:loading' : 'mdi:delete'"
+                :class="{ 'animate-spin': loading === 'delete' }"
+              />
             </button>
 
             <button
@@ -143,15 +156,6 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
             >
               <span v-if="loading === 'scrape'" class="loading loading-xs loading-spinner"></span>
               {{ loading === 'scrape' ? '擷取中...' : '擷取最新價格' }}
-            </button>
-
-            <button
-              class="btn join-item btn-soft btn-sm btn-error"
-              :disabled="loading === 'delete'"
-              @click="runAction('delete')"
-            >
-              <span v-if="loading === 'delete'" class="loading loading-xs loading-spinner"></span>
-              刪除
             </button>
           </div>
         </div>
@@ -380,7 +384,7 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
         <h3 class="mb-4 text-lg font-extrabold text-base-content">修改購票限期</h3>
 
         <fieldset class="fieldset">
-          <legend class="fieldset-legend mb-2 text-sm font-bold">購票限期</legend>
+          <legend class="fieldset-legend mb-2 text-sm font-bold">限期</legend>
 
           <VueDatePicker
             v-model="deadlineValue"
@@ -400,10 +404,6 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
               />
             </template>
           </VueDatePicker>
-
-          <p class="mt-2 text-xs leading-relaxed text-base-content/50">
-            變更此參數將會依據您歷史儲存的價格數據，動態重新計算 37% 觀察期與決策期。
-          </p>
         </fieldset>
 
         <div
@@ -436,13 +436,13 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
                 v-if="loading === 'update_deadline'"
                 class="loading loading-xs loading-spinner"
               ></span>
-              儲存變更
+              更新
             </button>
           </div>
         </div>
       </div>
 
-      <div class="modal-backdrop bg-black/30 backdrop-blur-sm" @click="showModal = false"></div>
+      <div class="modal-backdrop bg-black/10 backdrop-blur-xs" @click="showModal = false"></div>
     </dialog>
   </AppLayout>
 </template>
