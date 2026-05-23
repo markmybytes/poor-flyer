@@ -37,7 +37,7 @@ import { Link } from '@inertiajs/vue3'
             >
               <span class="hidden sm:inline">追蹤清單</span>
 
-              <span class="sm:hidden">清單</span>
+              <span class="sm:hidden">追蹤</span>
             </Link>
 
             <Link
@@ -63,9 +63,9 @@ import { Link } from '@inertiajs/vue3'
                   : 'font-semibold btn-ghost'
               "
             >
-              <span class="hidden sm:inline">日誌</span>
+              <span class="hidden sm:inline">系統紀錄</span>
 
-              <span class="sm:hidden">日誌</span>
+              <span class="sm:hidden">紀錄</span>
             </Link>
           </div>
         </div>

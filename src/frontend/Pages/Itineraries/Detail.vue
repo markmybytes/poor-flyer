@@ -41,7 +41,7 @@ const submitDeadline = async (clear = false) => {
       throw new Error()
     }
 
-    toast.success(clear ? '已移除購票限期' : '購票限期已更新')
+    toast.success(clear ? '已移除購票限期' : '已更新購票限期')
     showModal.value = false
     router.reload()
   } catch {
@@ -52,7 +52,7 @@ const submitDeadline = async (clear = false) => {
 }
 
 const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
-  if (action === 'delete' && !confirm('確認刪除此航班追蹤？')) {
+  if (action === 'delete' && !confirm('確定刪除此追蹤？')) {
     return
   }
   loading.value = action
@@ -81,7 +81,7 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
     }
   } catch {
     toast.error(
-      `${action === 'scrape' ? '擷取' : action === 'delete' ? '刪除' : '操作'}失敗，請稍後再試`,
+      `${action === 'scrape' ? '更新票價' : action === 'delete' ? '刪除' : '操作'}失敗，請稍後再試`,
     )
   } finally {
     loading.value = null
@@ -104,7 +104,7 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
                 出發日期：{{ fmtDate(itinerary.flights[0].flightDate) }}
                 <span v-if="itinerary.deadline" class="mx-2 text-base-content/30">|</span>
 
-                <span v-if="itinerary.deadline">限期：{{ fmtDate(itinerary.deadline) }}</span>
+                <span v-if="itinerary.deadline">購票限期：{{ fmtDate(itinerary.deadline) }}</span>
               </p>
             </div>
 
@@ -125,11 +125,11 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
               :disabled="loading === 'toggle'"
               @click="runAction('toggle')"
             >
-              {{ itinerary.isActive ? '停止追蹤' : '開啟追蹤' }}
+              {{ itinerary.isActive ? '暫停追蹤' : '開始追蹤' }}
             </button>
 
             <button
-              title="修改限期"
+              title="修改購票限期"
               class="btn join-item btn-sm"
               :disabled="loading !== null"
               @click="openEditModal"
@@ -138,7 +138,7 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
             </button>
 
             <button
-              title="刪除"
+              title="刪除此追蹤"
               class="btn join-item btn-soft btn-sm btn-error"
               :disabled="loading === 'delete'"
               @click="runAction('delete')"
@@ -155,7 +155,7 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
               @click="runAction('scrape')"
             >
               <span v-if="loading === 'scrape'" class="loading loading-xs loading-spinner"></span>
-              {{ loading === 'scrape' ? '擷取中...' : '擷取最新價格' }}
+              {{ loading === 'scrape' ? '更新中...' : '下載最新票價' }}
             </button>
           </div>
         </div>
@@ -194,10 +194,10 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
               >
                 {{
                   itinerary.rule37Analysis.phase === 'BUY_SIGNAL'
-                    ? '購買信號 (最佳時機)'
+                    ? '入手訊號'
                     : itinerary.rule37Analysis.phase === 'OBSERVING'
-                      ? '觀察期'
-                      : '等待中'
+                      ? '數據觀察期'
+                      : '決策期'
                 }}
               </span>
 
@@ -217,16 +217,16 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
 
             <p class="mt-2 text-xs font-medium text-base-content/60">
               <span v-if="itinerary.rule37Analysis.phase === 'BUY_SIGNAL'">
-                價格低於門檻，為購入的最佳時機。
+                最新總計已跌穿觀察期錄得的最低價格。
               </span>
 
               <span v-else-if="itinerary.rule37Analysis.phase === 'OBSERVING'">
-                收集基準數據中。決策期將於
+                系統現正收集票價數據，決策期將於
                 <span class="font-bold">{{ fmtDate(itinerary.rule37Analysis.cutoffDate) }}</span>
                 開始。
               </span>
 
-              <span v-else>已進入決策期。若價格低於觸發門檻，系統將提示購買。</span>
+              <span v-else>已進入決策階段。只要總價低於對比基準，系統便會即時提示你出手。</span>
             </p>
           </template>
 
@@ -237,9 +237,7 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
               <span class="text-xl font-extrabold tracking-tight text-warning">收集數據中</span>
             </div>
 
-            <p class="mt-2 text-sm font-medium text-base-content/60">
-              尚無足夠的歷史數據以進行購買時機分析。
-            </p>
+            <p class="mt-2 text-sm font-medium text-base-content/60">未有足夠數據分析購買時機。</p>
           </template>
 
           <template v-else>
@@ -247,13 +245,13 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
               <span class="status status-lg status-neutral opacity-40"></span>
 
               <span class="text-xl font-extrabold tracking-tight text-base-content/40">
-                無購票限期
+                未啟用數據分析
               </span>
             </div>
 
             <p class="mt-2 text-sm font-medium text-base-content/60">
               <button class="inline-block link font-bold link-primary" @click="openEditModal">
-                設定限期
+                設定購票限期
               </button>
               以啟用購買時機分析。
             </p>
@@ -268,7 +266,7 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
           >
             <div class="flex items-center justify-between">
               <span class="text-[10px] font-bold tracking-widest text-base-content/50 uppercase">
-                最新總價
+                最新總計
               </span>
             </div>
 
@@ -339,7 +337,7 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
             :class="activeTab === 'graph' ? 'tab-active' : ''"
             @click="activeTab = 'graph'"
           >
-            價格趨勢圖表
+            價格趨勢圖
           </button>
         </div>
 

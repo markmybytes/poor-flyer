@@ -111,10 +111,10 @@ function submit() {
     .then((res) =>
       res.json().then((data) => {
         if (!res.ok) {
-          toast.error(data.message || '建立失敗，請檢查輸入內容')
+          toast.error(data.message || '新增失敗，請檢查輸入內容')
           return
         }
-        toast.success('航班追蹤已建立')
+        toast.success('已成功建立票價追蹤')
         router.visit('/')
       }),
     )
@@ -134,48 +134,50 @@ function submit() {
         <ul>
           <li><Link href="/">追蹤清單</Link></li>
 
-          <li>新增航班</li>
+          <li>建立新旅程</li>
         </ul>
       </div>
 
       <div>
-        <h2 class="text-3xl font-extrabold tracking-tight text-base-content">建立新追蹤</h2>
+        <h2 class="text-3xl font-extrabold tracking-tight text-base-content">建立新旅程</h2>
 
-        <p class="mt-2 text-base-content/70">輸入航班資訊，系統會依照排程收集機票價格資料。</p>
+        <p class="mt-2 text-base-content/70">
+          輸入你想追蹤的航段資料，系統將依排程自動追蹤並記錄機票價格變動。
+        </p>
       </div>
     </div>
 
     <div class="card mb-6 rounded-2xl border border-base-200 bg-base-100 shadow-sm">
       <div class="card-body p-6 md:p-8">
-        <h3 class="mb-3 text-lg font-bold text-base-content">購買時機分析原理</h3>
+        <h3 class="mb-3 text-lg font-bold text-base-content">最佳購買時機分析原理</h3>
 
         <div class="space-y-3 text-sm leading-relaxed text-base-content/70">
           <p>
             PoorFlyer 採用<span class="font-semibold text-base-content">「37% 法則」</span>
-            來判斷購票時機。這是一個來自最優停止理論（Optimal Stopping
-            Theory）的數學策略，用於在有限時間內做出最優決策。
+            判斷黃金購票時機。此策略源自數學的「最佳停止理論」（Optimal Stopping
+            Theory），旨在有限時間及選擇內找出最的選項。
           </p>
 
-          <p>運作方式：當你設定購票限期後，系統會將整段觀察期分為兩個階段：</p>
+          <p>運作原理：設定購票限期後，系統會將整個觀察期自動分為兩個階段：</p>
 
           <ul class="list-inside list-disc space-y-1.5 pl-1">
             <li>
-              <span class="font-semibold text-base-content">觀察期</span>（前 37%
-              時間）：收集數據，記錄出現過的最低票價格作為基準。
+              <span class="font-semibold text-base-content">數據觀察期</span>（前 37%
+              時間）：純粹收集票價，記錄期間出現過的最低價格作為「對比基準」。
             </li>
 
             <li>
               <span class="font-semibold text-base-content">決策期</span>
 
-              （後 63% 時間）：一旦出現低於觀察期最低價的票價，即發出<span
-                class="font-medium text-success"
-                >購買信號</span
-              >。
+              （後 63% 時間）：一旦票價跌穿觀察期的最低價格，系統便會發出
+              <span class="font-medium text-success">入手訊號 </span>
+              。
             </li>
           </ul>
 
           <p class="mt-2 text-xs text-base-content/50">
-            設定購票限期為選填項目。若不設定，系統仍會持續追蹤票價歷史，但不會提供購買時機建議。
+            *
+            購票限期為選填項目。若未有設定，系統仍會持續記錄歷史票價並繪製趨勢圖，但不會提供購票時機建議。
           </p>
         </div>
       </div>
@@ -225,20 +227,18 @@ function submit() {
               >
                 <div class="mb-5 flex items-center gap-3 border-b border-base-200 pb-3">
                   <h4 class="font-bold text-base-content">
-                    {{
-                      form.tripType === 'MULTI_CITY' ? `航班資料 - 第 ${index + 1} 程` : '航班資料'
-                    }}
+                    {{ form.tripType === 'MULTI_CITY' ? `第 ${index + 1} 航段資料` : '航段資料' }}
                   </h4>
                 </div>
 
                 <div class="grid gap-6 md:grid-cols-3">
                   <fieldset class="fieldset">
-                    <legend class="fieldset-legend text-sm font-bold">出發地機場代碼</legend>
+                    <legend class="fieldset-legend text-sm font-bold">出發地 (IATA 代碼)</legend>
 
                     <input
                       v-model="leg.origin"
                       type="text"
-                      placeholder="如: HKG"
+                      placeholder="例如: HKG"
                       class="input-bordered input w-full uppercase transition-colors focus:input-primary"
                       required
                       maxlength="3"
@@ -247,12 +247,12 @@ function submit() {
                   </fieldset>
 
                   <fieldset class="fieldset">
-                    <legend class="fieldset-legend text-sm font-bold">目的地機場代碼</legend>
+                    <legend class="fieldset-legend text-sm font-bold">目的地 (IATA 代碼)</legend>
 
                     <input
                       v-model="leg.destination"
                       type="text"
-                      placeholder="如: NRT"
+                      placeholder="例如: NRT"
                       class="input-bordered input w-full uppercase transition-colors focus:input-primary"
                       required
                       maxlength="3"
@@ -262,7 +262,7 @@ function submit() {
 
                   <fieldset class="fieldset">
                     <legend class="fieldset-legend text-sm font-bold">
-                      {{ form.tripType === 'ROUND_TRIP' ? '去回程日期' : '出發日期' }}
+                      {{ form.tripType === 'ROUND_TRIP' ? '去程及回程日期' : '出發日期' }}
                     </legend>
 
                     <VueDatePicker
@@ -320,12 +320,12 @@ function submit() {
             </div>
           </div>
 
-          <div class="divider text-base-content/30">進階設定</div>
+          <div class="divider text-base-content/30">分析設定</div>
 
           <div class="grid gap-6 md:grid-cols-2">
             <fieldset class="fieldset">
               <legend class="fieldset-legend text-sm font-bold">
-                購票限期 <span class="font-normal text-base-content/50">（選填）</span>
+                最遲購票限期 <span class="font-normal text-base-content/50">（選填）</span>
               </legend>
 
               <VueDatePicker
@@ -345,12 +345,13 @@ function submit() {
                     placeholder="選擇日期"
                     class="input-bordered input w-full cursor-pointer transition-colors focus:input-primary"
                     readonly
-                    :disabled="form.processing"
                   />
                 </template>
               </VueDatePicker>
 
-              <p class="label mt-1 p-0 text-xs text-base-content/55">設定後將啟用購買時機分析</p>
+              <p class="label mt-1 p-0 text-xs text-base-content/55">
+                設定限期後系統方可計算最佳購買時機
+              </p>
             </fieldset>
 
             <fieldset class="fieldset justify-end">
@@ -365,9 +366,9 @@ function submit() {
                 />
 
                 <div>
-                  <span class="label-text block text-sm font-bold">啟用追蹤</span>
+                  <span class="label-text block text-sm font-bold">啟用自動追蹤</span>
 
-                  <span class="label-text-alt text-base-content/60">自動收集機票價格</span>
+                  <span class="label-text-alt text-base-content/60">每日自動更新並記錄票價</span>
                 </div>
               </label>
             </fieldset>
@@ -382,7 +383,7 @@ function submit() {
               :disabled="form.processing"
             >
               <span v-if="form.processing" class="loading loading-spinner"></span>
-              {{ form.processing ? '設定中...' : '建立追蹤' }}
+              {{ form.processing ? '處理中...' : '建立' }}
             </button>
           </div>
         </form>

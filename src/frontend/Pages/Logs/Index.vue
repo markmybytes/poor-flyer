@@ -34,7 +34,6 @@ const dateRange = ref<Date[] | null>(
     : null,
 )
 
-// NEW: Track items per page, initialize from backend props
 const itemsPerPage = ref(props.pagination.perPage || 50)
 
 const isAllLevelsSelected = computed(() =>
@@ -69,7 +68,7 @@ function navigate(page = 1) {
   expandedRows.value = []
   const data: Record<string, string | number> = {
     page,
-    per_page: itemsPerPage.value, // <-- Added to API payload
+    per_page: itemsPerPage.value,
     levels: selectedLevels.value.join(','),
   }
 
@@ -118,7 +117,6 @@ const pageNumbers = computed((): (number | '...')[] => {
   const { page } = props.pagination
   const total = totalPages.value
 
-  // If total pages are 7 or less, just show them all
   if (total <= 7) {
     return Array.from({ length: total }, (_, i) => i + 1)
   }
@@ -140,7 +138,7 @@ function clearLogs() {
     .then((r) => r.json())
     .then((d: { success: boolean; message?: string }) => {
       if (!d.success) throw new Error(d.message || '清除失敗')
-      toast.success('日誌已清除')
+      toast.success('已刪除所有紀錄')
       confirmModal.value?.close()
       router.reload()
     })
@@ -152,17 +150,15 @@ function clearLogs() {
 <template>
   <AppLayout>
     <div class="mb-8">
-      <h2 class="text-3xl font-extrabold tracking-tight text-base-content">應用程式日誌</h2>
+      <h2 class="text-3xl font-extrabold tracking-tight text-base-content">系統運行紀錄</h2>
 
-      <p class="mt-2 text-sm font-medium text-base-content/65">
-        查看、篩選和管理應用程式運行日誌。
-      </p>
+      <p class="mt-2 text-sm font-medium text-base-content/65">檢視、篩選及管理系統的運行紀錄。</p>
     </div>
 
     <div class="tracker-panel mb-6 rounded-lg border border-base-200 bg-base-100 p-4 shadow-sm">
       <div class="flex flex-wrap items-end gap-4">
         <div class="min-w-48 flex-1">
-          <div class="mb-2 text-xs font-semibold text-base-content/70">日誌級別</div>
+          <div class="mb-2 text-xs font-semibold text-base-content/70">紀錄級別</div>
 
           <div class="join flex flex-wrap gap-0">
             <button
@@ -203,7 +199,7 @@ function clearLogs() {
 
         <div class="flex-none">
           <button class="btn btn-outline btn-sm btn-error" @click="confirmModal?.showModal()">
-            清除日誌
+            清理紀錄
           </button>
         </div>
       </div>
@@ -213,20 +209,20 @@ function clearLogs() {
       <div v-if="logs.length === 0" class="py-16 text-center text-base-content/50">
         <div class="mb-2 text-4xl">📋</div>
 
-        <div class="font-medium">沒有符合條件的日誌記錄</div>
+        <div class="font-medium">無符合篩選條件的紀錄</div>
       </div>
 
       <div v-else class="overflow-x-auto">
         <table class="table w-full table-sm">
           <thead>
             <tr class="bg-base-200/60 text-xs uppercase">
-              <th class="hidden w-44 md:table-cell">時間戳記</th>
+              <th class="hidden w-44 md:table-cell">時間</th>
 
-              <th class="w-20">級別</th>
+              <th class="w-20">等級</th>
 
               <th class="hidden w-48 md:table-cell">來源</th>
 
-              <th>訊息</th>
+              <th>內容</th>
 
               <th class="w-8"></th>
             </tr>
@@ -313,20 +309,20 @@ function clearLogs() {
 
     <div class="mt-6 flex flex-col items-center justify-between gap-4 sm:flex-row">
       <div class="flex items-center gap-3 text-sm text-base-content/70">
-        <span>顯示 {{ startIndex }} - {{ endIndex }} 筆，共 {{ pagination.total }} 筆</span>
+        <span>顯示第 {{ startIndex }} 至 {{ endIndex }} 條，共 {{ pagination.total }} 條紀錄</span>
 
         <select
           v-model="itemsPerPage"
-          class="select-bordered select w-28 bg-base-100 select-sm"
+          class="select-bordered select w-32 bg-base-100 select-sm"
           @change="navigate(1)"
         >
-          <option :value="20">20 筆 / 頁</option>
+          <option :value="20">每頁 20 條</option>
 
-          <option :value="50">50 筆 / 頁</option>
+          <option :value="50">每頁 50 條</option>
 
-          <option :value="100">100 筆 / 頁</option>
+          <option :value="100">每頁 100 條</option>
 
-          <option :value="500">500 筆 / 頁</option>
+          <option :value="500">每頁 500 條</option>
         </select>
       </div>
 
@@ -366,10 +362,10 @@ function clearLogs() {
 
     <dialog ref="confirmModal" class="modal">
       <div class="modal-box">
-        <h3 class="text-lg font-bold">確認清除日誌</h3>
+        <h3 class="text-lg font-bold">確認清除紀錄</h3>
 
-        <p class="py-4 text-base-content/70">
-          此操作將永久清除所有日誌記錄，且無法復原。確定繼續嗎？
+        <p class="py-4 text-sm text-base-content/70">
+          此操作將永久清除所有系統紀錄且無法復原。確定繼續？
         </p>
 
         <div class="modal-action">
