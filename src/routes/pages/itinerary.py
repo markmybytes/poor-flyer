@@ -19,7 +19,7 @@ from src.utils.transform import model_to_dict
 
 logger = logging.getLogger(__name__)
 
-flights_bp = Blueprint('flights', __name__, url_prefix='/flights')
+itineraries_bp = Blueprint('itineraries', __name__, url_prefix='/itineraries')
 
 
 def _serialize_snapshot(snapshot: FareSnapshot, currency: str) -> dict:
@@ -109,7 +109,7 @@ def _serialize_itinerary(itinerary: Itinerary, base_currency: str) -> dict:
     }
 
 
-@flights_bp.route('/')
+@itineraries_bp.route('/')
 def index():
     base_currency = get_configured_base_currency()
     itineraries = (
@@ -122,10 +122,10 @@ def index():
         .unique()
         .all()
     )
-    logger.debug('Rendered flights index: itineraries=%d', len(itineraries))
+    logger.debug('Rendered itineraries index: itineraries=%d', len(itineraries))
 
     return render_inertia(
-        'Flights/Index',
+        'Itineraries/Index',
         props={
             'itineraries': [_serialize_itinerary(it, base_currency) for it in itineraries],
             'base_currency': base_currency,
@@ -133,33 +133,33 @@ def index():
     )
 
 
-@flights_bp.route('/create')
+@itineraries_bp.route('/create')
 def create():
-    return render_inertia('Flights/Create')
+    return render_inertia('Itineraries/Create')
 
 
-@flights_bp.route('/<flight_id>')
-def show(flight_id):
+@itineraries_bp.route('/<itinerary_id>')
+def show(itinerary_id):
     try:
         base_currency = get_configured_base_currency()
 
         itinerary = db.session.execute(
             select(Itinerary)
             .options(selectinload(Itinerary.flights).selectinload(Flight.fare_snapshots))
-            .where(Itinerary.id == flight_id)
+            .where(Itinerary.id == itinerary_id)
         ).scalar_one_or_none()
 
         if not itinerary:
-            logger.debug('Itinerary not found: id=%s', flight_id)
-            return redirect('/flights/')
+            logger.debug('Itinerary not found: id=%s', itinerary_id)
+            return redirect('/itineraries/')
 
         return render_inertia(
-            'Flights/Detail',
+            'Itineraries/Detail',
             props={
-                'itinerary': _serialize_itinerary(itinerary, base_currency),
+            'itinerary': _serialize_itinerary(itinerary, base_currency),
                 'base_currency': base_currency,
             },
         )
     except Exception:
-        logger.exception('Error rendering flights detail page: id=%s', flight_id)
-        return redirect('/flights/')
+        logger.exception('Error rendering itineraries detail page: id=%s', itinerary_id)
+        return redirect('/itineraries/')

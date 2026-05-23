@@ -21,7 +21,7 @@ WORKDIR /app
 
 ENV DISPLAY=:99
 
-VOLUME ["/app/data"]
+VOLUME ["/app/instance"]
 
 RUN apt-get update && apt-get install -y \
     xvfb \

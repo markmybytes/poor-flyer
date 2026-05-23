@@ -6,6 +6,7 @@ from pathlib import Path
 
 import httpx
 from fake_useragent import UserAgent
+from flask import current_app
 from patchright.sync_api import sync_playwright
 
 logger = logging.getLogger(__name__)
@@ -86,7 +87,7 @@ def scrape_prices_advanced(
     try:
         with sync_playwright() as p:
             ctx = p.chromium.launch_persistent_context(
-                user_data_dir=Path('patchright_profile').absolute(),
+                user_data_dir=str(Path(current_app.instance_path).joinpath('patchright_profile')),
                 channel='chrome',
                 headless=False,
                 no_viewport=True,
