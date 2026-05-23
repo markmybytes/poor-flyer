@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import AppLayout from '@/Layouts/AppLayout.vue'
 import type { Itinerary } from '@/types'
 import { fmtDate, fmtFare, fmtItineraryName } from '@/utils'
@@ -63,14 +63,14 @@ const summary = computed(() => {
     <div class="mb-8 flex items-center justify-between">
       <div class="flex-1"></div>
 
-      <Link href="/flights/create" class="btn shadow-sm btn-primary">建立追蹤</Link>
+      <Link href="/itineraries/create" class="btn shadow-sm btn-primary">建立追蹤</Link>
     </div>
 
     <div v-if="itineraries?.length" class="grid gap-6 lg:grid-cols-2">
       <Link
         v-for="itinerary in itineraries.toSorted((a, b) => a.createdAt.localeCompare(b.createdAt))"
         :key="itinerary.id"
-        :href="`/flights/${itinerary.id}`"
+        :href="`/itineraries/${itinerary.id}`"
         class="tracker-panel group card rounded-lg border bg-base-100 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
         :class="{
           'border-success/40 hover:border-success/70':
@@ -241,7 +241,7 @@ const summary = computed(() => {
           加入您想關注的出發地與目的地，我們將為您不間斷追蹤價格，並在最佳時機提示您購買。
         </p>
 
-        <Link href="/flights/create" class="btn shadow-sm btn-lg btn-primary">
+        <Link href="/itineraries/create" class="btn shadow-sm btn-lg btn-primary">
           建立您的第一個追蹤
         </Link>
       </div>

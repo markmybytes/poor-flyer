@@ -103,7 +103,7 @@ function submit() {
     }),
   }
 
-  fetch('/api/flights', {
+  fetch('/api/itineraries', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -355,7 +355,7 @@ function submit() {
 
             <fieldset class="fieldset justify-end">
               <label
-                class="label cursor-pointer justify-start gap-4 rounded-xl border border-base-200 bg-base-200/20 p-4 transition-colors hover:border-success/30"
+                class="cursor-pointer.justify-start label gap-4 rounded-xl border border-base-200 bg-base-200/20 p-4 transition-colors hover:border-success/30"
               >
                 <input
                   v-model="form.isActive"

@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import FareGraph from '@/Components/FareGraph.vue'
 import FaretList from '@/Components/FareList.vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
@@ -32,7 +32,7 @@ const submitDeadline = async (clear = false) => {
   const targetDeadline = clear ? null : deadlineValue.value || null
 
   try {
-    const res = await fetch(`/api/flights/${props.itinerary.id}`, {
+    const res = await fetch(`/api/itineraries/${props.itinerary.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ deadline: targetDeadline }),
@@ -67,7 +67,7 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
 
   try {
     const res = await fetch(
-      `/api/flights/${props.itinerary.id}${action === 'scrape' ? '/scrape' : ''}`,
+      `/api/itineraries/${props.itinerary.id}${action === 'scrape' ? '/scrape' : ''}`,
       opts,
     )
     if (!res.ok) {
@@ -75,7 +75,7 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
     }
 
     if (action === 'delete') {
-      router.visit('/flights/')
+      router.visit('/itineraries/')
     } else {
       router.reload()
     }
