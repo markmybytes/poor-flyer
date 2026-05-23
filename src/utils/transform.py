@@ -6,6 +6,8 @@ from datetime import UTC, date, datetime
 from flask.json.provider import DefaultJSONProvider
 from sqlalchemy import inspect
 
+from src.extensions.database import floating_datetime
+
 logger = logging.getLogger(__name__)
 
 logger = logging.getLogger(__name__)
@@ -67,10 +69,13 @@ class CamelCaseJSONProvider(DefaultJSONProvider):
         return super().dumps(obj, **kwargs)
 
     def default(self, obj):
+        if isinstance(obj, floating_datetime):
+            return obj.isoformat()
+
         if isinstance(obj, datetime):
             if obj.tzinfo is None:
                 logger.warning(
-                    'Serialization alert: Naive datetime leaked to JSON encoder. Assuming UTC.'
+                    'Serialization alert: Unprotected naive datetime leaked. Assuming UTC.'
                 )
                 normalized = obj.replace(tzinfo=UTC)
             else:
