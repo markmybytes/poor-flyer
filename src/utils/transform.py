@@ -1,7 +1,7 @@
 import collections.abc
 import logging
 from dataclasses import asdict, is_dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 from flask.json.provider import DefaultJSONProvider
 from sqlalchemy import inspect
@@ -62,11 +62,25 @@ def camelize(obj):
 
 class CamelCaseJSONProvider(DefaultJSONProvider):
     def dumps(self, obj, **kwargs):
-        return super().dumps(camelize(obj), **kwargs)
+        if isinstance(obj, (dict, list)):
+            obj = camelize(obj)
+        return super().dumps(obj, **kwargs)
 
     def default(self, obj):
-        if isinstance(obj, (datetime, date)):
+        if isinstance(obj, datetime):
+            if obj.tzinfo is None:
+                logger.warning(
+                    'Serialization alert: Naive datetime leaked to JSON encoder. Assuming UTC.'
+                )
+                normalized = obj.replace(tzinfo=UTC)
+            else:
+                normalized = obj.astimezone(UTC)
+            return normalized.isoformat().replace('+00:00', 'Z')
+
+        if isinstance(obj, date):
             return obj.isoformat()
+
         if hasattr(obj, '__table__'):
             return camelize(model_to_dict(obj))
+
         return super().default(obj)

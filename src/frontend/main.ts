@@ -4,6 +4,7 @@ import { createApp, h } from 'vue'
 import VueToast from 'vue-toast-notification'
 import 'vue-toast-notification/dist/theme-bootstrap.css'
 
+import './bootstrap'
 import './css/app.css'
 
 type StrOrNum = string | number

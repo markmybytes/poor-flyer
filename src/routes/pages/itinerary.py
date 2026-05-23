@@ -3,7 +3,7 @@ from collections import defaultdict
 from dataclasses import asdict
 from datetime import date, datetime
 
-from flask import Blueprint, redirect
+from flask import Blueprint, g, redirect
 from flask_inertia import render_inertia
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -91,7 +91,9 @@ def _serialize_itinerary(itinerary: Itinerary, base_currency: str) -> dict:
             if isinstance(itinerary.created_at, datetime)
             else getattr(itinerary.created_at, 'date', lambda: itinerary.created_at)()
         )
-        r37 = compute_37_best(it_created_at, date.today(), itinerary.deadline, combined)
+        r37 = compute_37_best(
+            it_created_at, datetime.now(g.tz).date(), itinerary.deadline, combined
+        )
         if r37:
             r37_dict = {**asdict(r37), 'phase': r37.phase.value}
 
@@ -156,7 +158,7 @@ def show(itinerary_id):
         return render_inertia(
             'Itineraries/Detail',
             props={
-            'itinerary': _serialize_itinerary(itinerary, base_currency),
+                'itinerary': _serialize_itinerary(itinerary, base_currency),
                 'base_currency': base_currency,
             },
         )

@@ -1,8 +1,8 @@
 ﻿import logging
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime, time
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, g, jsonify, request
 from sqlalchemy import delete, select
 from sqlalchemy.orm import selectinload
 
@@ -177,20 +177,24 @@ def scrape_flight(itinerary_id):
             logger.debug('Itinerary not found for scraping: %s', itinerary_id)
             return jsonify({'success': False, 'message': 'Entry not found'}), 404
 
-        today = date.today()
-        today_start = datetime.combine(today, datetime.min.time()).replace(tzinfo=UTC)
-        today_end = datetime.combine(today, datetime.max.time()).replace(tzinfo=UTC)
+        today_local = datetime.now(g.tz).date()
 
         for flight in itinerary.flights:
             db.session.execute(
                 delete(FareSnapshot)
                 .where(FareSnapshot.flight_id == flight.id)
-                .where(FareSnapshot.created_at >= today_start)
-                .where(FareSnapshot.created_at <= today_end)
+                .where(
+                    FareSnapshot.created_at
+                    >= datetime.combine(today_local, time.min, tzinfo=g.tz).astimezone(UTC)
+                )
+                .where(
+                    FareSnapshot.created_at
+                    <= datetime.combine(today_local, time.max, tzinfo=g.tz).astimezone(UTC)
+                )
             )
 
         any_scraped_or_attempted = False
-        if active_flights := [f for f in itinerary.flights if f.flight_date >= today]:
+        if active_flights := [f for f in itinerary.flights if f.flight_date >= today_local]:
             any_scraped_or_attempted = True
             logger.info('Scraping %d flights for itinerary %s', len(active_flights), itinerary_id)
 
