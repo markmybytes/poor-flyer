@@ -97,7 +97,7 @@ const summary = computed(() => {
                 v-if="!itinerary.isActive"
                 class="badge gap-2 badge-soft px-3 py-3 badge-warning"
               >
-                已暫停更新
+                已暫停
               </span>
 
               <span v-else class="badge gap-2 badge-soft px-3 py-3 badge-success">
