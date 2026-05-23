@@ -1,10 +1,8 @@
 """Database extension module with SQLAlchemy models and initialization."""
 
 import logging
-import os
 import uuid
 from datetime import UTC, date, datetime
-from pathlib import Path
 
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import (
@@ -24,12 +22,6 @@ from sqlalchemy.orm import (
 )
 
 logger = logging.getLogger(__name__)
-
-# Database path and URL configuration
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-DEFAULT_DATABASE_PATH = Path(os.getenv('DATABASE_PATH', str(BASE_DIR / 'data' / 'db.sqlite')))
-DEFAULT_DATABASE_URL = f'sqlite:///{DEFAULT_DATABASE_PATH.as_posix()}'
-logger.info('Database initialized: path=%s', DEFAULT_DATABASE_PATH)
 
 
 class Base(DeclarativeBase):
