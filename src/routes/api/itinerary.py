@@ -17,7 +17,6 @@ itineraries_bp = Blueprint('itineraries', __name__, url_prefix='/itineraries')
 
 @itineraries_bp.route('', methods=['POST'])
 def create_flight():
-    session = db.session
     try:
         data = request.get_json(silent=True) or request.form.to_dict()
 
@@ -32,7 +31,7 @@ def create_flight():
             created_at=datetime.now(UTC),
         )
 
-        session.add(itinerary)
+        db.session.add(itinerary)
 
         flights_data = data.get('flights', [])
         for i, flight_data in enumerate(flights_data):
@@ -44,13 +43,13 @@ def create_flight():
                 destination=flight_data.get('destination', '').upper(),
                 flight_date=datetime.strptime(flight_data.get('flight_date'), '%Y-%m-%d').date(),
             )
-            session.add(flight)
+            db.session.add(flight)
 
-        session.commit()
+        db.session.commit()
         logger.info('Created itinerary: id=%s flights=%d', itinerary.id, len(flights_data))
         return jsonify({'success': True, 'message': 'Entry created', 'data': itinerary.id})
     except Exception as e:
-        session.rollback()
+        db.session.rollback()
         logger.exception('Error creating itinerary')
         return jsonify({'success': False, 'message': str(e)}), 400
 
@@ -106,16 +105,15 @@ def get_flight(itinerary_id):
             }
         )
     except Exception as e:
-        session.rollback()
+        db.session.rollback()
         logger.exception('Error retrieving itinerary: id=%s', itinerary_id)
         return jsonify({'success': False, 'message': str(e)}), 400
 
 
 @itineraries_bp.route('/<itinerary_id>', methods=['PATCH'])
 def update_flight(itinerary_id):
-    session = db.session
     try:
-        entry = session.execute(
+        entry = db.session.execute(
             select(Itinerary).where(Itinerary.id == itinerary_id)
         ).scalar_one_or_none()
 
@@ -125,12 +123,10 @@ def update_flight(itinerary_id):
 
         data = request.get_json(silent=True) or request.form.to_dict()
 
-        # Handle tracking toggle state
         if 'is_active' in data:
             entry.is_active = data['is_active']
             logger.info('Updated itinerary: id=%s is_active=%s', itinerary_id, data['is_active'])
 
-        # Handle updating or removing purchase deadlines
         if 'deadline' in data:
             deadline_str = data['deadline']
             if deadline_str:
@@ -139,19 +135,18 @@ def update_flight(itinerary_id):
                 entry.deadline = None
             logger.info('Updated itinerary: id=%s deadline=%s', itinerary_id, entry.deadline)
 
-        session.commit()
+        db.session.commit()
         return jsonify({'success': True, 'message': 'Entry updated', 'data': entry.id})
     except Exception as e:
-        session.rollback()
+        db.session.rollback()
         logger.exception('Error updating itinerary: id=%s', itinerary_id)
         return jsonify({'success': False, 'message': str(e)}), 400
 
 
 @itineraries_bp.route('/<itinerary_id>', methods=['DELETE'])
 def delete_flight(itinerary_id):
-    session = db.session
     try:
-        entry = session.execute(
+        entry = db.session.execute(
             select(Itinerary).where(Itinerary.id == itinerary_id)
         ).scalar_one_or_none()
 
@@ -159,21 +154,20 @@ def delete_flight(itinerary_id):
             logger.debug('Itinerary not found for deletion: %s', itinerary_id)
             return jsonify({'success': False, 'message': 'Entry not found'}), 404
 
-        session.delete(entry)
-        session.commit()
+        db.session.delete(entry)
+        db.session.commit()
         logger.info('Deleted itinerary: id=%s', itinerary_id)
         return jsonify({'success': True, 'message': 'Entry deleted', 'data': None})
     except Exception as e:
-        session.rollback()
+        db.session.rollback()
         logger.exception('Error deleting itinerary: id=%s', itinerary_id)
         return jsonify({'success': False, 'message': str(e)}), 400
 
 
 @itineraries_bp.route('/<itinerary_id>/scrape', methods=['POST'])
 def scrape_flight(itinerary_id):
-    session = db.session
     try:
-        itinerary = session.execute(
+        itinerary = db.session.execute(
             select(Itinerary)
             .options(selectinload(Itinerary.flights))
             .where(Itinerary.id == itinerary_id)
@@ -188,7 +182,7 @@ def scrape_flight(itinerary_id):
         today_end = datetime.combine(today, datetime.max.time()).replace(tzinfo=UTC)
 
         for flight in itinerary.flights:
-            session.execute(
+            db.session.execute(
                 delete(FareSnapshot)
                 .where(FareSnapshot.flight_id == flight.id)
                 .where(FareSnapshot.created_at >= today_start)
@@ -206,7 +200,7 @@ def scrape_flight(itinerary_id):
 
             for flight, res in zip(active_flights, results, strict=False):
                 for result in res.results:
-                    session.add(
+                    db.session.add(
                         FareSnapshot(
                             id=str(uuid.uuid4()),
                             flight_id=flight.id,
@@ -222,16 +216,16 @@ def scrape_flight(itinerary_id):
                     )
 
         if not any_scraped_or_attempted:
-            session.rollback()
+            db.session.rollback()
             logger.warning('No active flights to scrape: itinerary_id=%s', itinerary_id)
             return jsonify(
                 {'success': False, 'message': 'Cannot scrape: flight date has passed for all legs'}
             ), 400
 
-        session.commit()
+        db.session.commit()
         logger.info('Scrape completed: itinerary_id=%s', itinerary_id)
         return jsonify({'success': True, 'message': 'Scrape completed', 'data': itinerary.id})
     except Exception as e:
-        session.rollback()
+        db.session.rollback()
         logger.exception('Error scraping itinerary: id=%s', itinerary_id)
         return jsonify({'success': False, 'message': str(e)}), 400
