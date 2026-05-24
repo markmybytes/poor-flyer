@@ -72,13 +72,10 @@ def _get_combined_totals(itinerary: Itinerary, currency: str) -> dict[date, floa
     return combined_totals
 
 
-def _serialize_itinerary(itinerary: Itinerary, base_currency: str) -> dict:
-    """Combines flat table mappings, leg arrays, and math metrics into a single response."""
+def _serialize_itinerary(itinerary: Itinerary, base_currency: str, *, today: date) -> dict:
     combined = _get_combined_totals(itinerary, base_currency)
-
     stats = compute_price_stats(combined)
     stats_dict = asdict(stats) if stats else None
-
     r37_dict = None
     if itinerary.deadline and combined:
         it_created_at = (
@@ -86,9 +83,7 @@ def _serialize_itinerary(itinerary: Itinerary, base_currency: str) -> dict:
             if isinstance(itinerary.created_at, datetime)
             else getattr(itinerary.created_at, 'date', lambda: itinerary.created_at)()
         )
-        r37 = compute_37_best(
-            it_created_at, datetime.now(g.tz).date(), itinerary.deadline, combined
-        )
+        r37 = compute_37_best(it_created_at, today, itinerary.deadline, combined)
         if r37:
             r37_dict = {**asdict(r37), 'phase': r37.phase.value}
 
@@ -117,11 +112,13 @@ def index():
         .all()
     )
     logger.debug('Rendered itineraries index: itineraries=%d', len(itineraries))
-
     return render_inertia(
         'Itineraries/Index',
         props={
-            'itineraries': [_serialize_itinerary(it, base_currency) for it in itineraries],
+            'itineraries': [
+                _serialize_itinerary(it, base_currency, today=datetime.now(g.tz).date())
+                for it in itineraries
+            ],
             'base_currency': base_currency,
         },
     )
@@ -136,21 +133,20 @@ def create():
 def show(itinerary_id):
     try:
         base_currency = get_configured_base_currency()
-
         itinerary = db.session.execute(
             select(Itinerary)
             .options(selectinload(Itinerary.flights).selectinload(Flight.fare_snapshots))
             .where(Itinerary.id == itinerary_id)
         ).scalar_one_or_none()
-
         if not itinerary:
             logger.debug('Itinerary not found: id=%s', itinerary_id)
             return redirect('/itineraries/')
-
         return render_inertia(
             'Itineraries/Detail',
             props={
-                'itinerary': _serialize_itinerary(itinerary, base_currency),
+                'itinerary': _serialize_itinerary(
+                    itinerary, base_currency, today=datetime.now(g.tz).date()
+                ),
                 'base_currency': base_currency,
             },
         )
