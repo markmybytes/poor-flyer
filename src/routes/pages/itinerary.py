@@ -23,24 +23,19 @@ itineraries_bp = Blueprint('itineraries', __name__, url_prefix='/itineraries')
 
 
 def _serialize_snapshot(snapshot: FareSnapshot, currency: str) -> dict:
+    """Clones snapshot columns into a dict and applies currency translations safely."""
+    data = model_to_dict(snapshot)
     if snapshot.scrape_status == 'success' and snapshot.fare is not None:
         try:
-            snapshot.fare = convert_amount(
-                snapshot.fare,
-                snapshot.currency,
-                currency,
-            )
-            snapshot.currency = currency
+            data['fare'] = convert_amount(snapshot.fare, snapshot.currency, currency)
+            data['currency'] = currency
         except FXRatesError:
-            logger.warning(
-                'Failed to convert fare snapshot: snapshot_id=%s',
-                snapshot.id,
-            )
-
-    return model_to_dict(snapshot)
+            logger.warning('Failed to convert fare snapshot: snapshot_id=%s', snapshot.id)
+    return data
 
 
 def _get_combined_totals(itinerary: Itinerary, currency: str) -> dict[date, float]:
+    """Computes daily combined price minimums across all legs of an itinerary."""
     date_fares = defaultdict(dict)
     for flight in itinerary.flights:
         for s in flight.fare_snapshots:
@@ -50,8 +45,7 @@ def _get_combined_totals(itinerary: Itinerary, currency: str) -> dict[date, floa
                     fare_value = convert_amount(s.fare, src_currency, currency)
                 except FXRatesError:
                     logger.warning(
-                        'Failed to convert itinerary fare snapshot: snapshot_id=%s',
-                        s.id,
+                        'Failed to convert itinerary fare snapshot: snapshot_id=%s', s.id
                     )
                     continue
 
@@ -79,6 +73,7 @@ def _get_combined_totals(itinerary: Itinerary, currency: str) -> dict[date, floa
 
 
 def _serialize_itinerary(itinerary: Itinerary, base_currency: str) -> dict:
+    """Combines flat table mappings, leg arrays, and math metrics into a single response."""
     combined = _get_combined_totals(itinerary, base_currency)
 
     stats = compute_price_stats(combined)
@@ -97,13 +92,10 @@ def _serialize_itinerary(itinerary: Itinerary, base_currency: str) -> dict:
         if r37:
             r37_dict = {**asdict(r37), 'phase': r37.phase.value}
 
-    return {
-        **model_to_dict(itinerary),
+    return model_to_dict(itinerary) | {
         'flights': [
-            {
-                **model_to_dict(f),
-                'fare_snapshots': [_serialize_snapshot(s, base_currency) for s in f.fare_snapshots],
-            }
+            model_to_dict(f)
+            | {'fare_snapshots': [_serialize_snapshot(s, base_currency) for s in f.fare_snapshots]}
             for f in itinerary.flights
         ],
         'statistics': stats_dict,
