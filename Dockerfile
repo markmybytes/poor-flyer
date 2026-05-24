@@ -28,6 +28,7 @@ RUN apt-get update && apt-get install -y \
     xauth \
     curl \
     xz-utils \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 RUN if [ "$TARGETARCH" = "amd64" ]; then S6_ARCH="x86_64"; \
