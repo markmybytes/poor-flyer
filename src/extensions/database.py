@@ -1,9 +1,8 @@
-"""Database extension module with SQLAlchemy models and initialization."""
-
 import logging
 import uuid
 from datetime import UTC, date, datetime
 
+import sqlalchemy.types as types
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import (
     Boolean,
@@ -25,31 +24,74 @@ logger = logging.getLogger(__name__)
 
 
 class Base(DeclarativeBase):
-    """Base class for all SQLAlchemy models."""
+    pass
+
+
+db = SQLAlchemy(model_class=Base, session_options={'autoflush': False})
+
+
+class floating_datetime(datetime):
+    """A marker subclass indicating this datetime is INTENTIONALLY timezone-unaware."""
 
     pass
 
 
-# Initialize SQLAlchemy extension
-db = SQLAlchemy(model_class=Base, session_options={'autoflush': False})
+class UTCDateTime(types.TypeDecorator):  # Timezone-Aware Force Type for SQLite
+    """
+    Custom DateTime decorator that forces SQLite to return timezone-aware
+    UTC datetime objects instead of naive datetimes, silencing the false-positive
+    JSON serialization warning spam.
+    """
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None:
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=UTC)
+            return value.astimezone(UTC)
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is not None and value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value
 
 
-# Database models
+class FloatingDateTime(types.TypeDecorator):
+    """
+    Maps to standard DateTime(timezone=False).
+    Returns a 'floating_datetime' instance so the serializer knows not to alarm logs.
+    """
+
+    impl = DateTime(timezone=False)
+    cache_ok = True
+
+    def process_result_value(self, value, dialect):
+        if value is not None:
+            # Reconstruct as our explicit marker subclass
+            return floating_datetime(
+                value.year,
+                value.month,
+                value.day,
+                value.hour,
+                value.minute,
+                value.second,
+                value.microsecond,
+            )
+        return value
+
+
 class Itinerary(db.Model):
-    """Itinerary tracking model. Represents a multi-leg tracked trip."""
-
     __tablename__ = 'itineraries'
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    trip_type: Mapped[str] = mapped_column(
-        String, nullable=False
-    )  # 'SINGLE', 'ROUND_TRIP', 'MULTI_CITY'
+    trip_type: Mapped[str] = mapped_column(String, nullable=False)
     deadline: Mapped[date | None] = mapped_column(Date, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC)
-    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=lambda: datetime.now(UTC))
 
     flights: Mapped[list['Flight']] = relationship(
         'Flight',
@@ -60,8 +102,6 @@ class Itinerary(db.Model):
 
 
 class Flight(db.Model):
-    """Flight leg model."""
-
     __tablename__ = 'flights'
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -80,8 +120,6 @@ class Flight(db.Model):
 
 
 class FareSnapshot(db.Model):
-    """Fare snapshot model."""
-
     __tablename__ = 'fare_snapshots'
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -90,23 +128,21 @@ class FareSnapshot(db.Model):
     )
 
     flight_number: Mapped[str | None] = mapped_column(String, nullable=True)
-    departure_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    arrival_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    departure_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    arrival_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
     fare: Mapped[float | None] = mapped_column(Float, nullable=True)
     currency: Mapped[str | None] = mapped_column(String, nullable=True)
     scrape_status: Mapped[str] = mapped_column(String, nullable=False)
     error_message: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC)
-    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=lambda: datetime.now(UTC))
 
     flight: Mapped['Flight'] = relationship('Flight', back_populates='fare_snapshots')
 
 
 class Config(db.Model):
-    """Configuration model for storing app settings."""
-
     __tablename__ = 'config'
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AppLayout from '@/Layouts/AppLayout.vue'
+import { formatLocalDateTime, parsePureCalendarDate } from '@/utils/timezone'
 import { router } from '@inertiajs/vue3'
 import { VueDatePicker } from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
@@ -30,7 +31,10 @@ const selectedLevels = ref<string[]>(
 
 const dateRange = ref<Date[] | null>(
   props.filters.startDate && props.filters.endDate
-    ? [new Date(props.filters.startDate), new Date(props.filters.endDate)]
+    ? [
+        parsePureCalendarDate(props.filters.startDate)!,
+        parsePureCalendarDate(props.filters.endDate)!,
+      ]
     : null,
 )
 
@@ -237,7 +241,7 @@ function clearLogs() {
                 <td
                   class="hidden font-mono text-xs whitespace-nowrap text-base-content/60 md:table-cell"
                 >
-                  {{ entry.timestamp.split(',')[0] }}
+                  {{ formatLocalDateTime(entry.timestamp, entry.timestamp) }}
                 </td>
 
                 <td>
@@ -282,7 +286,7 @@ function clearLogs() {
                         <span class="mr-1 font-semibold text-base-content/70">時間:</span>
 
                         <span class="font-mono text-base-content/60">{{
-                          entry.timestamp.split(',')[0]
+                          formatLocalDateTime(entry.timestamp, entry.timestamp)
                         }}</span>
                       </div>
 

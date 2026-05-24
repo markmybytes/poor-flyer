@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AppLayout from '@/Layouts/AppLayout.vue'
+import { formatLocalDateTime } from '@/utils/timezone'
 import { computed, reactive } from 'vue'
 import { useToast } from 'vue-toast-notification'
 
@@ -85,13 +86,7 @@ const displayedRates = computed(() => {
 })
 
 const fxStatusTime = computed(() => {
-  if (!fxStatusState.last_updated) {
-    return '—'
-  }
-  const parsed = new Date(fxStatusState.last_updated)
-  return Number.isNaN(parsed.getTime())
-    ? fxStatusState.last_updated
-    : parsed.toLocaleString('zh-HK')
+  return formatLocalDateTime(fxStatusState.last_updated)
 })
 
 function saveSettings(sec: 'email' | 'currency' | 'smtp' | 'itinerary') {
@@ -153,8 +148,8 @@ function refreshFxRates() {
 
       const d = res.data || {}
       Object.assign(fxStatusState, {
-        base_currency: d.base_currency ?? form.currency.base_currency,
-        last_updated: d.last_updated ?? null,
+        base_currency: d.baseCurrency ?? form.currency.base_currency,
+        last_updated: d.lastUpdated ?? null,
         rates: d.rates ?? {},
         error: null,
       })

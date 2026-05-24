@@ -56,9 +56,11 @@ def _resolve_cache_path() -> Path:
 
 
 def _cache_age_seconds(iso: str) -> float:
-    return (
-        datetime.now(UTC) - datetime.fromisoformat(iso.replace('Z', '+00:00')).astimezone(UTC)
-    ).total_seconds()
+    """Calculates cache age by ensuring both targets are timezone-aware UTC objects."""
+    dt = datetime.fromisoformat(iso)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return (datetime.now(UTC) - dt).total_seconds()
 
 
 def _read_cache() -> dict[str, Any] | None:
@@ -114,10 +116,14 @@ def _fetch_live_rates(base: str, api_key: str | None) -> dict[str, Any]:
         raise FXRatesError('FX API response does not include valid rates data')
     nb = _normalize_currency(str(data.get('base', base)), base)
     rates[nb] = 1.0
+
+    if not (last_updated := data.get('date')):
+        last_updated = datetime.now(UTC).isoformat().replace('+00:00', 'Z')
+
     res = {
         'base': nb,
         'rates': {k.upper(): float(v) for k, v in rates.items()},
-        'last_updated': data.get('date') or datetime.now(UTC).isoformat(),
+        'last_updated': last_updated,
     }
     _write_cache(res)
     logger.info(

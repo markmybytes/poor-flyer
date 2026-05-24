@@ -8,6 +8,7 @@ import { router } from '@inertiajs/vue3'
 import { ref } from 'vue'
 import { useToast } from 'vue-toast-notification'
 
+import { calculateDaysRemaining } from '@/utils/timezone'
 import { Icon } from '@iconify/vue'
 import { VueDatePicker } from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
@@ -205,13 +206,7 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
                 v-if="itinerary.rule37Analysis.phase === 'OBSERVING'"
                 class="badge badge-outline px-2 badge-sm font-semibold"
               >
-                {{
-                  Math.ceil(
-                    (new Date(itinerary.rule37Analysis.cutoffDate).getTime() - Date.now()) /
-                      86400000,
-                  )
-                }}
-                天後結束
+                {{ calculateDaysRemaining(itinerary.rule37Analysis.cutoffDate) }} 天後結束 天後結束
               </span>
             </div>
 
