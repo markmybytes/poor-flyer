@@ -15,7 +15,7 @@ RUN npm run build-only
 FROM python:3.12-slim
 
 ARG S6_OVERLAY_VERSION=3.2.2.0
-ARG S6_OVERLAY_ARCH="x86_64"
+ARG TARGETARCH
 
 WORKDIR /app
 
@@ -30,12 +30,15 @@ RUN apt-get update && apt-get install -y \
     xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl -sSL "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz" | tar -xJ -C / && \
-    curl -sSL "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_OVERLAY_ARCH}.tar.xz" | tar -xJ -C /
+RUN if [ "$TARGETARCH" = "amd64" ]; then S6_ARCH="x86_64"; \
+    elif [ "$TARGETARCH" = "arm64" ]; then S6_ARCH="aarch64"; \
+    else S6_ARCH="$TARGETARCH"; fi && \
+    curl -sSL "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz" | tar -xJ -C / && \
+    curl -sSL "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz" | tar -xJ -C /
 
 COPY pyproject.toml .
 RUN pip install --no-cache-dir .
-RUN patchright install chrome && patchright install-deps
+RUN patchright install chrome --with-deps
 
 COPY . .
 COPY --from=frontend-builder /app/src/static/dist ./src/static/dist
