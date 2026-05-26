@@ -129,8 +129,8 @@ class FareSnapshot(db.Model):
 
     flight_number: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    departure_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
-    arrival_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    departure_at: Mapped[datetime | None] = mapped_column(FloatingDateTime, nullable=True)
+    arrival_at: Mapped[datetime | None] = mapped_column(FloatingDateTime, nullable=True)
 
     fare: Mapped[float | None] = mapped_column(Float, nullable=True)
     currency: Mapped[str | None] = mapped_column(String, nullable=True)
