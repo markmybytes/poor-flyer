@@ -206,7 +206,7 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
                 v-if="itinerary.rule37Analysis.phase === 'OBSERVING'"
                 class="badge badge-outline px-2 badge-sm font-semibold"
               >
-                {{ calculateDaysRemaining(itinerary.rule37Analysis.cutoffDate) }} 天後結束 天後結束
+                {{ calculateDaysRemaining(itinerary.rule37Analysis.cutoffDate) }} 天後結束
               </span>
             </div>
 
