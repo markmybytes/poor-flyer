@@ -95,27 +95,33 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
     <div class="tracker-panel card mb-6 rounded-lg">
       <div class="card-body p-0">
         <div class="border-b border-base-300/70 px-6 py-5">
-          <div class="flex items-start justify-between gap-4">
-            <div>
-              <h3 class="flex items-center gap-2 text-base font-bold text-base-content">
-                {{ fmtItineraryName(itinerary) }}
-              </h3>
+          <div class="flex flex-col gap-2">
+            <div class="flex justify-between gap-2">
+              <div class="text-base font-bold text-base-content">
+                <span>{{ fmtItineraryName(itinerary) }}</span>
+              </div>
 
-              <p class="mt-0.5 text-sm font-medium text-base-content/60">
-                出發日期：{{ fmtDate(itinerary.flights[0].flightDate) }}
-                <span v-if="itinerary.deadline" class="mx-2 text-base-content/30">|</span>
+              <div class="shrink-0">
+                <span
+                  v-if="!itinerary.isActive"
+                  class="badge gap-2 badge-soft badge-warning max-sm:p-1"
+                >
+                  已暫停
+                </span>
 
-                <span v-if="itinerary.deadline">購票限期：{{ fmtDate(itinerary.deadline) }}</span>
-              </p>
+                <span v-else class="badge badge-soft badge-success max-sm:p-1">
+                  <span class="status status-success"></span> 追蹤中
+                </span>
+              </div>
             </div>
 
-            <div class="flex shrink-0 flex-wrap gap-2">
-              <span v-if="itinerary.isActive" class="badge badge-soft px-3 py-3 badge-success">
-                <span class="status status-success"></span> 追蹤中
-              </span>
-
-              <span v-else class="badge badge-soft px-3 py-3 badge-warning">已暫停</span>
-            </div>
+            <p class="text-sm font-medium text-base-content/60">
+              日期：{{
+                itinerary.flights.length == 1
+                  ? fmtDate(itinerary.flights.at(0).flightDate)
+                  : `${fmtDate(itinerary.flights.at(0).flightDate)} - ${fmtDate(itinerary.flights.at(-1).flightDate)}`
+              }}
+            </p>
           </div>
         </div>
 
@@ -206,7 +212,7 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
                 v-if="itinerary.rule37Analysis.phase === 'OBSERVING'"
                 class="badge badge-outline px-2 badge-sm font-semibold"
               >
-                {{ calculateDaysRemaining(itinerary.rule37Analysis.cutoffDate) }} 天後結束 天後結束
+                {{ calculateDaysRemaining(itinerary.rule37Analysis.cutoffDate) }} 天後結束
               </span>
             </div>
 
@@ -221,7 +227,7 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
                 開始。
               </span>
 
-              <span v-else>已進入決策階段。只要總價低於對比基準，系統便會即時提示你出手。</span>
+              <span v-else> 已進入決策階段。系統將會分析價格變化，找出最佳購買時機。 </span>
             </p>
           </template>
 
@@ -304,7 +310,7 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
     </div>
 
     <div class="tracker-panel card rounded-lg">
-      <div class="card-body gap-6 p-4 md:p-6">
+      <div class="card-body gap-2 p-4 md:p-6">
         <div class="tabs-box tabs flex-nowrap overflow-x-auto bg-base-200/70 p-1 whitespace-nowrap">
           <button
             v-if="itinerary.tripType === 'SINGLE'"
