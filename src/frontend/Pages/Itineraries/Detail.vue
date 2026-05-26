@@ -310,7 +310,7 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
     </div>
 
     <div class="tracker-panel card rounded-lg">
-      <div class="card-body gap-6 p-4 md:p-6">
+      <div class="card-body gap-2 p-4 md:p-6">
         <div class="tabs-box tabs flex-nowrap overflow-x-auto bg-base-200/70 p-1 whitespace-nowrap">
           <button
             v-if="itinerary.tripType === 'SINGLE'"
