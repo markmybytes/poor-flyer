@@ -278,11 +278,13 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
             </div>
 
             <div class="mt-1.5 text-xs font-medium text-base-content/40">
-              <template v-if="itinerary.rule37Analysis?.historyBestVal">
-                門檻：{{ fmtFare(itinerary.rule37Analysis.historyBestVal, baseCurrency) }}
+              <template v-if="itinerary.deadline">
+                門檻：{{
+                  itinerary.rule37Analysis?.historyBestVal
+                    ? fmtFare(itinerary.rule37Analysis.historyBestVal, baseCurrency)
+                    : '--'
+                }}
               </template>
-
-              <template v-else-if="itinerary.deadline">觀察中...</template>
             </div>
           </div>
 
