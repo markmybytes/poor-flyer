@@ -227,7 +227,7 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
                 開始。
               </span>
 
-              <span v-else>已進入決策階段。只要總價低於對比基準，系統便會即時提示你出手。</span>
+              <span v-else> 已進入決策階段。系統將會分析價格變化，找出最佳購買時機。 </span>
             </p>
           </template>
 
