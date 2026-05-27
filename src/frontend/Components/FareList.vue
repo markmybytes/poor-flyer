@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Flight, Rule37Analysis } from '@/types'
-import { fmtDate, fmtFare, fmtTime, fmtTz } from '@/utils'
+import { fmtDate, fmtFare, fmtTime } from '@/utils'
 import { computed, ref } from 'vue'
 
 const props = defineProps<{
@@ -169,16 +169,10 @@ const dailySnapshots = computed(() => {
 
                   <td class="text-base-content/70">
                     {{ fmtTime(snap.departureAt) }}
-                    <span class="text-[10px] text-base-content/40">
-                      {{ fmtTz(snap.departureAt) }}
-                    </span>
                   </td>
 
                   <td class="text-base-content/70">
                     {{ fmtTime(snap.arrivalAt) }}
-                    <span class="text-[10px] text-base-content/40">
-                      {{ fmtTz(snap.arrivalAt) }}
-                    </span>
                   </td>
 
                   <td class="text-right font-bold text-base-content">

@@ -58,14 +58,8 @@ def _parse_hkexpress_response(data: dict) -> list[ScrapeResult]:
                         fare=float(j['display_item_amount']),
                         currency=j.get('fare', {}).get('currency_code', 'HKD'),
                         flight_number=((j.get('segment') or [{}])[0].get('flight_number', '')),
-                        departure_at=datetime.fromisoformat(
-                            f'{j["departure_date_time"]}'
-                            f'{(j.get("segment") or [{}])[0].get("departure_timezone", "")}'
-                        ),
-                        arrival_at=datetime.fromisoformat(
-                            f'{j["arrival_date_time"]}'
-                            f'{(j.get("segment") or [{}])[0].get("arrival_timezone", "")}'
-                        ),
+                        departure_at=datetime.fromisoformat(j['departure_date_time']),
+                        arrival_at=datetime.fromisoformat(j['arrival_date_time']),
                     )
                     for j in journeys
                 ],

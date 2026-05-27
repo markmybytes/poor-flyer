@@ -174,5 +174,5 @@ def test_floating_datetime_round_trip(app):
         db.session.expire(snapshot)
 
         fetched = db.session.get(FareSnapshot, snapshot.id)
+        assert isinstance(fetched.arrival_at, datetime)
         assert isinstance(fetched.departure_at, datetime)
-        assert fetched.departure_at.tzinfo is not None

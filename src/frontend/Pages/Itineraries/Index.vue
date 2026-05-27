@@ -79,31 +79,33 @@ const summary = computed(() => {
         }"
       >
         <div class="card-body gap-5 p-6">
-          <div class="flex items-start justify-between gap-4">
-            <div>
-              <div
-                class="mb-2 flex flex-wrap items-center gap-3 text-xl font-black tracking-tight text-base-content transition-colors group-hover:text-primary"
-              >
+          <div class="flex flex-col gap-2">
+            <div class="flex justify-between gap-2">
+              <div class="text-xl font-black tracking-tight text-base-content">
                 <span>{{ fmtItineraryName(itinerary) }}</span>
               </div>
 
-              <p class="text-sm font-medium text-base-content/65">
-                出發日期：{{ fmtDate(itinerary.flights[0]?.flightDate) }}
-              </p>
+              <div class="shrink-0">
+                <span
+                  v-if="!itinerary.isActive"
+                  class="badge gap-2 badge-soft badge-warning max-sm:p-1"
+                >
+                  已暫停
+                </span>
+
+                <span v-else class="badge badge-soft badge-success max-sm:p-1">
+                  <span class="status status-success"></span> 追蹤中
+                </span>
+              </div>
             </div>
 
-            <div class="shrink-0">
-              <span
-                v-if="!itinerary.isActive"
-                class="badge gap-2 badge-soft px-3 py-3 badge-warning"
-              >
-                已暫停
-              </span>
-
-              <span v-else class="badge gap-2 badge-soft px-3 py-3 badge-success">
-                <span class="status status-success"></span> 追蹤中
-              </span>
-            </div>
+            <p class="text-sm font-medium text-base-content/65">
+              日期：{{
+                itinerary.flights.length == 1
+                  ? fmtDate(itinerary.flights.at(0).flightDate)
+                  : `${fmtDate(itinerary.flights.at(0).flightDate)} - ${fmtDate(itinerary.flights.at(-1).flightDate)}`
+              }}
+            </p>
           </div>
 
           <div
