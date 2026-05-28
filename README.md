@@ -46,7 +46,16 @@
 
 <p align="right">(<a href="#readme-top">回到最頂</a>)</p>
 
-### 使用的第三方工具
+### 功能／特點
+
+- 🤖 **自動價格追蹤** - 每日自動從航空公司獲取機票價格
+- 📊 **價格圖表分析** - 可視化展示價格趨勢
+- 🎯 **37% 法則算法** - 運用自佳停止理論，分析最佳購買時機
+- 📧 **電郵通知** - 檢測到最佳購買時機時自動發送提醒
+- 💱 **多幣種支持** - 實時匯率轉換（HKD、USD、EUR、JPY、CNY 等 25+ 種貨幣）
+- 🐳 **Docker 部署** - 開箱即用的 Docker 部署支援
+
+### 建基於以下工具
 
 [<img src="https://img.shields.io/badge/Flask-3BABC3?logo=flask&logoColor=fff&style=for-the-badge">](https://flask.palletsprojects.com/en/stable/)
 [<img src="https://img.shields.io/badge/Iconify-026C9C?logo=iconify&logoColor=fff&style=for-the-badge">](https://iconify.design/)
@@ -58,29 +67,84 @@
 
 <p align="right">(<a href="#readme-top">回到最頂</a>)</p>
 
-<!-- GETTING STARTED -->
+<!-- USAGE -->
 
-## 開發
+## 使用指南
 
-### 所需軟件
+### 基本流程
 
+1. **設定**
+   - 選擇顯示貨幣
+   - 設定電郵地址以接收提醒
 
+2. **創建行程**
+   - 輸入出發地、目的地和出發日期
+   - 設定購票截止日期
 
-### 安裝 Dependency
+3. **系統自動追蹤**
+   - 每日自動更新價格
+   - 當偵測到最佳時機時，發送電郵提醒
 
+### 37% 法則算法
 
+使用37% 法則算法幫您分析最佳購買時機：
 
-### 常用指令
-
-
+- **觀察階段**：在購票限期前 37% 的時間內，系統只觀察價格
+- **買入信號**：之後如果價格降至歷史低點以下，您會收到提醒
 
 <p align="right">(<a href="#readme-top">回到最頂</a>)</p>
 
-<!-- USAGE EXAMPLES -->
+<!-- DEPLOYMENT -->
 
-## 使用
+## 部署
 
+本項目可通過 Docker 部署。詳細的部署說明請參考項目文件。
 
+<p align="right">(<a href="#readme-top">回到最頂</a>)</p>
+
+<!-- GETTING STARTED -->
+
+## 開發指南
+
+### 所需軟件
+
+- uv
+- volta
+
+### 安裝 Dependency
+
+```bash
+uv sync --all-extras
+npm install
+```
+
+### 常用指令
+
+**本地開發**
+
+```bash
+flask dev
+```
+
+**更新數據庫結構**
+
+```bash
+flask db migrate # 掃瞄數據庫結構改動並建立更新數據庫結構的指令碼
+flask db upgrade # 建立數據庫／寫入新數據庫結構
+```
+
+**構建前端**
+
+```bash
+npm run build
+```
+
+**測試**
+
+```bash
+pytest
+npm run test
+```
 
 <p align="right">(<a href="#readme-top">回到最頂</a>)</p>
 
