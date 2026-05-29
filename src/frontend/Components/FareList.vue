@@ -201,12 +201,7 @@ const dailySnapshots = computed(() => {
                         class="flex flex-col items-end justify-end gap-2 sm:flex-row sm:items-center"
                       >
                         <div class="flex flex-wrap justify-end gap-1">
-                          <div
-                            v-if="
-                              snap.fare === stats.min &&
-                              group.snapshots.some((s) => s.fare > stats.min)
-                            "
-                          >
+                          <div v-if="snap.fare === stats.min">
                             <Icon
                               icon="mdi:trending-down"
                               class="size-4 rounded bg-success/30 p-0.5"
