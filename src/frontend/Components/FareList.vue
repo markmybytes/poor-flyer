@@ -12,17 +12,35 @@ const props = defineProps<{
 const expandedGroups = ref(new Set<number>())
 
 const stats = computed(() => {
-  const fares = (props.flight.fareSnapshots || [])
-    .filter((s) => s.scrapeStatus === 'success' && s.fare !== null)
-    .map((s) => s.fare as number)
-
-  if (!fares.length) {
-    return { min: null, max: null }
+  const valid = (props.flight.fareSnapshots || []).filter(
+    (s) => s.scrapeStatus === 'success' && s.fare !== null,
+  )
+  if (!valid.length) {
+    return { min: null, max: null, highlightGroup: false }
   }
 
-  const min = Math.min(...fares)
-  const max = Math.max(...fares)
-  return min === max ? { min: null, max: null } : { min, max }
+  const daily = Object.values(
+    valid.reduce(
+      (acc, { createdAt, fare }) => {
+        const d = createdAt.split('T')[0],
+          f = fare as number
+        acc[d] = { min: Math.min(acc[d]?.min ?? f, f), max: Math.max(acc[d]?.max ?? f, f) }
+        return acc
+      },
+      {} as Record<string, { min: number; max: number }>,
+    ),
+  )
+
+  const min = Math.min(...daily.map((v) => v.min))
+  const max = Math.max(...daily.map((v) => v.max))
+
+  return min === max
+    ? { min: null, max: null, highlightGroup: false }
+    : {
+        min,
+        max,
+        highlightGroup: !daily.every((v) => v.min === daily[0].min), // only if the daily mins differ across days
+      }
 })
 
 const dailySnapshots = computed(() => {
@@ -84,6 +102,7 @@ const dailySnapshots = computed(() => {
           class="collapse-title flex w-full items-center justify-between pr-14 pl-5 text-left transition-colors hover:bg-base-200/40"
           :class="{
             'bg-success/10':
+              stats.highlightGroup &&
               stats.min !== null &&
               group.snapshots.some((s) => s.fare === stats.min) &&
               !group.snapshots.some((s) => s.fare === stats.max),
