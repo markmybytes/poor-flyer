@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Flight, Rule37Analysis } from '@/types'
 import { fmtDate, fmtFare, fmtTime } from '@/utils'
+import { Icon } from '@iconify/vue'
 import { computed, ref } from 'vue'
 
 const props = defineProps<{
@@ -200,19 +201,21 @@ const dailySnapshots = computed(() => {
                         class="flex flex-col items-end justify-end gap-2 sm:flex-row sm:items-center"
                       >
                         <div class="flex flex-wrap justify-end gap-1">
-                          <span
-                            v-if="snap.fare === stats.min"
-                            class="badge badge-soft badge-xs badge-success"
+                          <div
+                            v-if="
+                              snap.fare === stats.min &&
+                              group.snapshots.some((s) => s.fare > stats.min)
+                            "
                           >
-                            [歷史低位]
-                          </span>
+                            <Icon
+                              icon="mdi:trending-down"
+                              class="size-4 rounded bg-success/30 p-0.5"
+                            />
+                          </div>
 
-                          <span
-                            v-if="snap.fare === stats.max"
-                            class="badge badge-soft badge-xs badge-error"
-                          >
-                            [歷史高位]
-                          </span>
+                          <div v-if="snap.fare === stats.max">
+                            <Icon icon="mdi:trending-up" class="size-4 rounded bg-error/30 p-0.5" />
+                          </div>
                         </div>
 
                         <span>{{ fmtFare(snap.fare, snap.currency) }}</span>
