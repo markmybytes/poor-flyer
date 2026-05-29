@@ -38,22 +38,17 @@
 
 <p align="center">
   <img width="1114" height="352" alt="project screenshot" src="https://github.com/user-attachments/assets/2488805e-0bb7-42e5-8ae4-be88c17ccf8f" />
-<p align="right">
+</p>
 
-[PooFlyer](https://markmybytes.github.io/poor-flyer/) 是一個機票價格追蹤工具，每日自動從航空公司獲取機票價格。
+[PoorFlyer 窮人想飛](https://markmybytes.github.io/poor-flyer/) 是一款專為精打細算旅客而設的機票價格追蹤工具。
+程式每日會自動收集航空公司的最新票價，並整理成一目了然的價格走勢圖表，同時內置多種貨幣的匯率轉換，遇到外幣機票標價時亦毋須自行換算。
 
-內建[37% 法則／秘書問題](https://zh.wikipedia.org/zh-hant/%E7%A7%98%E6%9B%B8%E5%95%8F%E9%A1%8C)算法，助您分析最佳購買時機。
+與一般只作簡單記錄的工具不同，PoorFlyer 內建了經典的 **[37% 法則（秘書問題）](https://zh.wikipedia.org/zh-hant/%E7%A7%98%E6%9B%B8%E5%95%8F%E9%A1%8C)** 算法。
+透過「最佳停止理論」，程式會為你分析出最理性的購買時機。當最佳時機來臨，系統會發送電郵通知，助你以蔗渣價錢享受燒鵝味道。
+
+程式亦支援 **Docker**，只需輸入幾行簡單指令，即可在自己的伺服器或 NAS 輕鬆架設專屬的個人機票追蹤面板。
 
 <p align="right">(<a href="#readme-top">回到最頂</a>)</p>
-
-### 功能／特點
-
-- 🤖 **自動價格追蹤** - 每日自動從航空公司獲取機票價格
-- 📊 **價格圖表分析** - 可視化展示價格趨勢
-- 🎯 **37% 法則算法** - 運用自佳停止理論，分析最佳購買時機
-- 📧 **電郵通知** - 檢測到最佳購買時機時自動發送提醒
-- 💱 **多幣種支持** - 實時匯率轉換（HKD、USD、EUR、JPY、CNY 等 25+ 種貨幣）
-- 🐳 **Docker 部署** - 開箱即用的 Docker 部署支援
 
 ### 建基於以下工具
 
