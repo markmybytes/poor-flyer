@@ -40,7 +40,7 @@
   <img width="1114" height="352" alt="project screenshot" src="https://github.com/user-attachments/assets/2488805e-0bb7-42e5-8ae4-be88c17ccf8f" />
 </p>
 
-[PoorFlyer 窮人想飛](https://markmybytes.github.io/poor-flyer/) 是一款專為精打細算旅客而設的機票價格追蹤工具。
+_PoorFlyer 窮人想飛_ 是一款專為精打細算旅客而設的機票價格追蹤工具。
 程式每日會自動收集航空公司的最新票價，並整理成一目了然的價格走勢圖表，同時內置多種貨幣的匯率轉換，遇到外幣機票標價時亦毋須自行換算。
 
 與一般只作簡單記錄的工具不同，PoorFlyer 內建了經典的 **[37% 法則（秘書問題）](https://zh.wikipedia.org/zh-hant/%E7%A7%98%E6%9B%B8%E5%95%8F%E9%A1%8C)** 算法。
