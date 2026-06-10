@@ -1,13 +1,11 @@
 {
-    "recommendations": [
-        "ms-python.python",
-        "njpwerner.autodocstring",
-        "matangover.mypy",
-        "charliermarsh.ruff",
-        "ms-vscode.vscode-typescript-next",
-        "vue.volar",
-        "bradlc.vscode-tailwindcss",
-        "dbaeumer.vscode-eslint",
-        "esbenp.prettier-vscode"
-    ]
+  "recommendations": [
+    "ms-python.python",
+    "matangover.mypy",
+    "charliermarsh.ruff",
+    "vue.volar",
+    "bradlc.vscode-tailwindcss",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode"
+  ]
 }
