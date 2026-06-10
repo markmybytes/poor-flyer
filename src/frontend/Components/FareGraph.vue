@@ -51,7 +51,7 @@ onMounted(() => {
       borderColor: '#ff9800',
       backgroundColor: 'rgba(255, 152, 0, 0.1)',
       borderWidth: 3,
-      tension: 0.4,
+      tension: 0.1,
       fill: false,
       spanGaps: false,
     })
@@ -77,7 +77,7 @@ onMounted(() => {
       backgroundColor:
         props.itinerary.tripType === 'SINGLE' ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
       borderWidth: 2,
-      tension: 0.4,
+      tension: 0.1,
       fill: props.itinerary.tripType === 'SINGLE',
       spanGaps: false,
     })
@@ -90,7 +90,6 @@ onMounted(() => {
       borderColor: 'rgba(255, 99, 132, 0.8)',
       borderDash: [10, 10],
       borderWidth: 1,
-      tension: 0,
       spanGaps: false,
       pointRadius: 0,
     })
