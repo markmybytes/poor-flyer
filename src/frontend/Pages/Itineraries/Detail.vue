@@ -214,6 +214,13 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
               >
                 {{ calculateDaysRemaining(itinerary.rule37Analysis.cutoffDate) }} 天後結束
               </span>
+
+              <span
+                v-else-if="itinerary.rule37Analysis.phase === 'WAITING'"
+                class="badge badge-outline px-2 badge-sm font-semibold"
+              >
+                {{ calculateDaysRemaining(itinerary.deadline) }} 天後到期
+              </span>
             </div>
 
             <p class="mt-2 text-xs font-medium text-base-content/60">
