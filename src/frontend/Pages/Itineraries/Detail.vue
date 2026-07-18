@@ -219,7 +219,22 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
                 v-else-if="itinerary.rule37Analysis.phase === 'WAITING'"
                 class="badge badge-outline px-2 badge-sm font-semibold"
               >
-                {{ calculateDaysRemaining(itinerary.deadline) }} 天後到期
+                {{
+                  calculateDaysRemaining(itinerary.deadline) > 0
+                    ? `限期：${calculateDaysRemaining(itinerary.deadline)}天後`
+                    : '限期：已過'
+                }}
+              </span>
+
+              <span
+                v-if="itinerary.rule37Analysis.phase === 'WAITING'"
+                class="badge badge-outline px-2 badge-sm font-semibold"
+              >
+                {{
+                  calculateDaysRemaining(itinerary.flights[0].flightDate) > 0
+                    ? `出發日期：${calculateDaysRemaining(itinerary.flights[0].flightDate)}天後`
+                    : '出發日期：已過'
+                }}
               </span>
             </div>
 
