@@ -179,84 +179,140 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
       }"
     >
       <div class="flex flex-col lg:flex-row lg:items-stretch">
-        <div class="flex flex-1 flex-col justify-center p-5 sm:p-6">
-          <template v-if="itinerary.deadline && itinerary.rule37Analysis?.phase">
-            <div class="flex items-center gap-3">
+        <div class="flex flex-1 flex-col justify-between p-4 sm:p-5">
+          <div>
+            <div class="flex items-center gap-2.5">
               <span
-                class="status status-lg shadow-sm"
+                class="status shadow-sm"
                 :class="{
-                  'animate-pulse status-success': itinerary.rule37Analysis.phase === 'BUY_SIGNAL',
-                  'status-neutral': itinerary.rule37Analysis.phase === 'OBSERVING',
-                  'status-info': itinerary.rule37Analysis.phase === 'WAITING',
+                  'animate-pulse status-success': itinerary.rule37Analysis?.phase === 'BUY_SIGNAL',
+                  'status-info': itinerary.rule37Analysis?.phase === 'WAITING',
+                  'status-neutral': itinerary.rule37Analysis?.phase === 'OBSERVING',
+                  'status-warning': !itinerary.rule37Analysis?.phase && itinerary.deadline,
+                  'status-neutral opacity-40': !itinerary.deadline,
                 }"
               ></span>
 
               <span
-                class="text-xl font-extrabold tracking-tight"
+                class="text-lg font-extrabold tracking-tight"
                 :class="{
-                  'text-success': itinerary.rule37Analysis.phase === 'BUY_SIGNAL',
-                  'text-neutral': itinerary.rule37Analysis.phase === 'OBSERVING',
-                  'text-info': itinerary.rule37Analysis.phase === 'WAITING',
+                  'text-success': itinerary.rule37Analysis?.phase === 'BUY_SIGNAL',
+                  'text-info': itinerary.rule37Analysis?.phase === 'WAITING',
+                  'text-neutral': itinerary.rule37Analysis?.phase === 'OBSERVING',
+                  'text-warning': !itinerary.rule37Analysis?.phase && itinerary.deadline,
+                  'text-base-content/40': !itinerary.deadline,
                 }"
               >
-                {{
-                  itinerary.rule37Analysis.phase === 'BUY_SIGNAL'
-                    ? '入手訊號'
-                    : itinerary.rule37Analysis.phase === 'OBSERVING'
-                      ? '數據觀察期'
-                      : '決策期'
-                }}
-              </span>
+                <template v-if="itinerary.rule37Analysis?.phase === 'BUY_SIGNAL'">
+                  入手訊號
+                </template>
 
-              <span
-                v-if="itinerary.rule37Analysis.phase === 'OBSERVING'"
-                class="badge badge-outline px-2 badge-sm font-semibold"
-              >
-                {{ calculateDaysRemaining(itinerary.rule37Analysis.cutoffDate) }} 天後結束
+                <template v-else-if="itinerary.rule37Analysis?.phase === 'WAITING'">
+                  決策期
+                </template>
+
+                <template v-else-if="itinerary.rule37Analysis?.phase === 'OBSERVING'">
+                  數據觀察期
+                </template>
+
+                <template v-else-if="itinerary.deadline">收集數據中</template>
+
+                <template v-else>未啟用數據分析</template>
               </span>
             </div>
 
-            <p class="mt-2 text-xs font-medium text-base-content/60">
-              <span v-if="itinerary.rule37Analysis.phase === 'BUY_SIGNAL'">
+            <p class="mt-1.5 text-xs font-medium text-base-content/60">
+              <template v-if="itinerary.rule37Analysis?.phase === 'BUY_SIGNAL'">
                 最新總計已跌穿觀察期錄得的最低價格。
-              </span>
+              </template>
 
-              <span v-else-if="itinerary.rule37Analysis.phase === 'OBSERVING'">
+              <template v-else-if="itinerary.rule37Analysis?.phase === 'WAITING'">
+                已進入決策階段。系統將會分析價格變化，找出最佳購買時機。
+              </template>
+
+              <template v-else-if="itinerary.rule37Analysis?.phase === 'OBSERVING'">
                 系統現正收集票價數據，決策期將於
                 <span class="font-bold">{{ fmtDate(itinerary.rule37Analysis.cutoffDate) }}</span>
                 開始。
-              </span>
+              </template>
 
-              <span v-else> 已進入決策階段。系統將會分析價格變化，找出最佳購買時機。 </span>
+              <template v-else-if="itinerary.deadline">未有足夠數據分析購買時機。</template>
+
+              <template v-else>
+                <button class="inline-block link font-bold link-primary" @click="openEditModal">
+                  設定購票限期
+                </button>
+                以啟用購買時機分析。
+              </template>
             </p>
-          </template>
+          </div>
 
-          <template v-else-if="itinerary.deadline">
-            <div class="flex items-center gap-3">
-              <span class="status status-lg status-warning shadow-sm"></span>
+          <div class="mt-2.5">
+            <div class="my-2 border-t border-base-300/60"></div>
 
-              <span class="text-xl font-extrabold tracking-tight text-warning">收集數據中</span>
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
+              <template v-if="itinerary.rule37Analysis?.phase === 'OBSERVING'">
+                <div class="flex items-center gap-1.5">
+                  <span class="font-medium text-base-content/50">決策期</span>
+
+                  <span
+                    class="rounded bg-base-300/50 px-1.5 py-0.5 font-bold text-base-content"
+                    :class="{
+                      'bg-error/10 text-error':
+                        calculateDaysRemaining(itinerary.rule37Analysis.cutoffDate) <= 0,
+                    }"
+                  >
+                    {{
+                      calculateDaysRemaining(itinerary.rule37Analysis.cutoffDate) > 0
+                        ? calculateDaysRemaining(itinerary.rule37Analysis.cutoffDate) + '天後'
+                        : '已過'
+                    }}
+                  </span>
+                </div>
+
+                <span class="hidden text-base-content/25 sm:inline">|</span>
+              </template>
+
+              <template v-else-if="itinerary.deadline">
+                <div class="flex items-center gap-1.5">
+                  <span class="font-medium text-base-content/50">購票限期</span>
+
+                  <span
+                    class="rounded bg-base-300/50 px-1.5 py-0.5 font-bold text-base-content"
+                    :class="{
+                      'bg-error/10 text-error': calculateDaysRemaining(itinerary.deadline) <= 0,
+                    }"
+                  >
+                    {{
+                      calculateDaysRemaining(itinerary.deadline) > 0
+                        ? calculateDaysRemaining(itinerary.deadline) + '天後'
+                        : '已過'
+                    }}
+                  </span>
+                </div>
+
+                <span class="hidden text-base-content/25 sm:inline">|</span>
+              </template>
+
+              <div v-if="itinerary.flights?.length" class="flex items-center gap-1.5">
+                <span class="font-medium text-base-content/50">出發日期</span>
+
+                <span
+                  class="rounded bg-base-300/50 px-1.5 py-0.5 font-bold text-base-content"
+                  :class="{
+                    'bg-error/10 text-error':
+                      calculateDaysRemaining(itinerary.flights[0].flightDate) <= 0,
+                  }"
+                >
+                  {{
+                    calculateDaysRemaining(itinerary.flights[0].flightDate) > 0
+                      ? calculateDaysRemaining(itinerary.flights[0].flightDate) + '天後'
+                      : '已過'
+                  }}
+                </span>
+              </div>
             </div>
-
-            <p class="mt-2 text-sm font-medium text-base-content/60">未有足夠數據分析購買時機。</p>
-          </template>
-
-          <template v-else>
-            <div class="flex items-center gap-3">
-              <span class="status status-lg status-neutral opacity-40"></span>
-
-              <span class="text-xl font-extrabold tracking-tight text-base-content/40">
-                未啟用數據分析
-              </span>
-            </div>
-
-            <p class="mt-2 text-sm font-medium text-base-content/60">
-              <button class="inline-block link font-bold link-primary" @click="openEditModal">
-                設定購票限期
-              </button>
-              以啟用購買時機分析。
-            </p>
-          </template>
+          </div>
         </div>
 
         <div
