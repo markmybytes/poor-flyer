@@ -17,7 +17,7 @@ import { zhHK } from 'date-fns/locale'
 const props = defineProps<{ itinerary: Itinerary; baseCurrency: string }>()
 const toast = useToast()
 
-const activeTab = ref('0')
+const activeTab = ref('graph')
 const loading = ref<string | null>(null)
 
 const showModal = ref(false)
@@ -315,6 +315,14 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
       <div class="card-body gap-2 p-4 md:p-6">
         <div class="tabs-box tabs flex-nowrap overflow-x-auto bg-base-200/70 p-1 whitespace-nowrap">
           <button
+            class="tab h-12 shrink-0 px-6 text-sm font-bold"
+            :class="activeTab === 'graph' ? 'tab-active' : ''"
+            @click="activeTab = 'graph'"
+          >
+            價格趨勢圖
+          </button>
+
+          <button
             v-if="itinerary.tripType === 'SINGLE'"
             class="tab h-12 shrink-0 px-6 text-sm font-bold"
             :class="activeTab === '0' ? 'tab-active' : ''"
@@ -334,14 +342,6 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
               {{ f.origin }} → {{ f.destination }}
             </button>
           </template>
-
-          <button
-            class="tab h-12 shrink-0 px-6 text-sm font-bold"
-            :class="activeTab === 'graph' ? 'tab-active' : ''"
-            @click="activeTab = 'graph'"
-          >
-            價格趨勢圖
-          </button>
         </div>
 
         <div class="grid overflow-hidden">
