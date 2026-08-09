@@ -4,7 +4,7 @@ import uuid
 from datetime import date
 
 from flask import render_template
-from sqlalchemy import func
+from sqlalchemy import func, select
 
 from src.extensions.database import FareSnapshot, Flight, Itinerary, db
 from src.services import setting
@@ -135,7 +135,7 @@ def scrape_fares():
 
 
 def disable_departured_itineraries():
-    """Daily job to disable itineraries with past departure dates."""
+    """Daily job to disable itineraries once their first flight date has passed."""
     from src.extensions.scheduler import scheduler
 
     if not setting.get_bool('itinerary', 'disable_departured_itineraries', False):
@@ -146,17 +146,16 @@ def disable_departured_itineraries():
         try:
             today = date.today()
 
-            past_itineraries_subquery = (
-                db.session.query(Flight.itinerary_id)
+            past_itinerary_ids = (
+                select(Flight.itinerary_id)
                 .group_by(Flight.itinerary_id)
-                .having(func.max(Flight.flight_date) < today)
-                .subquery()
+                .having(func.min(Flight.flight_date) < today)
             )
 
             updated_count = (
                 db.session.query(Itinerary)
                 .filter(Itinerary.is_active)
-                .filter(Itinerary.id.in_(past_itineraries_subquery))
+                .filter(Itinerary.id.in_(past_itinerary_ids))
                 .update({Itinerary.is_active: False}, synchronize_session=False)
             )
 

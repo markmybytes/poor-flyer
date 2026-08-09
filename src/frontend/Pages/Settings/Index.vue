@@ -49,7 +49,7 @@ const form = reactive({
   },
   itinerary: {
     disable_departured_itineraries:
-      props.settings.itinerary?.disableDeparturedItineraries !== 'false',
+      props.settings.itinerary?.disableDeparturedItineraries === 'true',
   },
   smtp: {
     host: props.settings.smtp?.host ?? '',
