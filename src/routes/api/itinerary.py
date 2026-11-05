@@ -140,6 +140,9 @@ def update_flight(itinerary_id):
 
         data = request.get_json(silent=True) or request.form.to_dict()
 
+        if {'cabin_class', 'max_stops', 'airlines'} & data.keys():
+            return jsonify({'message': '搜尋條件於建立後不可修改', 'data': None}), 400
+
         if 'is_active' in data:
             entry.is_active = data['is_active']
             logger.info('Updated itinerary: id=%s is_active=%s', itinerary_id, data['is_active'])
@@ -151,21 +154,6 @@ def update_flight(itinerary_id):
             else:
                 entry.deadline = None
             logger.info('Updated itinerary: id=%s deadline=%s', itinerary_id, entry.deadline)
-
-        if 'cabin_class' in data:
-            raw = data['cabin_class']
-            entry.cabin_class = _enum_value(CabinClass, raw, 'cabin_class') if raw else None
-            logger.info('Updated itinerary: id=%s cabin_class=%s', itinerary_id, entry.cabin_class)
-
-        if 'max_stops' in data:
-            raw = data['max_stops']
-            entry.max_stops = _enum_value(MaxStops, raw, 'max_stops') if raw else None
-            logger.info('Updated itinerary: id=%s max_stops=%s', itinerary_id, entry.max_stops)
-
-        if 'airlines' in data:
-            raw = data['airlines']
-            entry.airlines = list(parse_airlines(raw)) if raw is not None else None
-            logger.info('Updated itinerary: id=%s airlines=%s', itinerary_id, entry.airlines)
 
         db.session.commit()
         return jsonify({'success': True, 'message': 'Entry updated', 'data': entry.id})

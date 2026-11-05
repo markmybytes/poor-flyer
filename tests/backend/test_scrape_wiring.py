@@ -1,6 +1,8 @@
 import json
 from datetime import UTC, date, datetime, timedelta
 
+import pytest
+
 from src.extensions.database import FareSnapshot, Flight, Itinerary, db
 from src.routes.api import itinerary as api_itinerary
 from src.services import scheduler as scheduler_module
@@ -99,28 +101,17 @@ def test_on_demand_scrape_failed_leg_writes_sentinel(client, app, monkeypatch):
         assert snapshots[0].scrape_status == 'error'
 
 
-def test_patch_itinerary_search_filters(client, app):
-    with app.app_context():
-        itinerary, _ = _seed_itinerary()
-        iid = itinerary.id
-
-    resp = client.patch(
-        f'/api/itineraries/{iid}',
-        data=json.dumps(
-            {'cabin_class': 'business', 'max_stops': 'ONE_STOP', 'airlines': ['cx', 'jl']}
-        ),
-        content_type='application/json',
-    )
-
-    assert resp.status_code == 200
-    with app.app_context():
-        updated = db.session.get(Itinerary, iid)
-        assert updated.cabin_class == 'BUSINESS'
-        assert updated.max_stops == 'ONE_STOP'
-        assert updated.airlines == ['CX', 'JL']
-
-
-def test_patch_itinerary_null_clears_filters_to_default(client, app):
+@pytest.mark.parametrize(
+    'payload',
+    [
+        {'cabin_class': 'FIRST'},
+        {'max_stops': 'ONE_STOP'},
+        {'airlines': ['JL']},
+        {'airlines': []},
+        {'cabin_class': None, 'max_stops': None, 'airlines': None},
+    ],
+)
+def test_patch_itinerary_rejects_filter_edits(client, app, payload):
     with app.app_context():
         itinerary, _ = _seed_itinerary()
         itinerary.cabin_class = 'BUSINESS'
@@ -131,34 +122,33 @@ def test_patch_itinerary_null_clears_filters_to_default(client, app):
 
     resp = client.patch(
         f'/api/itineraries/{iid}',
-        data=json.dumps({'cabin_class': None, 'max_stops': None, 'airlines': None}),
+        data=json.dumps(payload),
         content_type='application/json',
     )
 
-    assert resp.status_code == 200
+    assert resp.status_code == 400
+    assert resp.get_json()['message'] == '搜尋條件於建立後不可修改'
     with app.app_context():
-        updated = db.session.get(Itinerary, iid)
-        assert updated.cabin_class is None
-        assert updated.max_stops is None
-        assert updated.airlines is None
+        unchanged = db.session.get(Itinerary, iid)
+        assert unchanged.cabin_class == 'BUSINESS'
+        assert unchanged.max_stops == 'NON_STOP'
+        assert unchanged.airlines == ['CX']
 
 
-def test_patch_itinerary_empty_airlines_is_explicit_empty(client, app):
+def test_patch_itinerary_deadline_only_still_updates(client, app):
     with app.app_context():
         itinerary, _ = _seed_itinerary()
-        itinerary.airlines = ['CX']
-        db.session.commit()
         iid = itinerary.id
 
     resp = client.patch(
         f'/api/itineraries/{iid}',
-        data=json.dumps({'airlines': []}),
+        data=json.dumps({'deadline': '2025-12-31'}),
         content_type='application/json',
     )
 
     assert resp.status_code == 200
     with app.app_context():
-        assert db.session.get(Itinerary, iid).airlines == []
+        assert db.session.get(Itinerary, iid).deadline == date(2025, 12, 31)
 
 
 def test_patch_itinerary_absent_filters_are_unchanged(client, app):
@@ -182,21 +172,6 @@ def test_patch_itinerary_absent_filters_are_unchanged(client, app):
         assert updated.cabin_class == 'BUSINESS'
         assert updated.max_stops == 'NON_STOP'
         assert updated.airlines == ['CX']
-
-
-def test_patch_itinerary_rejects_invalid_filter(client, app):
-    with app.app_context():
-        itinerary, _ = _seed_itinerary()
-        iid = itinerary.id
-
-    resp = client.patch(
-        f'/api/itineraries/{iid}',
-        data=json.dumps({'cabin_class': 'DELUXE'}),
-        content_type='application/json',
-    )
-
-    assert resp.status_code == 400
-    assert resp.get_json()['success'] is False
 
 
 def test_create_itinerary_accepts_search_filters(client, app):

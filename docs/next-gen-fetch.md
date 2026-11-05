@@ -129,18 +129,21 @@ New module `src/services/fli_search.py`:
 existing route style; settings form reads `props.settings.*` camelCase, writes
 snake_case.
 
-**Submission surface (revised 2026-11):** rides the existing endpoints —
-`Create.vue` → `POST /api/itineraries`, `Detail.vue` inline filter editor →
-`PATCH /api/itineraries/<id>` (backend must accept the three filter keys
-there), settings → existing settings patch path. Form-CRUD-over-API is
-grandfathered per the STYLE.md Inertia-first rule; migrating it is a separate
-future pass.
+**Submission surface (revised 2026-11):** filters are create-only.
+`Create.vue` → `POST /api/itineraries` accepts the three filter keys; after
+creation they are frozen, because `FareSnapshot` rows are not filter-versioned
+and editing filters would skew the historical baseline. `PATCH
+/api/itineraries/<id>` rejects `cabin_class`, `max_stops`, or `airlines` with
+`400` and message `搜尋條件於建立後不可修改`; `deadline` / `is_active` patches
+are unchanged. `Detail.vue` shows a read-only filter summary with a hint to
+delete and recreate the itinerary in order to change them. Form-CRUD-over-API
+is grandfathered per the STYLE.md Inertia-first rule; migrating it is a
+separate future pass.
 
-- Itinerary create/edit: cabin dropdown, stops dropdown, airlines — multiselect
+- Itinerary create: cabin dropdown, stops dropdown, airlines — multiselect
   of common carriers (UO, GK, MM, 7C, CX, JL, TR, …) **plus** free-text input
   for any other IATA code. `Create.vue` carries the fields from creation; the
-  edit surface is a compact inline filter editor on `Detail.vue` using the
-  existing PATCH endpoint (no redesign of the page).
+  detail page renders them read-only.
 - Settings page: the same three controls acting as global defaults.
 - All controls optional; empty = default.
 - Option lists (cabin, stops, common carriers) defined once in a shared exported

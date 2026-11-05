@@ -30,11 +30,6 @@ function mountDetail(overrides: Record<string, unknown> = {}) {
   })
 }
 
-function lastRequestBody() {
-  const call = vi.mocked(fetch).mock.calls.at(-1)
-  return JSON.parse(String(call?.[1]?.body ?? '{}'))
-}
-
 describe('Itineraries/Detail filters', () => {
   beforeEach(() => {
     vi.mocked(fetch).mockResolvedValue({
@@ -43,73 +38,35 @@ describe('Itineraries/Detail filters', () => {
     } as Response)
   })
 
-  it('opens the inline filter editor', async () => {
-    const wrapper = mountDetail()
-    expect(wrapper.findAll('select')).toHaveLength(0)
-    const toggle = wrapper.findAll('button').find((b) => b.text().includes('修改'))
-    await toggle?.trigger('click')
-    expect(wrapper.findAll('select')).toHaveLength(2)
+  it('renders read-only filter values from props', () => {
+    const wrapper = mountDetail({
+      cabinClass: 'BUSINESS',
+      maxStops: 'NON_STOP',
+      airlines: ['CX', 'JL'],
+    })
+
     expect(wrapper.text()).toContain('票價搜尋條件')
+    expect(wrapper.text()).toContain('艙等 商務艙')
+    expect(wrapper.text()).toContain('轉機 直飛')
+    expect(wrapper.text()).toContain('CX')
+    expect(wrapper.text()).toContain('JL')
+    expect(wrapper.text()).toContain('修改搜尋條件請刪除後重新建立')
   })
 
-  it('prefills filters from the itinerary props', async () => {
-    const wrapper = mountDetail({ cabinClass: 'BUSINESS', maxStops: 'NON_STOP' })
-    await wrapper
-      .findAll('button')
-      .find((b) => b.text().includes('修改'))
-      ?.trigger('click')
-    const selects = wrapper.findAll('select')
-    expect((selects[0].element as HTMLSelectElement).value).toBe('BUSINESS')
-    expect((selects[1].element as HTMLSelectElement).value).toBe('NON_STOP')
-  })
-
-  it('PATCHes snake_case keys and omits untouched airlines', async () => {
+  it('shows 未設定 for unset filters', () => {
     const wrapper = mountDetail()
-    await wrapper
-      .findAll('button')
-      .find((b) => b.text().includes('修改'))
-      ?.trigger('click')
-    const selects = wrapper.findAll('select')
-    await selects[0].setValue('FIRST')
-    await selects[1].setValue('ONE_STOP')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
 
-    expect(fetch).toHaveBeenCalledWith(
-      '/api/itineraries/it-1',
-      expect.objectContaining({ method: 'PATCH' }),
-    )
-    const body = lastRequestBody()
-    expect(body.cabin_class).toBe('FIRST')
-    expect(body.max_stops).toBe('ONE_STOP')
-    expect(body).not.toHaveProperty('airlines')
-    expect(vi.mocked(router.reload)).toHaveBeenCalled()
+    expect(wrapper.text()).toContain('艙等 未設定')
+    expect(wrapper.text()).toContain('轉機 未設定')
+    expect(wrapper.text()).toContain('航空公司 未設定')
   })
 
-  it('sends an airline include list', async () => {
+  it('renders no filter editor form', () => {
     const wrapper = mountDetail()
-    await wrapper
-      .findAll('button')
-      .find((b) => b.text().includes('修改'))
-      ?.trigger('click')
-    const input = wrapper.find('input[placeholder="搜尋航空公司名稱或代碼"]')
-    await input.setValue('UO')
-    await input.trigger('keydown.enter')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
-    expect(lastRequestBody().airlines).toEqual(['UO'])
-  })
 
-  it('sends an empty array when the airline filter is cleared', async () => {
-    const wrapper = mountDetail({ airlines: ['CX'] })
-    await wrapper
-      .findAll('button')
-      .find((b) => b.text().includes('修改'))
-      ?.trigger('click')
-    await wrapper.find('button[aria-label="移除 CX"]').trigger('click')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
-    expect(lastRequestBody().airlines).toEqual([])
+    expect(wrapper.findAll('form')).toHaveLength(0)
+    expect(wrapper.findAll('select')).toHaveLength(0)
+    expect(wrapper.find('input[placeholder="搜尋航空公司名稱或代碼"]').exists()).toBe(false)
   })
 
   it('asks for confirmation in a modal before deleting', async () => {
