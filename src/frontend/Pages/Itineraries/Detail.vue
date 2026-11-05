@@ -171,7 +171,11 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
 
               <span v-else class="text-base-content/45">未設定篩選</span>
 
-              <span class="tooltip" tabindex="0" data-tip="修改搜尋條件請刪除後重新建立">
+              <span
+                class="tooltip before:text-xs"
+                tabindex="0"
+                data-tip="修改搜尋條件請刪除後重新建立"
+              >
                 <Icon
                   icon="mdi:information-outline"
                   class="size-3.5 shrink-0 cursor-help text-base-content/40"
