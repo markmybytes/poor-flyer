@@ -101,14 +101,17 @@ def test_camelcase_json_provider_floating_datetime_no_warning(app, caplog):
         assert 'Serialization alert' not in caplog.text
 
 
-def test_camelcase_json_provider_naive_datetime_logs_warning(app, caplog):
+def test_camelcase_json_provider_naive_datetime_serializes_without_zone(app, caplog):
+    """Naive datetimes are flight-local wall-clock times — no invented 'Z'."""
     with app.app_context():
         provider = CamelCaseJSONProvider(app)
         naive_dt = datetime(2024, 6, 15, 8, 0, 0)
         with caplog.at_level(logging.WARNING, logger='src.utils.transform'):
             result = provider.default(naive_dt)
-        assert 'Serialization alert' in caplog.text
-        assert result.endswith('Z')
+        assert 'Sequence alert' not in caplog.text
+        assert not caplog.records or caplog.records[-1].levelno < logging.WARNING
+        assert result == '2024-06-15T08:00:00'
+        assert not result.endswith('Z')
 
 
 def test_camelcase_json_provider_date(app):
