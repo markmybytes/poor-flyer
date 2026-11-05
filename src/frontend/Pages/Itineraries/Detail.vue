@@ -79,6 +79,8 @@ function submitFilters() {
     })
 }
 
+const showDeleteModal = ref(false)
+
 const submitDeadline = async (clear = false) => {
   loading.value = 'update_deadline'
   const targetDeadline = clear ? null : deadlineValue.value || null
@@ -104,8 +106,8 @@ const submitDeadline = async (clear = false) => {
 }
 
 const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
-  if (action === 'delete' && !confirm('確定刪除此追蹤？')) {
-    return
+  if (action === 'delete') {
+    showDeleteModal.value = false
   }
   loading.value = action
 
@@ -198,13 +200,9 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
             <button
               title="刪除此追蹤"
               class="btn join-item btn-soft btn-sm btn-error"
-              :disabled="loading === 'delete'"
-              @click="runAction('delete')"
+              @click="showDeleteModal = true"
             >
-              <Icon
-                :icon="loading === 'delete' ? 'mdi:loading' : 'mdi:delete'"
-                :class="{ 'animate-spin': loading === 'delete' }"
-              />
+              <Icon icon="mdi:delete" />
             </button>
 
             <button
@@ -591,6 +589,37 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
       </div>
 
       <div class="modal-backdrop bg-black/10 backdrop-blur-xs" @click="showModal = false"></div>
+    </dialog>
+
+    <dialog class="modal" :class="{ 'modal-open': showDeleteModal }">
+      <div class="modal-box max-w-sm rounded-2xl border border-base-200 bg-base-100 shadow-xl">
+        <h3 class="mb-2 text-lg font-extrabold text-base-content">刪除此追蹤？</h3>
+
+        <p class="text-sm text-base-content/60">
+          刪除後將移除此旅程及其所有已收集的票價資料，此操作無法復原。
+        </p>
+
+        <div class="modal-action mt-6 justify-end gap-2 border-t border-base-200 pt-4">
+          <button type="button" class="btn btn-ghost btn-sm" @click="showDeleteModal = false">
+            取消
+          </button>
+
+          <button
+            type="button"
+            class="btn btn-soft btn-sm btn-error"
+            :disabled="loading === 'delete'"
+            @click="runAction('delete')"
+          >
+            <span v-if="loading === 'delete'" class="loading loading-xs loading-spinner"></span>
+            刪除
+          </button>
+        </div>
+      </div>
+
+      <div
+        class="modal-backdrop bg-black/10 backdrop-blur-xs"
+        @click="showDeleteModal = false"
+      ></div>
     </dialog>
   </AppLayout>
 </template>

@@ -109,4 +109,26 @@ describe('Itineraries/Detail filters', () => {
     await flushPromises()
     expect(lastRequestBody().airlines).toEqual([])
   })
+
+  it('asks for confirmation in a modal before deleting', async () => {
+    const wrapper = mountDetail({ isActive: true })
+    // trash button only opens the modal — no fetch yet
+    vi.mocked(fetch).mockClear()
+    await wrapper.find('button[title="刪除此追蹤"]').trigger('click')
+    expect(wrapper.text()).toContain('此操作無法復原')
+    expect(fetch).not.toHaveBeenCalled()
+
+    // confirm button inside the modal triggers the DELETE + visit
+    const confirmBtn = wrapper
+      .findAll('button')
+      .find((b) => b.text().trim() === '刪除')
+    await confirmBtn?.trigger('click')
+    await flushPromises()
+
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/itineraries/it-1',
+      expect.objectContaining({ method: 'DELETE' }),
+    )
+    expect(vi.mocked(router.visit)).toHaveBeenCalled()
+  })
 })
