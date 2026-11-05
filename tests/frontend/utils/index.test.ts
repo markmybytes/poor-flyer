@@ -86,6 +86,11 @@ describe('fmtTime', () => {
     expect(typeof result).toBe('string')
     expect(result).not.toBe('—')
   })
+
+  it('renders naive flight-local times literally, no timezone shift', () => {
+    expect(fmtTime('2026-12-05T21:30:00')).toBe('21:30')
+    expect(fmtTime('2026-12-05 21:30')).toBe('21:30')
+  })
 })
 
 describe('fmtTz', () => {

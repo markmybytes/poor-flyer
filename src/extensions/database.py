@@ -5,6 +5,7 @@ from datetime import UTC, date, datetime
 import sqlalchemy.types as types
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import (
+    JSON,
     Boolean,
     Date,
     DateTime,
@@ -90,6 +91,9 @@ class Itinerary(db.Model):
     trip_type: Mapped[str] = mapped_column(String, nullable=False)
     deadline: Mapped[date | None] = mapped_column(Date, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    cabin_class: Mapped[str | None] = mapped_column(String, nullable=True)
+    max_stops: Mapped[str | None] = mapped_column(String, nullable=True)
+    airlines: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=lambda: datetime.now(UTC))
 

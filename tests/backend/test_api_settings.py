@@ -32,7 +32,7 @@ def test_get_settings_currency_defaults(client, app):
 def test_patch_settings_updates_base_currency(client, app):
     with app.app_context():
         with patch('src.routes.api.settings.setting.get_all_masked', return_value={}):
-            with patch('src.routes.api.settings.setting.set_many') as mock_set:
+            with patch('src.routes.api.settings.setting.set_many'):
                 resp = client.patch(
                     '/api/settings',
                     data=json.dumps({'currency': {'base_currency': 'USD'}}),

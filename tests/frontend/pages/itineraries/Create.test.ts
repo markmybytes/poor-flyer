@@ -1,5 +1,6 @@
 import CreatePage from '@/Pages/Itineraries/Create.vue'
 import { flushPromises, mount } from '@vue/test-utils'
+import { router } from '@inertiajs/vue3'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const globalStubs = {
@@ -8,10 +9,22 @@ const globalStubs = {
 }
 
 describe('Itineraries/Create', () => {
+  function lastRequestBody() {
+    return vi.mocked(router.post).mock.calls.at(-1)?.[1] as Record<string, unknown>
+  }
+
+  function lastRequestOptions() {
+    return vi.mocked(router.post).mock.calls.at(-1)?.[2] as {
+      onSuccess?: () => void
+      onError?: (errors: Record<string, string>) => void
+    }
+  }
+
   beforeEach(() => {
+    vi.clearAllMocks()
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
-      json: async () => ({ success: true, data: 'new-id' }),
+      json: async () => ({ data: [] }),
     } as Response)
   })
 
@@ -48,35 +61,78 @@ describe('Itineraries/Create', () => {
     expect(submitBtn.exists()).toBe(true)
   })
 
-  it('calls fetch with POST to /api/itineraries on submit', async () => {
-    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
-    const form = wrapper.find('form')
-    await form.trigger('submit')
-    await flushPromises()
-    expect(fetch).toHaveBeenCalledWith(
-      '/api/itineraries',
-      expect.objectContaining({ method: 'POST' }),
-    )
-  })
-
-  it('shows toast success on successful submission', async () => {
+  it('posts to /itineraries through the Inertia router on submit', async () => {
     const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
     await wrapper.find('form').trigger('submit')
     await flushPromises()
+    expect(router.post).toHaveBeenCalledWith(
+      '/itineraries',
+      expect.objectContaining({ trip_type: 'SINGLE' }),
+      expect.any(Object),
+    )
+  })
+
+  it('shows toast success when the visit succeeds', async () => {
+    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    lastRequestOptions().onSuccess?.()
     const { useToast } = await import('vue-toast-notification')
     expect(vi.mocked(useToast)().success).toHaveBeenCalled()
   })
 
-  it('shows toast error when fetch fails', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce({
-      ok: false,
-      json: async () => ({ success: false, message: 'Server error' }),
-    } as Response)
-
+  it('shows toast error with the Inertia error bag message', async () => {
     const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
     await wrapper.find('form').trigger('submit')
     await flushPromises()
+    lastRequestOptions().onError?.({ itinerary: '請檢查輸入內容' })
     const { useToast } = await import('vue-toast-notification')
-    expect(vi.mocked(useToast)().error).toHaveBeenCalled()
+    expect(vi.mocked(useToast)().error).toHaveBeenCalledWith('請檢查輸入內容')
+  })
+
+  it('renders the fetch filter controls', () => {
+    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    const selects = wrapper.findAll('select')
+    expect(selects).toHaveLength(2)
+    expect(selects[0].findAll('option')).toHaveLength(5)
+    expect(selects[1].findAll('option')).toHaveLength(5)
+    expect(wrapper.find('input[placeholder="搜尋航空公司名稱或代碼"]').exists()).toBe(true)
+  })
+
+  it('sends snake_case filter keys and omits untouched airlines', async () => {
+    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    const selects = wrapper.findAll('select')
+    await selects[0].setValue('BUSINESS')
+    await selects[1].setValue('NON_STOP')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const body = lastRequestBody()
+    expect(body.cabin_class).toBe('BUSINESS')
+    expect(body.max_stops).toBe('NON_STOP')
+    expect(body).not.toHaveProperty('airlines')
+  })
+
+  it('sends airlines as an include list', async () => {
+    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    const input = wrapper.find('input[placeholder="搜尋航空公司名稱或代碼"]')
+    await input.setValue('uo')
+    await input.trigger('keydown.enter')
+    await input.setValue('vn')
+    await input.trigger('keydown.enter')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(lastRequestBody().airlines).toEqual(['UO', 'VN'])
+  })
+
+  it('sends an empty airline array when a selected carrier is cleared', async () => {
+    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    const input = wrapper.find('input[placeholder="搜尋航空公司名稱或代碼"]')
+    await input.setValue('UO')
+    await input.trigger('keydown.enter')
+    await wrapper.find('button[aria-label="移除 UO"]').trigger('click')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(lastRequestBody().airlines).toEqual([])
   })
 })

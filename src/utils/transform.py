@@ -74,12 +74,12 @@ class CamelCaseJSONProvider(DefaultJSONProvider):
 
         if isinstance(obj, datetime):
             if obj.tzinfo is None:
-                logger.warning(
-                    'Serialization alert: Unprotected naive datetime leaked. Assuming UTC.'
-                )
-                normalized = obj.replace(tzinfo=UTC)
-            else:
-                normalized = obj.astimezone(UTC)
+                # naive datetimes are flight-local wall-clock times everywhere in
+                # this schema (UTCDateTime covers the UTC ones) — serialize them
+                # without a zone suffix instead of pretending they are UTC
+                logger.debug('Serializing naive datetime as flight-local (no zone suffix).')
+                return obj.isoformat()
+            normalized = obj.astimezone(UTC)
             return normalized.isoformat().replace('+00:00', 'Z')
 
         if isinstance(obj, date):

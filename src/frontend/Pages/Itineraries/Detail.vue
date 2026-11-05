@@ -2,10 +2,11 @@
 import FareGraph from '@/Components/FareGraph.vue'
 import FaretList from '@/Components/FareList.vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
+import { CABIN_CLASS_OPTIONS, MAX_STOPS_OPTIONS } from '@/options'
 import type { Itinerary } from '@/types'
 import { fmtDate, fmtFare, fmtItineraryName } from '@/utils'
 import { router } from '@inertiajs/vue3'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useToast } from 'vue-toast-notification'
 
 import { calculateDaysRemaining } from '@/utils/timezone'
@@ -23,10 +24,29 @@ const loading = ref<string | null>(null)
 const showModal = ref(false)
 const deadlineValue = ref(props.itinerary.deadline || '')
 
+const filterSummary = computed(() => {
+  const cabin = CABIN_CLASS_OPTIONS.find(
+    (option) => option.value === props.itinerary.cabinClass,
+  )?.label
+  const stops = MAX_STOPS_OPTIONS.find(
+    (option) => option.value === props.itinerary.maxStops && option.value !== 'ANY',
+  )?.label
+  const { airlines } = props.itinerary
+
+  return {
+    cabin,
+    stops,
+    airlines,
+    empty: !cabin && !stops && !airlines?.length,
+  }
+})
+
 const openEditModal = () => {
   deadlineValue.value = props.itinerary.deadline || ''
   showModal.value = true
 }
+
+const showDeleteModal = ref(false)
 
 const submitDeadline = async (clear = false) => {
   loading.value = 'update_deadline'
@@ -53,8 +73,8 @@ const submitDeadline = async (clear = false) => {
 }
 
 const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
-  if (action === 'delete' && !confirm('確定刪除此追蹤？')) {
-    return
+  if (action === 'delete') {
+    showDeleteModal.value = false
   }
   loading.value = action
 
@@ -115,12 +135,52 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
               </div>
             </div>
 
-            <p class="text-sm font-medium text-base-content/60">
-              日期：{{
-                itinerary.flights.length == 1
-                  ? fmtDate(itinerary.flights.at(0).flightDate)
-                  : `${fmtDate(itinerary.flights.at(0).flightDate)} - ${fmtDate(itinerary.flights.at(-1).flightDate)}`
-              }}
+            <p
+              class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-base-content/60"
+            >
+              <span
+                >日期：{{
+                  itinerary.flights.length == 1
+                    ? fmtDate(itinerary.flights.at(0).flightDate)
+                    : `${fmtDate(itinerary.flights.at(0).flightDate)} - ${fmtDate(itinerary.flights.at(-1).flightDate)}`
+                }}</span
+              >
+            </p>
+
+            <p
+              class="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm font-medium text-base-content/60"
+            >
+              <template v-if="!filterSummary.empty">
+                <span v-if="filterSummary.cabin">{{ filterSummary.cabin }}</span>
+
+                <span v-if="filterSummary.stops">轉機 {{ filterSummary.stops }}</span>
+
+                <span
+                  v-if="filterSummary.airlines?.length"
+                  class="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1"
+                >
+                  <span
+                    v-for="code in filterSummary.airlines"
+                    :key="code"
+                    class="inline-flex rounded bg-base-200/60 px-2 py-0.5 text-xs font-bold text-base-content"
+                  >
+                    {{ code }}
+                  </span>
+                </span>
+              </template>
+
+              <span v-else class="text-base-content/45">未設定篩選</span>
+
+              <span
+                class="tooltip before:text-xs"
+                tabindex="0"
+                data-tip="修改搜尋條件請刪除後重新建立"
+              >
+                <Icon
+                  icon="mdi:information-outline"
+                  class="size-3.5 shrink-0 cursor-help text-base-content/40"
+                />
+              </span>
             </p>
           </div>
         </div>
@@ -147,13 +207,9 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
             <button
               title="刪除此追蹤"
               class="btn join-item btn-soft btn-sm btn-error"
-              :disabled="loading === 'delete'"
-              @click="runAction('delete')"
+              @click="showDeleteModal = true"
             >
-              <Icon
-                :icon="loading === 'delete' ? 'mdi:loading' : 'mdi:delete'"
-                :class="{ 'animate-spin': loading === 'delete' }"
-              />
+              <Icon icon="mdi:delete" />
             </button>
 
             <button
@@ -500,6 +556,37 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
       </div>
 
       <div class="modal-backdrop bg-black/10 backdrop-blur-xs" @click="showModal = false"></div>
+    </dialog>
+
+    <dialog class="modal" :class="{ 'modal-open': showDeleteModal }">
+      <div class="modal-box max-w-sm rounded-2xl border border-base-200 bg-base-100 shadow-xl">
+        <h3 class="mb-2 text-lg font-extrabold text-base-content">刪除此追蹤？</h3>
+
+        <p class="text-sm text-base-content/60">
+          刪除後將移除此旅程及其所有已收集的票價資料，此操作無法復原。
+        </p>
+
+        <div class="modal-action mt-6 justify-end gap-2 border-t border-base-200 pt-4">
+          <button type="button" class="btn btn-ghost btn-sm" @click="showDeleteModal = false">
+            取消
+          </button>
+
+          <button
+            type="button"
+            class="btn btn-soft btn-sm btn-error"
+            :disabled="loading === 'delete'"
+            @click="runAction('delete')"
+          >
+            <span v-if="loading === 'delete'" class="loading loading-xs loading-spinner"></span>
+            刪除
+          </button>
+        </div>
+      </div>
+
+      <div
+        class="modal-backdrop bg-black/10 backdrop-blur-xs"
+        @click="showDeleteModal = false"
+      ></div>
     </dialog>
   </AppLayout>
 </template>

@@ -38,6 +38,8 @@ def _stream_prefixed_output(proc: subprocess.Popen, label: str, color: str | Non
 @with_appcontext
 def dev():
     """Run Vite dev server, Flask dev server, and scheduler simultaneously."""
+    # child output (vite arrows, unicode logs) can hit cp950 limits on Windows consoles
+    sys.stdout.reconfigure(errors='replace')
     click.echo(click.style('Starting development environment...', fg='cyan'))
     logger.info('Development environment startup initiated')
 

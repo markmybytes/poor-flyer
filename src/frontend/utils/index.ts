@@ -46,13 +46,22 @@ export function fmtDate(iso: string | null) {
 }
 
 export function fmtTime(iso: string | null) {
-  return iso
-    ? new Date(iso).toLocaleTimeString('zh-HK', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      })
-    : '—'
+  if (!iso) {
+    return '—'
+  }
+
+  // flight scheduled times arrive without a zone suffix (flight-local by
+  // design); render them literally instead of shifting through Date
+  const naive = iso.match(/^\d{4}-\d{2}-\d{2}[T ](\d{2}:\d{2})(?::\d{2})?/)
+  if (naive) {
+    return naive[1]
+  }
+
+  return new Date(iso).toLocaleTimeString('zh-HK', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
 }
 
 export function fmtTz(iso: string | null) {

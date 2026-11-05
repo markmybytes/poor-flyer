@@ -113,6 +113,10 @@ stmt = (
 - Always finish chains that join a collection with `.unique()` on the parent to avoid duplicate rows.
 - Never depend on `lazy='select'` behaviour implicitly — if a relationship will be serialised, declare it in the same `options(...)` as the parent.
 
+### Application-Owned Cache Keys
+
+- Application-owned cache keys use lowercase colon-separated segments in stable order, with schema version last: `<domain>:<purpose>[:<scope-or-variant>...]:v<schema>`. Hash long or sensitive identifiers; use `v1` unless the cached payload shape changes. Package/vendor-managed keys retain their package-defined names.
+
 ### Migrations
 
 - Make every Alembic revision reversible with a working `downgrade()`. Mirror every schema change in both directions.
@@ -140,13 +144,14 @@ Create a new blueprint or module when:
 - **Pivot Attributes**: A child relationship has unique, highly mutable parameters that would clutter a parent resource file.
 - **Resource Cohesion**: Avoid grouping entirely distinct underlying models or unrelated view modules into a single file.
 
-#### 3. Micro-Interactions (Field Toggles, Field Manipulations)
+#### 3. Inertia First; JSON API by Exception
 
-For localised button actions (status switches, inline sort orders, triggering a background task), avoid sniffing the request payload to split the view function path. Instead, route the targeted action through an API endpoint under `src/routes/api/` to maximise UI responsiveness while keeping page views strictly resourceful.
+Inertia routes are the default for page reads, forms, CRUD, redirects, and mutations. Reserve API routes for independent JSON interactions that must avoid an Inertia visit: polling, job-status queries, data queries, or isolated state updates (e.g., status toggles, inline sort). API is not for ordinary form submission or general SPA replacement.
 
-- **Implementation**: Mount the action under `api_bp` returning a standard envelope. The Vue component catches the response via `fetch`/Axios and updates its local reactive state inside the successful `.then()` block to flip the UI state instantly.
-- **The Trade-Off (Frontend Sync Tax)**: This keeps the interface snappy by returning raw payloads that leave Inertia's navigation history, loading bars, and scroll positions undisturbed. However, it incurs a **Frontend Sync Tax** — the developer must write manual client-side state synchronisation to keep the UI in sync with the database.
-- **Safeguard Against File Explosion**: Do not create a standalone blueprint file for every single column update. Group related inline row/field modifications for the same model inside a single, cohesive API blueprint using semantic endpoint naming:
+- Use native `fetch`. Check `response.ok` explicitly — `fetch` does not reject on HTTP 4xx/5xx.
+- Manually sync returned state: apply the response in the success path to keep the UI accurate with the database (Frontend Sync Tax).
+- Triggered background actions (e.g. on-demand fare scrape) stay in an API endpoint under `src/routes/api/`. Mount it under `api_bp` with the standard envelope; the Vue component applies the response inside the successful `.then` block.
+- **Safeguard Against File Explosion**: Do not create a standalone blueprint file for every single endpoint. Group related actions for the same model inside a single, cohesive API blueprint using semantic endpoint naming:
 
 ```python
 # src/routes/api/itinerary.py — Cohesive grouping within a single blueprint
@@ -160,6 +165,8 @@ def update_status(itinerary_id: str):
 def update_sort_order(itinerary_id: str):
     ...
 ```
+
+- Form CRUD posts to the page URL that renders the form (e.g. `POST /itineraries`, `POST /settings`); `router.post` carries the submission so validation errors return in the Inertia error bag.
 
 #### 4. Nested Route Ownership
 
@@ -260,23 +267,28 @@ function submitData() {
 
 All API endpoints mounted under `src/routes/api/` (served at `/api/...`) **must** adhere to this envelope. This does **not** apply to page views under `src/routes/pages/` (served by Inertia).
 
-### 1. Envelope Schema (TypeScript Definition)
+### 1. HTTP Status as Source of Truth
+
+No `"success": true/false` payload flag. The HTTP status dictates outcome: handle `2xx` in the success path and route `4xx/5xx` to the error path. With native `fetch`, check `response.ok` and throw or otherwise route non-2xx responses explicitly.
+
+### 2. Envelope Schema (TypeScript Definition)
 
 ```typescript
 interface ApiResponse<T = unknown> {
-    success: boolean // true on 2xx, false on 4xx/5xx
     message: string | null // Context summary (null on standard reads)
     data: T | null // Main payload — object, array, or null
     errors?: Record<string, string[]> // Present ONLY on 422 validation failures
 }
 ```
 
-### 2. Execution Behaviors
+### 3. Execution Behaviors
 
-- **Successful Reads (`200 OK`):** `success: true`, `data` contains the requested resource object or collection array. `message` must be `null`.
+- **Successful Reads (`200 OK`):** `message` is `null`; `data` contains the requested resource object or collection array.
 - **Mutative Actions (`200 OK` / `201 Created`):** For state switches, updates, or deletions where no entity structure is expected by the client, `data` is `null` and `message` contains clear success text.
-- **Validation Failures (`422 Unprocessable Entity`):** `success: false`, `data: null`, `message` summarises the failure, and `errors` is a per-field dictionary. Flask does not auto-emit this envelope — wire it up with an `@app.errorhandler(ValidationError)` (or equivalent) before exposing a new write endpoint.
-- **Application Exceptions (`4xx` / `5xx`):** `success: false`, `data: null`, and `message` contains the error summary context.
+- **Validation Failures (`422 Unprocessable Entity`):** `data` is `null`, `message` summarises the failure, and `errors` is a per-field dictionary. Flask does not auto-emit this envelope — wire it up with an `@app.errorhandler(ValidationError)` (or equivalent) before exposing a new write endpoint.
+- **Application Exceptions (`4xx` / `5xx`):** `data` is `null`, and `message` contains the error summary context.
+
+> Existing endpoints that still emit a `success` flag are grandfathered — do not add `success` to new endpoints; migrating existing emitters is a dedicated pass, not incidental work.
 
 ### 3. Frontend Interop
 

@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, date, datetime
 from unittest.mock import patch
 
@@ -95,6 +96,86 @@ def test_itinerary_create_renders_correct_component(client, app):
         resp = client.get('/itineraries/create', headers=INERTIA_HEADERS)
     assert resp.status_code == 200
     assert resp.get_json()['component'] == 'Itineraries/Create'
+
+
+def test_itinerary_create_submit_persists_and_redirects(client, app):
+    resp = client.post(
+        '/itineraries',
+        data=json.dumps(
+            {
+                'trip_type': 'ROUND_TRIP',
+                'cabin_class': 'business',
+                'max_stops': 'NON_STOP',
+                'airlines': ['cx', 'jl'],
+                'flights': [
+                    {'origin': 'hkg', 'destination': 'nrt', 'flight_date': '2025-12-01'},
+                    {'origin': 'nrt', 'destination': 'hkg', 'flight_date': '2025-12-08'},
+                ],
+            }
+        ),
+        content_type='application/json',
+    )
+
+    assert resp.status_code == 302
+    assert resp.headers['Location'] == '/'
+    with app.app_context():
+        itinerary = db.session.query(Itinerary).one()
+        assert itinerary.trip_type == 'ROUND_TRIP'
+        assert itinerary.cabin_class == 'BUSINESS'
+        assert itinerary.max_stops == 'NON_STOP'
+        assert itinerary.airlines == ['CX', 'JL']
+        flights = (
+            db.session.query(Flight)
+            .filter_by(itinerary_id=itinerary.id)
+            .order_by(Flight.sequence)
+            .all()
+        )
+        assert [(f.origin, f.destination) for f in flights] == [
+            ('HKG', 'NRT'),
+            ('NRT', 'HKG'),
+        ]
+
+
+def test_itinerary_create_submit_honors_is_active(client, app):
+    payload = {
+        'trip_type': 'SINGLE',
+        'flights': [{'origin': 'HKG', 'destination': 'NRT', 'flight_date': '2025-12-01'}],
+    }
+    resp = client.post(
+        '/itineraries',
+        data=json.dumps({**payload, 'is_active': False}),
+        content_type='application/json',
+    )
+    assert resp.status_code == 302
+    with app.app_context():
+        assert db.session.query(Itinerary).one().is_active is False
+
+    resp = client.post('/itineraries', data=json.dumps(payload), content_type='application/json')
+    assert resp.status_code == 302
+    with app.app_context():
+        assert db.session.query(Itinerary).all()[-1].is_active is True
+
+
+def test_itinerary_create_submit_invalid_payload_returns_422(client, app):
+    resp = client.post(
+        '/itineraries',
+        data=json.dumps(
+            {
+                'trip_type': 'SINGLE',
+                'cabin_class': 'SUITE',
+                'flights': [{'origin': 'HKG', 'destination': 'NRT', 'flight_date': '2025-12-01'}],
+            }
+        ),
+        content_type='application/json',
+        headers=INERTIA_HEADERS,
+    )
+
+    assert resp.status_code == 422
+    data = resp.get_json()
+    assert data['component'] == 'Itineraries/Create'
+    assert data['props']['errors']['itinerary'] == '請檢查輸入內容'
+    with app.app_context():
+        assert db.session.query(Itinerary).count() == 0
 
 
 def test_itinerary_show_renders_detail_component(client, app):

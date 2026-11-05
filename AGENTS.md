@@ -10,6 +10,7 @@ Flask 3 + Vue 3 (Inertia SPA) flight-price tracker. Scrapes airline fares daily 
 
 - **Entry**: `create_app()` in `src/__init__.py`; WSGI: `wsgi.py`.
 - **Run**: `flask dev` (all-in-one) or `flask run` / `flask run-scheduler` (split).
+- **Price fetching**: `src/services/fli_search.py` queries Google Flights via [`fli`](https://github.com/punitarani/fli) (PyPI package `flights`).
 - Scheduler lives in its own service (see `s6-overlay/s6-rc.d/`), not the web process.
 
 ### Tech Stack
@@ -22,6 +23,7 @@ Flask 3 + Vue 3 (Inertia SPA) flight-price tracker. Scrapes airline fares daily 
 ### File Structure
 
 - `src/routes/{pages,api}` — web (Inertia) views and API (JSON) views
+  - `lookup.py` registers `GET /api/airlines` (full fli Airline list, route-cached 24h)
 - `src/services/` — domain logic and scheduler jobs
 - `src/utils/` — pure helpers (no Flask globals, no I/O)
 - `src/extensions/` — Flask extension singletons + `init_extensions(app)`; SQLAlchemy `Base` / `db` in `database.py`

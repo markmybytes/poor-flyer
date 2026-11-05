@@ -38,6 +38,32 @@ export interface Itinerary {
   deadline: string | null
   createdAt: string
   flights: Flight[]
+  cabinClass?: string | null
+  maxStops?: string | null
+  airlines?: string[] | null
   statistics?: PriceStats | null
   rule37Analysis?: Rule37Analysis | null
+}
+
+export interface Settings {
+  currency?: {
+    baseCurrency?: string
+    fxratesApiKey?: string
+    cacheTtl?: string | number
+  }
+  email?: {
+    recipients?: string
+  }
+  itinerary?: {
+    disableDeparturedItineraries?: string
+  }
+  smtp?: {
+    host?: string
+    port?: string | number
+    user?: string
+    password?: string
+    senderEmail?: string
+    requireAuth?: string
+    protocol?: string
+  }
 }

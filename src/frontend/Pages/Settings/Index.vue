@@ -1,32 +1,13 @@
 <script setup lang="ts">
 import AppLayout from '@/Layouts/AppLayout.vue'
+import type { Settings } from '@/types'
 import { formatLocalDateTime } from '@/utils/timezone'
+import { router } from '@inertiajs/vue3'
 import { computed, reactive } from 'vue'
 import { useToast } from 'vue-toast-notification'
 
 const props = defineProps<{
-  settings: {
-    currency?: {
-      baseCurrency?: string
-      fxratesApiKey?: string
-      cacheTtl?: string | number
-    }
-    email?: {
-      recipients?: string
-    }
-    itinerary?: {
-      disableDeparturedItineraries?: string
-    }
-    smtp?: {
-      host?: string
-      port?: string | number
-      user?: string
-      password?: string
-      senderEmail?: string
-      requireAuth?: string
-      protocol?: string
-    }
-  }
+  settings: Settings
   supportedCurrencies: string[]
   fxStatus: {
     baseCurrency?: string
@@ -112,25 +93,25 @@ function saveSettings(sec: 'email' | 'currency' | 'smtp' | 'itinerary') {
     },
   }
 
-  fetch('/api/settings', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ [sec]: payloads[sec] }),
-  })
-    .then((res) => res.json())
-    .then((data) => {
-      if (!data.success) {
-        return toast.error(data.message || '儲存失敗')
-      }
-      toast.success('設定已成功儲存')
-      ui.lastSaved = new Date().toLocaleString('zh-HK')
+  router.post(
+    '/settings',
+    { [sec]: payloads[sec] },
+    {
+      preserveScroll: true,
+      onSuccess: () => {
+        toast.success('設定已儲存')
+        ui.lastSaved = new Date().toLocaleString('zh-HK')
 
-      if (sec === 'smtp') {
-        form.smtp.password = ''
-      }
-    })
-    .catch(() => toast.error('儲存設定時發生錯誤'))
-    .finally(() => (ui.saving = false))
+        if (sec === 'smtp') {
+          form.smtp.password = ''
+        }
+      },
+      onError: (errors) => toast.error(errors.settings ?? '儲存失敗'),
+      onFinish: () => {
+        ui.saving = false
+      },
+    },
+  )
 }
 
 function refreshFxRates() {

@@ -8,8 +8,8 @@ from sqlalchemy import func, select
 
 from src.extensions.database import FareSnapshot, Flight, Itinerary, db
 from src.services import setting
+from src.services.fli_search import FlightQuery, filters_for_itinerary, scrape_prices
 from src.services.fx_rates import FXRatesError, convert_amount, get_configured_base_currency
-from src.services.scraper import FlightQuery, scrape_prices
 from src.utils.email import get_smtp_config, send_html_email
 from src.utils.rule37 import Phase, compute_37_best
 
@@ -25,6 +25,7 @@ def scrape_fares():
         try:
             logger.info('Daily scrape job started')
             today = date.today()
+            base_currency = get_configured_base_currency()
             itineraries = db.session.query(Itinerary).filter(Itinerary.is_active).all()
             logger.debug('Processing %d active itineraries', len(itineraries))
 
@@ -35,9 +36,23 @@ def scrape_fares():
 
                 scraped_count += 1
                 results = scrape_prices(
-                    [FlightQuery(f.origin, f.destination, f.flight_date) for f in active_legs]
+                    [FlightQuery(f.origin, f.destination, f.flight_date) for f in active_legs],
+                    currency_code=base_currency,
+                    filters=filters_for_itinerary(itinerary),
                 )
                 for flight, res in zip(active_legs, results, strict=False):
+                    if not res.success:
+                        db.session.add(
+                            FareSnapshot(
+                                id=str(uuid.uuid4()),
+                                flight_id=flight.id,
+                                fare=None,
+                                currency=base_currency,
+                                scrape_status='error',
+                                error_message=res.error_message or 'Scrape failed',
+                            )
+                        )
+                        continue
                     for r in res.results:
                         db.session.add(
                             FareSnapshot(
@@ -48,15 +63,13 @@ def scrape_fares():
                                 flight_number=r.flight_number,
                                 departure_at=r.departure_at,
                                 arrival_at=r.arrival_at,
-                                scrape_status='success' if res.success else 'error',
-                                error_message=res.error_message,
+                                scrape_status='success',
                             )
                         )
             db.session.commit()
             logger.info('Scraped prices for %d itineraries', scraped_count)
 
             smtp_cfg = get_smtp_config()
-            base_currency = get_configured_base_currency()
             recipients = [
                 r.strip() for r in setting.get('email', 'recipients', '').split(',') if r.strip()
             ]
@@ -72,17 +85,26 @@ def scrape_fares():
 
             buy_signals_sent = 0
             for flight in all_active_legs:
+                fare_by_date: dict[date, float] = {}
+                for snapshot in flight.fare_snapshots:
+                    if snapshot.scrape_status != 'success' or snapshot.fare is None:
+                        continue
+                    src_currency = (snapshot.currency or base_currency).upper()
+                    try:
+                        fare = convert_amount(float(snapshot.fare), src_currency, base_currency)
+                    except FXRatesError:
+                        logger.warning('Failed to convert fare for rule37: flight_id=%s', flight.id)
+                        continue
+                    day = snapshot.created_at.date()
+                    fare_by_date[day] = min(fare_by_date.get(day, fare), fare)
+
                 r37 = compute_37_best(
                     flight.itinerary.created_at.date(),
                     today,
                     flight.itinerary.deadline,
-                    {
-                        s.created_at.date(): float(s.fare)
-                        for s in flight.fare_snapshots
-                        if s.scrape_status == 'success'
-                    },
+                    fare_by_date,
                 )
-                if r37.phase != Phase.BUY_SIGNAL:
+                if not r37 or r37.phase != Phase.BUY_SIGNAL:
                     continue
 
                 buy_signals_sent += 1

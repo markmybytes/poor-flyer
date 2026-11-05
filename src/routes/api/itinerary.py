@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 import uuid
 from datetime import UTC, datetime, time
 
@@ -7,8 +7,9 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import selectinload
 
 from src.extensions.database import FareSnapshot, Flight, Itinerary, db
+from src.services.fli_search import FlightQuery, filters_for_itinerary, scrape_prices
 from src.services.fx_rates import FXRatesError, convert_amount, get_configured_base_currency
-from src.services.scraper import FlightQuery, scrape_prices
+from src.services.itinerary import create_itinerary
 
 logger = logging.getLogger(__name__)
 
@@ -19,34 +20,12 @@ itineraries_bp = Blueprint('itineraries', __name__, url_prefix='/itineraries')
 def create_flight():
     try:
         data = request.get_json(silent=True) or request.form.to_dict()
-
-        deadline_str = data.get('deadline')
-        deadline = datetime.strptime(deadline_str, '%Y-%m-%d').date() if deadline_str else None
-
-        itinerary = Itinerary(
-            id=str(uuid.uuid4()),
-            trip_type=data.get('trip_type', 'SINGLE'),
-            deadline=deadline,
-            is_active=True,
-            created_at=datetime.now(UTC),
-        )
-
-        db.session.add(itinerary)
-
-        flights_data = data.get('flights', [])
-        for i, flight_data in enumerate(flights_data):
-            flight = Flight(
-                id=str(uuid.uuid4()),
-                itinerary_id=itinerary.id,
-                sequence=i,
-                origin=flight_data.get('origin', '').upper(),
-                destination=flight_data.get('destination', '').upper(),
-                flight_date=datetime.strptime(flight_data.get('flight_date'), '%Y-%m-%d').date(),
-            )
-            db.session.add(flight)
+        itinerary = create_itinerary(data)
 
         db.session.commit()
-        logger.info('Created itinerary: id=%s flights=%d', itinerary.id, len(flights_data))
+        logger.info(
+            'Created itinerary: id=%s flights=%d', itinerary.id, len(data.get('flights', []))
+        )
         return jsonify({'success': True, 'message': 'Entry created', 'data': itinerary.id})
     except Exception as e:
         db.session.rollback()
@@ -123,6 +102,9 @@ def update_flight(itinerary_id):
 
         data = request.get_json(silent=True) or request.form.to_dict()
 
+        if {'cabin_class', 'max_stops', 'airlines'} & data.keys():
+            return jsonify({'message': '搜尋條件於建立後不可修改', 'data': None}), 400
+
         if 'is_active' in data:
             entry.is_active = data['is_active']
             logger.info('Updated itinerary: id=%s is_active=%s', itinerary_id, data['is_active'])
@@ -198,11 +180,27 @@ def scrape_flight(itinerary_id):
             any_scraped_or_attempted = True
             logger.info('Scraping %d flights for itinerary %s', len(active_flights), itinerary_id)
 
+            base_currency = get_configured_base_currency()
             results = scrape_prices(
-                [FlightQuery(f.origin, f.destination, f.flight_date) for f in active_flights]
+                [FlightQuery(f.origin, f.destination, f.flight_date) for f in active_flights],
+                currency_code=base_currency,
+                filters=filters_for_itinerary(itinerary),
             )
 
             for flight, res in zip(active_flights, results, strict=False):
+                if not res.success:
+                    db.session.add(
+                        FareSnapshot(
+                            id=str(uuid.uuid4()),
+                            flight_id=flight.id,
+                            created_at=datetime.now(UTC),
+                            fare=None,
+                            currency=base_currency,
+                            scrape_status='error',
+                            error_message=res.error_message or 'Scrape failed',
+                        )
+                    )
+                    continue
                 for result in res.results:
                     db.session.add(
                         FareSnapshot(
@@ -214,8 +212,7 @@ def scrape_flight(itinerary_id):
                             flight_number=result.flight_number,
                             departure_at=result.departure_at,
                             arrival_at=result.arrival_at,
-                            scrape_status='success' if res.success else 'error',
-                            error_message=res.error_message,
+                            scrape_status='success',
                         )
                     )
 
