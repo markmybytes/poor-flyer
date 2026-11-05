@@ -119,6 +119,8 @@ New module `src/services/fli_search.py`:
 
 ### 5.5 Disk cache for fli responses
 
+**Revised 2026-11 after live smoke:** the cache exists **only for development and testing** — its purpose is preventing repeated identical fli calls during dev iterations from burning the request budget. Production runs (scheduler, cron, container — `FLASK_DEBUG`/`TESTING` off) ignore the cache entirely and always fetch live data; fare truth is never served from a disk cache in production. Gate for caching + cache-path writes = `current_app.debug or current_app.config['TESTING']`.
+
 Daily scheduler runs happen only once a day, but **development and testing iterate heavily** — re-running a search against Google every time burns the same IP on identical queries and can trigger blockage. Follow the house pattern already used in `src/services/fx_rates.py` (filesystem cache under the instance dir + freshness check):
 
 - Key: hash of canonical (origin, destination, date, filters, currency) — cache per exact query.

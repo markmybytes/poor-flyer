@@ -138,6 +138,26 @@ def test_cache_hit_skips_network_and_force_refresh_bypasses(app, fake_search, qu
         assert len(fake_search.calls) == 2
 
 
+def test_empty_results_are_not_cached(app, fake_search, query):
+    # a Google blockage/consent wall must not persist as a "no flights" fact
+    fake_search.results = []
+    with app.app_context():
+        scrape_prices([query])
+        scrape_prices([query])
+        assert len(fake_search.calls) == 2
+
+
+def test_cache_disabled_in_production(app, fake_search, query):
+    # cache exists for dev/test rate-limit safety only; production fetches live
+    fake_search.results = [_result(100)]
+    with app.app_context() as ctx:
+        ctx.app.debug = False
+        ctx.app.config['TESTING'] = False
+        scrape_prices([query])
+        scrape_prices([query])
+        assert len(fake_search.calls) == 2
+
+
 def test_cache_key_is_stable_and_filter_sensitive(query):
     base = resolve_filters(default_cabin_class='ECONOMY', default_max_stops='ANY')
     assert cache_key(query, base, 'HKD') == cache_key(query, base, 'HKD')

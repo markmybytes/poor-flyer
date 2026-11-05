@@ -80,6 +80,12 @@ def filters_for_itinerary(itinerary: Itinerary) -> SearchFilters:
     )
 
 
+def _cache_enabled() -> bool:
+    # cache exists to protect the rate limit while developing/testing — a
+    # production scheduler must always fetch live fare data
+    return bool(current_app.debug or current_app.config.get('TESTING'))
+
+
 def _resolve_cache_path() -> Path:
     p = Path(current_app.instance_path) / 'fli_cache.json'
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -225,13 +231,16 @@ def _scrape_leg(
     query: FlightQuery, currency_code: str, filters: SearchFilters, force_refresh: bool
 ) -> ScrapeResult:
     key = cache_key(query, filters, currency_code)
-    entries = _read_cache()
-    entry = entries.get(key)
-    if not force_refresh and isinstance(entry, dict) and is_cache_fresh(entry, _cache_ttl()):
-        rows = _deserialize(entry.get('results', []))
-        logger.info('Fare cache hit: key=%s rows=%d', key, len(rows))
-        return ScrapeResult(success=True, results=rows)
+    if _cache_enabled():
+        entries = _read_cache()
+        entry = entries.get(key)
+        if not force_refresh and isinstance(entry, dict) and is_cache_fresh(entry, _cache_ttl()):
+            rows = _deserialize(entry.get('results', []))
+            logger.info('Fare cache hit: key=%s rows=%d', key, len(rows))
+            return ScrapeResult(success=True, results=rows)
 
+    # cache only exists to protect the rate limit while developing/testing;
+    # production always fetches live
     logger.info('Fare cache miss: key=%s', key)
     try:
         flights = _search_leg(query, currency_code, filters)
@@ -244,8 +253,12 @@ def _scrape_leg(
         )
         return ScrapeResult(success=False, error_message=str(exc))
 
-    entries[key] = {'cached_at': datetime.now(UTC).isoformat(), 'results': _serialize(flights)}
-    _write_cache(entries)
+    # an empty result is never cached: a Google blockage/consent wall must not
+    # persist as a "no flights" fact for the TTL window
+    if _cache_enabled() and flights:
+        entries = _read_cache()
+        entries[key] = {'cached_at': datetime.now(UTC).isoformat(), 'results': _serialize(flights)}
+        _write_cache(entries)
     logger.info(
         'Flight search completed: route=%s-%s rows=%d',
         query.origin,
