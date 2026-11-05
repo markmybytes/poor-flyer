@@ -73,12 +73,12 @@ describe('Itineraries/Create', () => {
   })
 
   it('shows toast error when fetch fails', async () => {
+    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: false,
       json: async () => ({ success: false, message: 'Server error' }),
     } as Response)
 
-    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
     await wrapper.find('form').trigger('submit')
     await flushPromises()
     const { useToast } = await import('vue-toast-notification')
@@ -91,7 +91,7 @@ describe('Itineraries/Create', () => {
     expect(selects).toHaveLength(2)
     expect(selects[0].findAll('option')).toHaveLength(5)
     expect(selects[1].findAll('option')).toHaveLength(5)
-    expect(wrapper.findAll('.checkbox')).toHaveLength(12)
+    expect(wrapper.find('input[placeholder="搜尋航空公司名稱或代碼"]').exists()).toBe(true)
   })
 
   it('sends snake_case filter keys and omits untouched airlines', async () => {
@@ -110,8 +110,9 @@ describe('Itineraries/Create', () => {
 
   it('sends airlines as an include list', async () => {
     const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
-    await wrapper.find('input[value="UO"]').setValue(true)
-    const input = wrapper.find('input[placeholder="其他 IATA 代碼"]')
+    const input = wrapper.find('input[placeholder="搜尋航空公司名稱或代碼"]')
+    await input.setValue('uo')
+    await input.trigger('keydown.enter')
     await input.setValue('vn')
     await input.trigger('keydown.enter')
     await wrapper.find('form').trigger('submit')
@@ -121,9 +122,10 @@ describe('Itineraries/Create', () => {
 
   it('sends an empty airline array when a selected carrier is cleared', async () => {
     const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
-    const checkbox = wrapper.find('input[value="UO"]')
-    await checkbox.setValue(true)
-    await checkbox.setValue(false)
+    const input = wrapper.find('input[placeholder="搜尋航空公司名稱或代碼"]')
+    await input.setValue('UO')
+    await input.trigger('keydown.enter')
+    await wrapper.find('button[aria-label="移除 UO"]').trigger('click')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
     expect(lastRequestBody().airlines).toEqual([])
