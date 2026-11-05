@@ -176,27 +176,46 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
         </div>
 
         <div class="border-t border-base-300/70 px-6 py-5">
-          <div class="flex flex-wrap items-center gap-2">
-            <p class="text-sm font-bold text-base-content">票價搜尋條件</p>
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+            <p class="font-bold text-base-content">票價搜尋條件</p>
 
-            <span class="badge badge-soft badge-sm">艙等 {{ filterLabels.cabinClass }}</span>
+            <span class="text-base-content">
+              <span class="text-base-content/55">艙等 </span>
 
-            <span class="badge badge-soft badge-sm">轉機 {{ filterLabels.maxStops }}</span>
+              <span class="font-medium">{{ filterLabels.cabinClass }}</span>
+            </span>
 
-            <template v-if="itinerary.airlines?.length">
+            <span aria-hidden="true" class="text-base-content/25">·</span>
+
+            <span class="text-base-content">
+              <span class="text-base-content/55">轉機 </span>
+
+              <span class="font-medium">{{ filterLabels.maxStops }}</span>
+            </span>
+
+            <span aria-hidden="true" class="text-base-content/25">·</span>
+
+            <span>
+              <span class="text-base-content/55">航空公司 </span>
+
               <span
-                v-for="code in itinerary.airlines"
-                :key="code"
-                class="inline-flex items-center rounded bg-base-200/60 px-2 py-1 text-xs font-bold"
+                v-if="itinerary.airlines?.length"
+                class="inline-flex flex-wrap items-center gap-1 align-middle"
               >
-                {{ code }}
+                <span
+                  v-for="code in itinerary.airlines"
+                  :key="code"
+                  class="inline-flex rounded bg-base-200/60 px-2 py-0.5 text-xs font-bold text-base-content"
+                >
+                  {{ code }}
+                </span>
               </span>
-            </template>
 
-            <span v-else class="badge badge-soft badge-sm">航空公司 未設定</span>
+              <span v-else class="text-base-content/45">未設定</span>
+            </span>
           </div>
 
-          <p class="mt-1 text-xs font-medium text-base-content/55">修改搜尋條件請刪除後重新建立</p>
+          <p class="mt-2 text-xs font-medium text-base-content/50">修改搜尋條件請刪除後重新建立</p>
         </div>
       </div>
     </div>
