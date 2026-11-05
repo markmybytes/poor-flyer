@@ -6,7 +6,7 @@ import { CABIN_CLASS_OPTIONS, MAX_STOPS_OPTIONS } from '@/options'
 import type { Itinerary } from '@/types'
 import { fmtDate, fmtFare, fmtItineraryName } from '@/utils'
 import { router } from '@inertiajs/vue3'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useToast } from 'vue-toast-notification'
 
 import { calculateDaysRemaining } from '@/utils/timezone'
@@ -24,14 +24,22 @@ const loading = ref<string | null>(null)
 const showModal = ref(false)
 const deadlineValue = ref(props.itinerary.deadline || '')
 
-const filterLabels = {
-  cabinClass:
-    CABIN_CLASS_OPTIONS.find((option) => option.value === props.itinerary.cabinClass)?.label ??
-    '未設定',
-  maxStops:
-    MAX_STOPS_OPTIONS.find((option) => option.value === props.itinerary.maxStops)?.label ??
-    '未設定',
-}
+const filterSummary = computed(() => {
+  const cabin = CABIN_CLASS_OPTIONS.find(
+    (option) => option.value === props.itinerary.cabinClass,
+  )?.label
+  const stops = MAX_STOPS_OPTIONS.find(
+    (option) => option.value === props.itinerary.maxStops && option.value !== 'ANY',
+  )?.label
+  const { airlines } = props.itinerary
+
+  return {
+    cabin,
+    stops,
+    airlines,
+    empty: !cabin && !stops && !airlines?.length,
+  }
+})
 
 const openEditModal = () => {
   deadlineValue.value = props.itinerary.deadline || ''
@@ -127,12 +135,48 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
               </div>
             </div>
 
-            <p class="text-sm font-medium text-base-content/60">
-              日期：{{
-                itinerary.flights.length == 1
-                  ? fmtDate(itinerary.flights.at(0).flightDate)
-                  : `${fmtDate(itinerary.flights.at(0).flightDate)} - ${fmtDate(itinerary.flights.at(-1).flightDate)}`
-              }}
+            <p
+              class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-base-content/60"
+            >
+              <span
+                >日期：{{
+                  itinerary.flights.length == 1
+                    ? fmtDate(itinerary.flights.at(0).flightDate)
+                    : `${fmtDate(itinerary.flights.at(0).flightDate)} - ${fmtDate(itinerary.flights.at(-1).flightDate)}`
+                }}</span
+              >
+            </p>
+
+            <p
+              class="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm font-medium text-base-content/60"
+            >
+              <template v-if="!filterSummary.empty">
+                <span v-if="filterSummary.cabin">{{ filterSummary.cabin }}</span>
+
+                <span v-if="filterSummary.stops">轉機 {{ filterSummary.stops }}</span>
+
+                <span
+                  v-if="filterSummary.airlines?.length"
+                  class="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1"
+                >
+                  <span
+                    v-for="code in filterSummary.airlines"
+                    :key="code"
+                    class="inline-flex rounded bg-base-200/60 px-2 py-0.5 text-xs font-bold text-base-content"
+                  >
+                    {{ code }}
+                  </span>
+                </span>
+              </template>
+
+              <span v-else class="text-base-content/45">未設定篩選</span>
+
+              <span class="tooltip" tabindex="0" data-tip="修改搜尋條件請刪除後重新建立">
+                <Icon
+                  icon="mdi:information-outline"
+                  class="size-3.5 shrink-0 cursor-help text-base-content/40"
+                />
+              </span>
             </p>
           </div>
         </div>
@@ -173,49 +217,6 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
               {{ loading === 'scrape' ? '更新中...' : '下載最新票價' }}
             </button>
           </div>
-        </div>
-
-        <div class="border-t border-base-300/70 px-6 py-5">
-          <div class="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
-            <p class="font-bold text-base-content">票價搜尋條件</p>
-
-            <span class="text-base-content">
-              <span class="text-base-content/55">艙等 </span>
-
-              <span class="font-medium">{{ filterLabels.cabinClass }}</span>
-            </span>
-
-            <span aria-hidden="true" class="text-base-content/25">·</span>
-
-            <span class="text-base-content">
-              <span class="text-base-content/55">轉機 </span>
-
-              <span class="font-medium">{{ filterLabels.maxStops }}</span>
-            </span>
-
-            <span aria-hidden="true" class="text-base-content/25">·</span>
-
-            <span>
-              <span class="text-base-content/55">航空公司 </span>
-
-              <span
-                v-if="itinerary.airlines?.length"
-                class="inline-flex flex-wrap items-center gap-1 align-middle"
-              >
-                <span
-                  v-for="code in itinerary.airlines"
-                  :key="code"
-                  class="inline-flex rounded bg-base-200/60 px-2 py-0.5 text-xs font-bold text-base-content"
-                >
-                  {{ code }}
-                </span>
-              </span>
-
-              <span v-else class="text-base-content/45">未設定</span>
-            </span>
-          </div>
-
-          <p class="mt-2 text-xs font-medium text-base-content/50">修改搜尋條件請刪除後重新建立</p>
         </div>
       </div>
     </div>

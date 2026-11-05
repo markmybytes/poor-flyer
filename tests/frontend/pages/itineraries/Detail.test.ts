@@ -45,20 +45,19 @@ describe('Itineraries/Detail filters', () => {
       airlines: ['CX', 'JL'],
     })
 
-    expect(wrapper.text()).toContain('票價搜尋條件')
-    expect(wrapper.text()).toContain('艙等 商務艙')
+    expect(wrapper.find('[data-tip="修改搜尋條件請刪除後重新建立"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('商務艙')
     expect(wrapper.text()).toContain('轉機 直飛')
     expect(wrapper.text()).toContain('CX')
     expect(wrapper.text()).toContain('JL')
-    expect(wrapper.text()).toContain('修改搜尋條件請刪除後重新建立')
+    expect(wrapper.text()).not.toContain('未設定篩選')
   })
 
-  it('shows 未設定 for unset filters', () => {
+  it('shows 未設定篩選 when all filters unset', () => {
     const wrapper = mountDetail()
 
-    expect(wrapper.text()).toContain('艙等 未設定')
-    expect(wrapper.text()).toContain('轉機 未設定')
-    expect(wrapper.text()).toContain('航空公司 未設定')
+    expect(wrapper.text()).toContain('未設定篩選')
+    expect(wrapper.text()).not.toContain('商務艙')
   })
 
   it('renders no filter editor form', () => {
