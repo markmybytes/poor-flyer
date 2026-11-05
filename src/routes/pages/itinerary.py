@@ -3,7 +3,7 @@ from collections import defaultdict
 from dataclasses import asdict
 from datetime import date, datetime
 
-from flask import Blueprint, g, redirect
+from flask import Blueprint, g, make_response, redirect, request
 from flask_inertia import render_inertia
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -14,6 +14,7 @@ from src.services.fx_rates import (
     convert_amount,
     get_configured_base_currency,
 )
+from src.services.itinerary import create_itinerary
 from src.utils.rule37 import compute_37_best, compute_price_stats
 from src.utils.transform import model_to_dict
 
@@ -127,6 +128,28 @@ def index():
 @itineraries_bp.route('/create')
 def create():
     return render_inertia('Itineraries/Create')
+
+
+@itineraries_bp.route('', methods=['POST'])
+def create_submit():
+    data = request.get_json(silent=True) or request.form.to_dict()
+    try:
+        itinerary = create_itinerary(data)
+        db.session.commit()
+    except (KeyError, TypeError, ValueError) as exc:
+        db.session.rollback()
+        logger.warning('Invalid itinerary submission: %s', exc)
+        response = make_response(
+            render_inertia(
+                'Itineraries/Create',
+                props={'errors': {'itinerary': '請檢查輸入內容'}},
+            )
+        )
+        response.status_code = 422
+        return response
+
+    logger.info('Created itinerary from page form: id=%s', itinerary.id)
+    return redirect('/')
 
 
 @itineraries_bp.route('/<itinerary_id>')

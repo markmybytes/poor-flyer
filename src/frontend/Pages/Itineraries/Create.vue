@@ -117,27 +117,14 @@ function submit() {
     }),
   }
 
-  fetch('/api/itineraries', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  })
-    .then((res) =>
-      res.json().then((data) => {
-        if (!res.ok) {
-          toast.error(data.message || '新增失敗，請檢查輸入內容')
-          return
-        }
-        toast.success('已成功建立票價追蹤')
-        router.visit('/')
-      }),
-    )
-    .catch((err) => {
-      toast.error(err instanceof Error ? err.message : '未知錯誤')
-    })
-    .finally(() => {
+  router.post('/itineraries', payload, {
+    preserveScroll: true,
+    onSuccess: () => toast.success('已成功建立票價追蹤'),
+    onError: (errors) => toast.error(errors.itinerary ?? '新增失敗，請檢查輸入內容'),
+    onFinish: () => {
       form.value.processing = false
-    })
+    },
+  })
 }
 </script>
 

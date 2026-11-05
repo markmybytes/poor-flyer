@@ -4,6 +4,8 @@ Provides type-safe access with Flask-Caching to reduce DB overhead.
 """
 
 import logging
+from collections.abc import Mapping
+from typing import Any
 
 from sqlalchemy import select
 
@@ -84,6 +86,67 @@ def get_all_masked(namespace: str) -> dict[str, str]:
     if 'password' in data:
         data['password'] = '***' if data['password'] else None
     return data
+
+
+def update(data: Mapping[str, Any]) -> None:
+    """Apply a partial settings payload, raising ValueError on invalid values."""
+    from src.services.fx_rates import SUPPORTED_CURRENCIES
+
+    if 'currency' in data and (currency_data := data['currency'] or {}):
+        existing = (get_all_masked('currency') or {}).copy()
+        if 'base_currency' in currency_data:
+            base = (currency_data.get('base_currency') or 'HKD').strip().upper()
+            if base not in SUPPORTED_CURRENCIES:
+                raise ValueError('Unsupported base currency')
+            existing['base_currency'] = base
+        if 'cache_ttl' in currency_data:
+            try:
+                ttl = int(currency_data.get('cache_ttl'))
+            except (TypeError, ValueError):
+                raise ValueError('Cache TTL must be an integer greater than 0') from None
+            if ttl <= 0:
+                raise ValueError('Cache TTL must be an integer greater than 0')
+            existing['cache_ttl'] = str(ttl)
+        if 'fxrates_api_key' in currency_data:
+            existing['fxrates_api_key'] = (currency_data.get('fxrates_api_key') or '').strip()
+        set_many('currency', existing)
+
+    if 'email' in data and (email_data := data['email'] or {}):
+        existing = (get_all_masked('email') or {}).copy()
+        if 'recipients' in email_data:
+            existing['recipients'] = email_data.get('recipients', '')
+        set_many('email', existing)
+
+    if 'itinerary' in data and (itinerary_data := data['itinerary'] or {}):
+        existing = (get_all_masked('itinerary') or {}).copy()
+        if 'disable_departured_itineraries' in itinerary_data:
+            existing['disable_departured_itineraries'] = (
+                'true' if itinerary_data.get('disable_departured_itineraries', False) else 'false'
+            )
+        set_many('itinerary', existing)
+
+    if 'smtp' in data and (smtp_data := data['smtp'] or {}):
+        # password excluded from the merge base: the masked '***' placeholder
+        # must never overwrite a stored password; only a re-typed value does
+        existing = {
+            k: v for k, v in (get_all_masked('smtp') or {}).copy().items() if k != 'password'
+        }
+        for field in ['host', 'user', 'sender_email', 'protocol']:
+            if field in smtp_data:
+                existing[field] = smtp_data.get(field, '')
+        if 'port' in smtp_data:
+            try:
+                existing['port'] = str(int(smtp_data.get('port')))
+            except (TypeError, ValueError):
+                raise ValueError('SMTP port must be an integer') from None
+        if 'require_auth' in smtp_data:
+            existing['require_auth'] = (
+                'true' if smtp_data.get('require_auth', True) in [True, 'true'] else 'false'
+            )
+        submitted_pwd = smtp_data.get('password')
+        if submitted_pwd:
+            existing['password'] = submitted_pwd
+        set_many('smtp', existing)
 
 
 def clear_cache() -> None:

@@ -166,7 +166,7 @@ def update_sort_order(itinerary_id: str):
     ...
 ```
 
-- Legacy note: form-CRUD over `/api/*` (e.g. `Create.vue` POST `/api/itineraries`) predates this rule and is grandfathered — do not carry the pattern into new surfaces; migrating it is a dedicated pass, not incidental work.
+- Form CRUD posts to the page URL that renders the form (e.g. `POST /itineraries`, `POST /settings`); `router.post` carries the submission so validation errors return in the Inertia error bag.
 
 #### 4. Nested Route Ownership
 

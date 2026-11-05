@@ -1,5 +1,6 @@
 import SettingsIndexPage from '@/Pages/Settings/Index.vue'
 import { flushPromises, mount } from '@vue/test-utils'
+import { router } from '@inertiajs/vue3'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const defaultProps = {
@@ -32,11 +33,19 @@ const globalStubs = {
 
 describe('Settings/Index', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       json: async () => ({ success: true }),
     } as Response)
   })
+
+  function lastSaveOptions() {
+    return vi.mocked(router.post).mock.calls.at(-1)?.[2] as {
+      onSuccess?: () => void
+      onError?: (errors: Record<string, string>) => void
+    }
+  }
 
   it('renders without crashing', () => {
     const wrapper = mount(SettingsIndexPage, {
@@ -86,20 +95,18 @@ describe('Settings/Index', () => {
     expect(wrapper.text()).toContain('API unavailable')
   })
 
-  it('calls PATCH /api/settings on save', async () => {
+  it('posts to /settings through the Inertia router on save', async () => {
     const wrapper = mount(SettingsIndexPage, {
       props: defaultProps,
       global: { stubs: globalStubs },
     })
-    const forms = wrapper.findAll('form')
-    if (forms.length > 0) {
-      await forms[0].trigger('submit')
-      await flushPromises()
-      expect(fetch).toHaveBeenCalledWith(
-        '/api/settings',
-        expect.objectContaining({ method: 'PATCH' }),
-      )
-    }
+    await wrapper.findAll('form')[0].trigger('submit')
+    await flushPromises()
+    expect(router.post).toHaveBeenCalledWith(
+      '/settings',
+      expect.objectContaining({ itinerary: expect.any(Object) }),
+      expect.any(Object),
+    )
   })
 
   it('shows toast success after saving', async () => {
@@ -107,32 +114,23 @@ describe('Settings/Index', () => {
       props: defaultProps,
       global: { stubs: globalStubs },
     })
-    const forms = wrapper.findAll('form')
-    if (forms.length > 0) {
-      await forms[0].trigger('submit')
-      await flushPromises()
-      const { useToast } = await import('vue-toast-notification')
-      expect(vi.mocked(useToast)().success).toHaveBeenCalled()
-    }
+    await wrapper.findAll('form')[0].trigger('submit')
+    await flushPromises()
+    lastSaveOptions().onSuccess?.()
+    const { useToast } = await import('vue-toast-notification')
+    expect(vi.mocked(useToast)().success).toHaveBeenCalledWith('設定已儲存')
   })
 
   it('shows toast error when save fails', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce({
-      ok: false,
-      json: async () => ({ success: false, message: 'Server error' }),
-    } as Response)
-
     const wrapper = mount(SettingsIndexPage, {
       props: defaultProps,
       global: { stubs: globalStubs },
     })
-    const forms = wrapper.findAll('form')
-    if (forms.length > 0) {
-      await forms[0].trigger('submit')
-      await flushPromises()
-      const { useToast } = await import('vue-toast-notification')
-      expect(vi.mocked(useToast)().error).toHaveBeenCalled()
-    }
+    await wrapper.findAll('form')[0].trigger('submit')
+    await flushPromises()
+    lastSaveOptions().onError?.({ settings: 'Unsupported base currency' })
+    const { useToast } = await import('vue-toast-notification')
+    expect(vi.mocked(useToast)().error).toHaveBeenCalledWith('Unsupported base currency')
   })
 
   it('calls POST /api/settings/test-email on test email button', async () => {

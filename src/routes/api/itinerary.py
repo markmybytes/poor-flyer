@@ -9,61 +9,23 @@ from sqlalchemy.orm import selectinload
 from src.extensions.database import FareSnapshot, Flight, Itinerary, db
 from src.services.fli_search import FlightQuery, filters_for_itinerary, scrape_prices
 from src.services.fx_rates import FXRatesError, convert_amount, get_configured_base_currency
-from src.utils.filters import CabinClass, MaxStops, parse_airlines
+from src.services.itinerary import create_itinerary
 
 logger = logging.getLogger(__name__)
 
 itineraries_bp = Blueprint('itineraries', __name__, url_prefix='/itineraries')
 
 
-def _enum_value(enum_type, value, label: str) -> str:
-    try:
-        return enum_type(str(value).strip().upper()).value
-    except ValueError:
-        raise ValueError(f'Invalid {label}') from None
-
-
 @itineraries_bp.route('', methods=['POST'])
 def create_flight():
     try:
         data = request.get_json(silent=True) or request.form.to_dict()
-
-        deadline_str = data.get('deadline')
-        deadline = datetime.strptime(deadline_str, '%Y-%m-%d').date() if deadline_str else None
-
-        itinerary = Itinerary(
-            id=str(uuid.uuid4()),
-            trip_type=data.get('trip_type', 'SINGLE'),
-            deadline=deadline,
-            is_active=True,
-            cabin_class=_enum_value(CabinClass, data['cabin_class'], 'cabin_class')
-            if data.get('cabin_class')
-            else None,
-            max_stops=_enum_value(MaxStops, data['max_stops'], 'max_stops')
-            if data.get('max_stops')
-            else None,
-            airlines=list(parse_airlines(data['airlines']))
-            if data.get('airlines') is not None
-            else None,
-            created_at=datetime.now(UTC),
-        )
-
-        db.session.add(itinerary)
-
-        flights_data = data.get('flights', [])
-        for i, flight_data in enumerate(flights_data):
-            flight = Flight(
-                id=str(uuid.uuid4()),
-                itinerary_id=itinerary.id,
-                sequence=i,
-                origin=flight_data.get('origin', '').upper(),
-                destination=flight_data.get('destination', '').upper(),
-                flight_date=datetime.strptime(flight_data.get('flight_date'), '%Y-%m-%d').date(),
-            )
-            db.session.add(flight)
+        itinerary = create_itinerary(data)
 
         db.session.commit()
-        logger.info('Created itinerary: id=%s flights=%d', itinerary.id, len(flights_data))
+        logger.info(
+            'Created itinerary: id=%s flights=%d', itinerary.id, len(data.get('flights', []))
+        )
         return jsonify({'success': True, 'message': 'Entry created', 'data': itinerary.id})
     except Exception as e:
         db.session.rollback()
