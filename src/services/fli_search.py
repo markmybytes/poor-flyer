@@ -112,7 +112,7 @@ def _search_leg(query: FlightQuery, currency_code: str, filters: SearchFilters) 
                 currency=result.currency or currency_code,
             )
         )
-    return sorted(flights, key=lambda f: f.fare)[:3]
+    return sorted(flights, key=lambda f: f.fare)
 
 
 def _scrape_leg(query: FlightQuery, currency_code: str, filters: SearchFilters) -> ScrapeResult:

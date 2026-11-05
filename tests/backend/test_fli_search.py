@@ -49,7 +49,7 @@ def query():
     return FlightQuery('HKG', 'NRT', date.today() + timedelta(days=30))
 
 
-def test_returns_top_three_cheapest_and_drops_null_prices(app, fake_search, query):
+def test_returns_all_fares_and_drops_null_prices(app, fake_search, query):
     fake_search.results = [
         _result(500, 'A'),
         _result(None, 'NULL'),
@@ -62,7 +62,7 @@ def test_returns_top_three_cheapest_and_drops_null_prices(app, fake_search, quer
 
     assert len(result) == 1
     assert result[0].success is True
-    assert [f.flight_number for f in result[0].results] == ['B', 'D', 'C']
+    assert [f.flight_number for f in result[0].results] == ['B', 'D', 'C', 'A']
     assert fake_search.calls[0]['currency'] == 'HKD'
 
 
