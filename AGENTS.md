@@ -23,6 +23,7 @@ Flask 3 + Vue 3 (Inertia SPA) flight-price tracker. Scrapes airline fares daily 
 ### File Structure
 
 - `src/routes/{pages,api}` — web (Inertia) views and API (JSON) views
+  - `lookup.py` registers `GET /api/airlines` (full fli Airline list, route-cached 24h)
 - `src/services/` — domain logic and scheduler jobs
 - `src/utils/` — pure helpers (no Flask globals, no I/O)
 - `src/extensions/` — Flask extension singletons + `init_extensions(app)`; SQLAlchemy `Base` / `db` in `database.py`

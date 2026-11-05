@@ -103,9 +103,10 @@ def _search_leg(query: FlightQuery, currency_code: str, filters: SearchFilters) 
         if result.price is None:
             continue
         leg = result.legs[0]
+        airline_code = leg.airline.name.removeprefix('_') if leg.airline else ''
         flights.append(
             Flight(
-                flight_number=leg.flight_number,
+                flight_number=f'{airline_code}{leg.flight_number}',
                 departure_at=leg.departure_datetime,
                 arrival_at=leg.arrival_datetime,
                 fare=float(result.price),

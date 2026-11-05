@@ -2,6 +2,7 @@ from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
+from fli.models import Airline
 
 from src.services import fli_search
 from src.services.fli_search import FlightQuery, ScrapeResult, scrape_prices
@@ -11,13 +12,14 @@ DEPARTURE = datetime(2025, 12, 1, 9, 0, tzinfo=UTC)
 ARRIVAL = datetime(2025, 12, 1, 12, 0, tzinfo=UTC)
 
 
-def _result(fare, number='UO123'):
+def _result(fare, number='123', airline=None):
     return SimpleNamespace(
         price=fare,
         currency='HKD',
         legs=[
             SimpleNamespace(
                 flight_number=number,
+                airline=airline,
                 departure_datetime=DEPARTURE,
                 arrival_datetime=ARRIVAL,
             )
@@ -82,6 +84,22 @@ def test_unknown_airport_returns_typed_error(app, fake_search, query):
     assert result[0].success is False
     assert 'Unknown airport code' in result[0].error_message
     assert fake_search.calls == []
+
+
+@pytest.mark.parametrize(
+    ('airline', 'number', 'expected'),
+    [
+        (Airline.UO, '652', 'UO652'),
+        (Airline._7C, '901', '7C901'),
+        (None, '652', '652'),
+    ],
+)
+def test_flight_number_prefixed_with_airline(app, fake_search, query, airline, number, expected):
+    fake_search.results = [_result(100, number, airline)]
+    with app.app_context():
+        result = scrape_prices([query])
+
+    assert result[0].results[0].flight_number == expected
 
 
 def test_unknown_airline_returns_typed_error(app, fake_search, query):
