@@ -41,29 +41,20 @@ def parse_airlines(value: Sequence[str] | str | None) -> tuple[str, ...]:
     return tuple(codes)
 
 
-def _resolve_enum(enum_type, value, default, fallback: str):
-    return enum_type(str(value).strip().upper() if value else default or fallback)
-
-
 def resolve_filters(
     cabin_class: str | None = None,
     max_stops: str | None = None,
     airlines: Sequence[str] | str | None = None,
-    *,
-    default_cabin_class: str | None = None,
-    default_max_stops: str | None = None,
-    default_airlines: Sequence[str] | str | None = None,
 ) -> SearchFilters:
-    """Apply per-itinerary values over global defaults.
+    """Apply per-itinerary values over hard-coded fallbacks.
 
-    Omitted values (None) fall back to defaults. An empty airlines list is an
-    explicit no-include-list restriction and does not fall back. Invalid
+    Omitted values (None) fall back to the constants below — there are no
+    user-facing global defaults (they were removed as UX cruft). An empty
+    airlines list is an explicit no-include-list restriction. Invalid
     non-empty enum values raise ValueError.
     """
     return SearchFilters(
-        cabin_class=_resolve_enum(CabinClass, cabin_class, default_cabin_class, CabinClass.ECONOMY),
-        max_stops=_resolve_enum(MaxStops, max_stops, default_max_stops, MaxStops.ANY),
-        airlines=parse_airlines(airlines)
-        if airlines is not None
-        else parse_airlines(default_airlines),
+        cabin_class=CabinClass((cabin_class or CabinClass.ECONOMY).upper()),
+        max_stops=MaxStops((max_stops or MaxStops.ANY).upper()),
+        airlines=parse_airlines(airlines),
     )

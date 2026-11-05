@@ -10,7 +10,6 @@ from src.services.fx_rates import (
     get_rates,
 )
 from src.utils.email import get_smtp_config, send_html_email
-from src.utils.filters import CabinClass, MaxStops, parse_airlines
 
 logger = logging.getLogger(__name__)
 settings_bp = Blueprint('settings', __name__, url_prefix='/settings')
@@ -24,11 +23,6 @@ def get_settings():
         currency['cache_ttl'] = currency.get('cache_ttl') or '86400'
         currency['fxrates_api_key'] = currency.get('fxrates_api_key') or ''
 
-        search = setting.get_all_masked('search') or {}
-        search['default_cabin_class'] = search.get('default_cabin_class') or 'ECONOMY'
-        search['default_max_stops'] = search.get('default_max_stops') or 'ANY'
-        search['default_airlines'] = search.get('default_airlines') or ''
-
         return jsonify(
             {
                 'success': True,
@@ -36,7 +30,6 @@ def get_settings():
                     'smtp': setting.get_all_masked('smtp') or {},
                     'email': setting.get_all_masked('email') or {},
                     'currency': currency,
-                    'search': search,
                 },
             }
         )
@@ -85,28 +78,6 @@ def patch_settings():
                     else 'false'
                 )
             setting.set_many('itinerary', existing)
-
-        if 'search' in data and (search_data := data['search'] or {}):
-            existing = (setting.get_all_masked('search') or {}).copy()
-            if 'default_cabin_class' in search_data:
-                try:
-                    existing['default_cabin_class'] = CabinClass(
-                        (search_data.get('default_cabin_class') or 'ECONOMY').strip().upper()
-                    ).value
-                except ValueError:
-                    return jsonify({'success': False, 'message': 'Unsupported cabin class'}), 400
-            if 'default_max_stops' in search_data:
-                try:
-                    existing['default_max_stops'] = MaxStops(
-                        (search_data.get('default_max_stops') or 'ANY').strip().upper()
-                    ).value
-                except ValueError:
-                    return jsonify({'success': False, 'message': 'Unsupported max stops'}), 400
-            if 'default_airlines' in search_data:
-                existing['default_airlines'] = ','.join(
-                    parse_airlines(search_data.get('default_airlines'))
-                )
-            setting.set_many('search', existing)
 
         if 'smtp' in data and (smtp_data := data['smtp'] or {}):
             existing = (setting.get_all_masked('smtp') or {}).copy()

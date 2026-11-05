@@ -1,10 +1,8 @@
 <script setup lang="ts">
-import FetchFilters from '@/Components/FetchFilters.vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
-import { parseAirlines } from '@/options'
 import type { Settings } from '@/types'
 import { formatLocalDateTime } from '@/utils/timezone'
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive } from 'vue'
 import { useToast } from 'vue-toast-notification'
 
 const props = defineProps<{
@@ -44,16 +42,6 @@ const form = reactive({
   },
 })
 
-const filters = ref<{
-  cabinClass: string
-  maxStops: string
-  airlines: string[] | null
-}>({
-  cabinClass: props.settings.search?.defaultCabinClass ?? '',
-  maxStops: props.settings.search?.defaultMaxStops ?? '',
-  airlines: parseAirlines(props.settings.search?.defaultAirlines),
-})
-
 const fxStatusState = reactive({
   base_currency: props.fxStatus?.baseCurrency ?? form.currency.base_currency,
   last_updated: props.fxStatus?.lastUpdated ?? null,
@@ -81,7 +69,7 @@ const fxStatusTime = computed(() => {
   return formatLocalDateTime(fxStatusState.last_updated)
 })
 
-function saveSettings(sec: 'email' | 'currency' | 'smtp' | 'itinerary' | 'search') {
+function saveSettings(sec: 'email' | 'currency' | 'smtp' | 'itinerary') {
   ui.saving = true
   const payloads = {
     smtp: {
@@ -101,11 +89,6 @@ function saveSettings(sec: 'email' | 'currency' | 'smtp' | 'itinerary' | 'search
     },
     itinerary: {
       disable_departured_itineraries: form.itinerary.disable_departured_itineraries,
-    },
-    search: {
-      default_cabin_class: filters.value.cabinClass,
-      default_max_stops: filters.value.maxStops,
-      default_airlines: filters.value.airlines ?? [],
     },
   }
 
@@ -226,35 +209,6 @@ function sendTestEmail() {
                 </p>
               </div>
             </label>
-
-            <div
-              class="flex flex-col items-start gap-3 border-t border-base-300/70 pt-4 sm:flex-row sm:items-center"
-            >
-              <button type="submit" :disabled="ui.saving" class="btn btn-primary">
-                <span v-if="ui.saving" class="loading loading-sm loading-spinner"></span>
-                {{ ui.saving ? '儲存中...' : '儲存設定' }}
-              </button>
-
-              <p v-if="ui.lastSaved" class="text-xs font-medium text-success">
-                ✓ 最後儲存於 {{ ui.lastSaved }}
-              </p>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <div class="tracker-panel card rounded-lg">
-        <div class="card-body p-0">
-          <div class="border-b border-base-300/70 px-6 py-5">
-            <h3 class="text-base font-bold text-base-content">預設搜尋條件</h3>
-
-            <p class="mt-0.5 text-sm font-medium text-base-content/60">
-              旅程未設定搜尋條件時，自動追蹤將採用以下預設
-            </p>
-          </div>
-
-          <form class="space-y-5 p-6" @submit.prevent="saveSettings('search')">
-            <FetchFilters v-model="filters" />
 
             <div
               class="flex flex-col items-start gap-3 border-t border-base-300/70 pt-4 sm:flex-row sm:items-center"

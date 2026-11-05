@@ -7,7 +7,7 @@ const defaultProps = {
     currency: { baseCurrency: 'HKD', fxratesApiKey: '', cacheTtl: '86400' },
     email: { recipients: '' },
     itinerary: { disableDeparturedItineraries: 'true' },
-    search: { defaultCabinClass: 'ECONOMY', defaultMaxStops: 'ANY', defaultAirlines: '' },
+    search: {},
     smtp: {
       host: '',
       port: '587',
@@ -148,42 +148,4 @@ describe('Settings/Index', () => {
     }
   })
 
-  it('renders the default fetch filter controls', () => {
-    const wrapper = mount(SettingsIndexPage, {
-      props: defaultProps,
-      global: { stubs: globalStubs },
-    })
-    const selects = wrapper.findAll('select')
-    expect(selects.length).toBeGreaterThanOrEqual(3)
-    expect(selects[0].findAll('option')).toHaveLength(5)
-    expect(wrapper.findAll('.checkbox')).toHaveLength(12)
-    expect(wrapper.text()).toContain('預設搜尋條件')
-  })
-
-  it('saves default fetch filters with snake_case keys', async () => {
-    const wrapper = mount(SettingsIndexPage, {
-      props: {
-        ...defaultProps,
-        settings: {
-          ...defaultProps.settings,
-          search: {
-            defaultCabinClass: 'PREMIUM_ECONOMY',
-            defaultMaxStops: 'NON_STOP',
-            defaultAirlines: 'UO,CX',
-          },
-        },
-      },
-      global: { stubs: globalStubs },
-    })
-    const forms = wrapper.findAll('form')
-    expect(forms[1].findAll('.checkbox')).toHaveLength(12)
-    await forms[1].trigger('submit')
-    await flushPromises()
-
-    const call = vi.mocked(fetch).mock.calls.at(-1)
-    const body = JSON.parse(String(call?.[1]?.body ?? '{}'))
-    expect(body.search.default_cabin_class).toBe('PREMIUM_ECONOMY')
-    expect(body.search.default_max_stops).toBe('NON_STOP')
-    expect(body.search.default_airlines).toEqual(['UO', 'CX'])
-  })
 })

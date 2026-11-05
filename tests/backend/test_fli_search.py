@@ -95,9 +95,7 @@ def test_unknown_airline_returns_typed_error(app, fake_search, query):
 
 
 def test_filters_are_mapped_to_fli_models(app, fake_search, query):
-    filters = resolve_filters(
-        'BUSINESS', 'ONE_STOP', ['CX'], default_cabin_class='ECONOMY', default_max_stops='ANY'
-    )
+    filters = resolve_filters('BUSINESS', 'ONE_STOP', ['CX'])
     with app.app_context():
         scrape_prices([query], filters=filters)
 
@@ -109,9 +107,7 @@ def test_filters_are_mapped_to_fli_models(app, fake_search, query):
 
 def test_digit_leading_airline_code_resolves(app, fake_search, query):
     # fli stores digit-leading IATA codes underscore-prefixed (e.g. 7C Jeju Air as "_7C")
-    filters = resolve_filters(
-        'ECONOMY', 'ANY', ['7C'], default_cabin_class='ECONOMY', default_max_stops='ANY'
-    )
+    filters = resolve_filters(None, None, ['7C'])
     with app.app_context():
         scrape_prices([query], filters=filters)
 

@@ -57,11 +57,6 @@ export interface Settings {
   itinerary?: {
     disableDeparturedItineraries?: string
   }
-  search?: {
-    defaultCabinClass?: string
-    defaultMaxStops?: string
-    defaultAirlines?: string | string[] | null
-  }
   smtp?: {
     host?: string
     port?: string | number

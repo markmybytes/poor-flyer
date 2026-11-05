@@ -17,43 +17,23 @@ CODES = st.lists(
 )
 
 
-@given(cabin=CABINS, stops=STOPS, default_cabin=CABINS, default_stops=STOPS)
-def test_per_itinerary_value_overrides_default(cabin, stops, default_cabin, default_stops):
-    filters = resolve_filters(
-        cabin.value,
-        stops.value,
-        default_cabin_class=default_cabin.value,
-        default_max_stops=default_stops.value,
-    )
-    assert filters.cabin_class is cabin
-    assert filters.max_stops is stops
-
-
 @given(cabin=CABINS, stops=STOPS)
-def test_missing_values_fall_back_to_defaults(cabin, stops):
-    filters = resolve_filters(
-        None,
-        '',
-        default_cabin_class=cabin.value,
-        default_max_stops=stops.value,
-    )
+def test_resolve_filters_keeps_per_itinerary_values(cabin, stops):
+    filters = resolve_filters(cabin.value, stops.value, ['CX'])
     assert filters.cabin_class is cabin
     assert filters.max_stops is stops
 
 
-@given(default=CODES)
-def test_omitted_airlines_fall_back_to_default(default):
-    filters = resolve_filters(None, None, default_airlines=default)
-    assert filters.airlines == parse_airlines(default)
+@given(codes=CODES)
+def test_resolve_filters_uses_hardcoded_fallbacks_and_codes(codes):
+    filters = resolve_filters(None, None, codes)
+    assert filters.cabin_class is CabinClass.ECONOMY
+    assert filters.max_stops is MaxStops.ANY
+    assert filters.airlines == parse_airlines(codes)
 
 
 def test_empty_airlines_is_explicit_no_restriction():
-    filters = resolve_filters(None, None, [], default_airlines=['CX', 'JL'])
-    assert filters.airlines == ()
-
-
-def test_empty_airlines_everywhere_means_no_restriction():
-    filters = resolve_filters(None, None, [], default_airlines='')
+    filters = resolve_filters(None, None, [])
     assert filters.airlines == ()
     assert isinstance(filters, SearchFilters)
 

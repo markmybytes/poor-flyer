@@ -19,7 +19,6 @@ from fli.models import MaxStops as FliMaxStops
 from fli.search import SearchClientError, SearchFlights
 
 from src.extensions.database import Itinerary
-from src.services.setting import get
 from src.utils.filters import MaxStops, SearchFilters, resolve_filters
 
 logger = logging.getLogger(__name__)
@@ -62,15 +61,8 @@ class ScrapeResult:
 
 
 def filters_for_itinerary(itinerary: Itinerary) -> SearchFilters:
-    """Merge per-itinerary filters over the configured global defaults."""
-    return resolve_filters(
-        itinerary.cabin_class,
-        itinerary.max_stops,
-        itinerary.airlines,
-        default_cabin_class=get('search', 'default_cabin_class', 'ECONOMY'),
-        default_max_stops=get('search', 'default_max_stops', 'ANY'),
-        default_airlines=get('search', 'default_airlines', ''),
-    )
+    """Merge per-itinerary filters over the hard-coded fallbacks."""
+    return resolve_filters(itinerary.cabin_class, itinerary.max_stops, itinerary.airlines)
 
 
 def _lookup_airline(code: str) -> Airline:
