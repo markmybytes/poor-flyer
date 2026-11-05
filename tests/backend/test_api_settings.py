@@ -32,7 +32,7 @@ def test_get_settings_currency_defaults(client, app):
 def test_patch_settings_updates_base_currency(client, app):
     with app.app_context():
         with patch('src.routes.api.settings.setting.get_all_masked', return_value={}):
-            with patch('src.routes.api.settings.setting.set_many') as mock_set:
+            with patch('src.routes.api.settings.setting.set_many'):
                 resp = client.patch(
                     '/api/settings',
                     data=json.dumps({'currency': {'base_currency': 'USD'}}),
@@ -100,3 +100,52 @@ def test_patch_settings_invalid_smtp_port_returns_400(client, app):
             )
     assert resp.status_code == 400
     assert 'SMTP port' in resp.get_json()['message']
+
+
+def test_get_settings_search_defaults(client, app):
+    with app.app_context():
+        with patch('src.routes.api.settings.setting.get_all_masked', return_value={}):
+            resp = client.get('/api/settings')
+    data = resp.get_json()['data']['search']
+    assert data['defaultCabinClass'] == 'ECONOMY'
+    assert data['defaultMaxStops'] == 'ANY'
+    assert data['cacheTtl'] == '43200'
+
+
+def test_patch_settings_updates_search_defaults(client, app):
+    with app.app_context():
+        with patch('src.routes.api.settings.setting.get_all_masked', return_value={}):
+            with patch('src.routes.api.settings.setting.set_many') as mock_set:
+                resp = client.patch(
+                    '/api/settings',
+                    data=json.dumps(
+                        {
+                            'search': {
+                                'default_cabin_class': 'business',
+                                'default_max_stops': 'NON_STOP',
+                                'default_airlines': ['cx', 'jl'],
+                                'cache_ttl': 3600,
+                            }
+                        }
+                    ),
+                    content_type='application/json',
+                )
+    assert resp.status_code == 200
+    namespace, values = mock_set.call_args.args
+    assert namespace == 'search'
+    assert values['default_cabin_class'] == 'BUSINESS'
+    assert values['default_max_stops'] == 'NON_STOP'
+    assert values['default_airlines'] == 'CX,JL'
+    assert values['cache_ttl'] == '3600'
+
+
+def test_patch_settings_invalid_search_enum_returns_400(client, app):
+    with app.app_context():
+        with patch('src.routes.api.settings.setting.get_all_masked', return_value={}):
+            resp = client.patch(
+                '/api/settings',
+                data=json.dumps({'search': {'default_cabin_class': 'DELUXE'}}),
+                content_type='application/json',
+            )
+    assert resp.status_code == 400
+    assert resp.get_json()['success'] is False

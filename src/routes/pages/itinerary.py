@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 from collections import defaultdict
 from dataclasses import asdict
 from datetime import date, datetime
@@ -52,7 +52,7 @@ def _get_combined_totals(itinerary: Itinerary, currency: str) -> dict[date, floa
                 s_date = (
                     s.created_at.date()
                     if isinstance(s.created_at, datetime)
-                    else getattr(s.created_at, 'date', lambda: s.created_at)()
+                    else getattr(s.created_at, 'date', lambda s=s: s.created_at)()
                 )
                 if (
                     flight.id not in date_fares[s_date]

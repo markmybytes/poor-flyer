@@ -213,7 +213,6 @@ def test_multiple_snapshots_across_offset_boundaries(app):
 
 
 def test_serialization_preserves_utc_storage_with_negative_offset_override(app):
-    tz_neg = timezone(timedelta(hours=-8))
     with app.app_context():
         it = _seed_itinerary_with_deadline(date(2025, 12, 15))
         frozen_today_for_negative = date(2025, 6, 1)
@@ -224,7 +223,6 @@ def test_serialization_preserves_utc_storage_with_negative_offset_override(app):
 
 
 def test_serialization_preserves_utc_storage_with_positive_offset_override(app):
-    tz_pos = timezone(timedelta(hours=8))
     with app.app_context():
         it = _seed_itinerary_with_deadline(date(2025, 12, 15))
         frozen_today_for_positive = date(2025, 6, 1)

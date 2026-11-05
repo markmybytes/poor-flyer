@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate test data for the airline price scraper covering all UI states."""
+"""Generate test data for the airline price tracker covering all UI states."""
 
 import random
 import sys

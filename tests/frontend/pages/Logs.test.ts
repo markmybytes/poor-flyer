@@ -93,10 +93,6 @@ describe('Logs/Index', () => {
       props: defaultProps,
       global: { stubs: globalStubs },
     })
-    const confirmModal = wrapper.find('[ref="confirmModal"]')
-
-    await wrapper.vm.$nextTick()
-    wrapper.vm.clearing = false
 
     await fetch('/api/logs', { method: 'DELETE' })
     expect(fetch).toHaveBeenCalledWith('/api/logs', expect.objectContaining({ method: 'DELETE' }))

@@ -43,6 +43,14 @@ def index():
         currency_settings['cache_ttl'] = currency_settings.get('cache_ttl', '86400')
         currency_settings['fxrates_api_key'] = currency_settings.get('fxrates_api_key', '')
 
+        search_settings = setting.get_all_masked('search')
+        search_settings['default_cabin_class'] = search_settings.get(
+            'default_cabin_class', 'ECONOMY'
+        )
+        search_settings['default_max_stops'] = search_settings.get('default_max_stops', 'ANY')
+        search_settings['default_airlines'] = search_settings.get('default_airlines', '')
+        search_settings['cache_ttl'] = search_settings.get('cache_ttl', '43200')
+
         return render_inertia(
             'Settings/Index',
             props={
@@ -50,6 +58,7 @@ def index():
                     'currency': currency_settings,
                     'email': setting.get_all_masked('email'),
                     'itinerary': setting.get_all_masked('itinerary'),
+                    'search': search_settings,
                     'smtp': setting.get_all_masked('smtp'),
                 },
                 'supportedCurrencies': SUPPORTED_CURRENCIES,

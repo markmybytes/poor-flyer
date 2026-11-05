@@ -8,6 +8,11 @@ const globalStubs = {
 }
 
 describe('Itineraries/Create', () => {
+  function lastRequestBody() {
+    const call = vi.mocked(fetch).mock.calls.at(-1)
+    return JSON.parse(String(call?.[1]?.body ?? '{}'))
+  }
+
   beforeEach(() => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
@@ -78,5 +83,49 @@ describe('Itineraries/Create', () => {
     await flushPromises()
     const { useToast } = await import('vue-toast-notification')
     expect(vi.mocked(useToast)().error).toHaveBeenCalled()
+  })
+
+  it('renders the fetch filter controls', () => {
+    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    const selects = wrapper.findAll('select')
+    expect(selects).toHaveLength(2)
+    expect(selects[0].findAll('option')).toHaveLength(5)
+    expect(selects[1].findAll('option')).toHaveLength(5)
+    expect(wrapper.findAll('.checkbox')).toHaveLength(12)
+  })
+
+  it('sends snake_case filter keys and omits untouched airlines', async () => {
+    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    const selects = wrapper.findAll('select')
+    await selects[0].setValue('BUSINESS')
+    await selects[1].setValue('NON_STOP')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const body = lastRequestBody()
+    expect(body.cabin_class).toBe('BUSINESS')
+    expect(body.max_stops).toBe('NON_STOP')
+    expect(body).not.toHaveProperty('airlines')
+  })
+
+  it('sends airlines as an include list', async () => {
+    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    await wrapper.find('input[value="UO"]').setValue(true)
+    const input = wrapper.find('input[placeholder="其他 IATA 代碼"]')
+    await input.setValue('vn')
+    await input.trigger('keydown.enter')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(lastRequestBody().airlines).toEqual(['UO', 'VN'])
+  })
+
+  it('sends an empty airline array when a selected carrier is cleared', async () => {
+    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    const checkbox = wrapper.find('input[value="UO"]')
+    await checkbox.setValue(true)
+    await checkbox.setValue(false)
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(lastRequestBody().airlines).toEqual([])
   })
 })

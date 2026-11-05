@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 import uuid
 from datetime import UTC, datetime, time
 
@@ -7,12 +7,20 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import selectinload
 
 from src.extensions.database import FareSnapshot, Flight, Itinerary, db
+from src.services.fli_search import FlightQuery, filters_for_itinerary, scrape_prices
 from src.services.fx_rates import FXRatesError, convert_amount, get_configured_base_currency
-from src.services.scraper import FlightQuery, scrape_prices
+from src.utils.filters import CabinClass, MaxStops, parse_airlines
 
 logger = logging.getLogger(__name__)
 
 itineraries_bp = Blueprint('itineraries', __name__, url_prefix='/itineraries')
+
+
+def _enum_value(enum_type, value, label: str) -> str:
+    try:
+        return enum_type(str(value).strip().upper()).value
+    except ValueError:
+        raise ValueError(f'Invalid {label}') from None
 
 
 @itineraries_bp.route('', methods=['POST'])
@@ -28,6 +36,15 @@ def create_flight():
             trip_type=data.get('trip_type', 'SINGLE'),
             deadline=deadline,
             is_active=True,
+            cabin_class=_enum_value(CabinClass, data['cabin_class'], 'cabin_class')
+            if data.get('cabin_class')
+            else None,
+            max_stops=_enum_value(MaxStops, data['max_stops'], 'max_stops')
+            if data.get('max_stops')
+            else None,
+            airlines=list(parse_airlines(data['airlines']))
+            if data.get('airlines') is not None
+            else None,
             created_at=datetime.now(UTC),
         )
 
@@ -135,6 +152,21 @@ def update_flight(itinerary_id):
                 entry.deadline = None
             logger.info('Updated itinerary: id=%s deadline=%s', itinerary_id, entry.deadline)
 
+        if 'cabin_class' in data:
+            raw = data['cabin_class']
+            entry.cabin_class = _enum_value(CabinClass, raw, 'cabin_class') if raw else None
+            logger.info('Updated itinerary: id=%s cabin_class=%s', itinerary_id, entry.cabin_class)
+
+        if 'max_stops' in data:
+            raw = data['max_stops']
+            entry.max_stops = _enum_value(MaxStops, raw, 'max_stops') if raw else None
+            logger.info('Updated itinerary: id=%s max_stops=%s', itinerary_id, entry.max_stops)
+
+        if 'airlines' in data:
+            raw = data['airlines']
+            entry.airlines = list(parse_airlines(raw)) if raw is not None else None
+            logger.info('Updated itinerary: id=%s airlines=%s', itinerary_id, entry.airlines)
+
         db.session.commit()
         return jsonify({'success': True, 'message': 'Entry updated', 'data': entry.id})
     except Exception as e:
@@ -198,11 +230,28 @@ def scrape_flight(itinerary_id):
             any_scraped_or_attempted = True
             logger.info('Scraping %d flights for itinerary %s', len(active_flights), itinerary_id)
 
+            base_currency = get_configured_base_currency()
             results = scrape_prices(
-                [FlightQuery(f.origin, f.destination, f.flight_date) for f in active_flights]
+                [FlightQuery(f.origin, f.destination, f.flight_date) for f in active_flights],
+                currency_code=base_currency,
+                filters=filters_for_itinerary(itinerary),
+                force_refresh=True,
             )
 
             for flight, res in zip(active_flights, results, strict=False):
+                if not res.success:
+                    db.session.add(
+                        FareSnapshot(
+                            id=str(uuid.uuid4()),
+                            flight_id=flight.id,
+                            created_at=datetime.now(UTC),
+                            fare=None,
+                            currency=base_currency,
+                            scrape_status='error',
+                            error_message=res.error_message or 'Scrape failed',
+                        )
+                    )
+                    continue
                 for result in res.results:
                     db.session.add(
                         FareSnapshot(
@@ -214,8 +263,7 @@ def scrape_flight(itinerary_id):
                             flight_number=result.flight_number,
                             departure_at=result.departure_at,
                             arrival_at=result.arrival_at,
-                            scrape_status='success' if res.success else 'error',
-                            error_message=res.error_message,
+                            scrape_status='success',
                         )
                     )
 

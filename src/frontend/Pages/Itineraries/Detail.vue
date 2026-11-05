@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import FareGraph from '@/Components/FareGraph.vue'
 import FaretList from '@/Components/FareList.vue'
+import FetchFilters from '@/Components/FetchFilters.vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
+import { parseAirlines } from '@/options'
 import type { Itinerary } from '@/types'
 import { fmtDate, fmtFare, fmtItineraryName } from '@/utils'
 import { router } from '@inertiajs/vue3'
@@ -23,9 +25,58 @@ const loading = ref<string | null>(null)
 const showModal = ref(false)
 const deadlineValue = ref(props.itinerary.deadline || '')
 
+const showFilters = ref(false)
+const filters = ref<{
+  cabinClass: string
+  maxStops: string
+  airlines: string[] | null
+}>({
+  cabinClass: props.itinerary.cabinClass ?? '',
+  maxStops: props.itinerary.maxStops ?? '',
+  airlines: parseAirlines(props.itinerary.airlines),
+})
+
 const openEditModal = () => {
   deadlineValue.value = props.itinerary.deadline || ''
   showModal.value = true
+}
+
+function toggleFilters() {
+  showFilters.value = !showFilters.value
+  if (showFilters.value) {
+    filters.value = {
+      cabinClass: props.itinerary.cabinClass ?? '',
+      maxStops: props.itinerary.maxStops ?? '',
+      airlines: parseAirlines(props.itinerary.airlines),
+    }
+  }
+}
+
+function submitFilters() {
+  loading.value = 'update_filters'
+  const payload = {
+    cabin_class: filters.value.cabinClass || null,
+    max_stops: filters.value.maxStops || null,
+    ...(filters.value.airlines ? { airlines: filters.value.airlines } : {}),
+  }
+
+  fetch(`/api/itineraries/${props.itinerary.id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error()
+      }
+      toast.success('已更新搜尋條件')
+      showFilters.value = false
+      router.reload()
+    })
+    .catch(() => toast.error('更新搜尋條件失敗，請稍後再試'))
+    .finally(() => {
+      loading.value = null
+    })
 }
 
 const submitDeadline = async (clear = false) => {
@@ -165,6 +216,46 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
               {{ loading === 'scrape' ? '更新中...' : '下載最新票價' }}
             </button>
           </div>
+        </div>
+
+        <div class="border-t border-base-300/70 px-6 py-5">
+          <div class="flex items-center justify-between gap-2">
+            <div>
+              <p class="text-sm font-bold text-base-content">票價搜尋條件</p>
+
+              <p class="mt-0.5 text-xs font-medium text-base-content/55">
+                留空表示套用系統預設；航空公司全部未選則不作限制
+              </p>
+            </div>
+
+            <button class="btn btn-ghost btn-sm" @click="toggleFilters">
+              <Icon :icon="showFilters ? 'mdi:chevron-up' : 'mdi:filter-cog'" />
+              {{ showFilters ? '收起' : '修改' }}
+            </button>
+          </div>
+
+          <form v-if="showFilters" class="mt-4 space-y-4" @submit.prevent="submitFilters">
+            <FetchFilters v-model="filters" />
+
+            <div class="flex justify-end gap-2">
+              <button type="button" class="btn btn-ghost btn-sm" @click="showFilters = false">
+                取消
+              </button>
+
+              <button
+                type="submit"
+                class="btn btn-sm btn-primary"
+                :disabled="loading === 'update_filters'"
+              >
+                <span
+                  v-if="loading === 'update_filters'"
+                  class="loading loading-xs loading-spinner"
+                ></span>
+
+                儲存
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>

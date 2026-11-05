@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FetchFilters from '@/Components/FetchFilters.vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import { Link, router } from '@inertiajs/vue3'
 import { VueDatePicker } from '@vuepic/vue-datepicker'
@@ -15,6 +16,16 @@ const form = ref({
   isActive: true,
   flights: [{ origin: '', destination: '', flightDate: '' }],
   processing: false,
+})
+
+const filters = ref<{
+  cabinClass: string
+  maxStops: string
+  airlines: string[] | null
+}>({
+  cabinClass: '',
+  maxStops: '',
+  airlines: null,
 })
 
 const roundTripDates = computed({
@@ -90,6 +101,9 @@ function submit() {
     trip_type: form.value.tripType,
     deadline: form.value.deadline || null,
     is_active: form.value.isActive,
+    cabin_class: filters.value.cabinClass || null,
+    max_stops: filters.value.maxStops || null,
+    ...(filters.value.airlines ? { airlines: filters.value.airlines } : {}),
     flights: form.value.flights.map((leg, i) => {
       const isRoundTripReturn = form.value.tripType === 'ROUND_TRIP' && i === 1
       return {
@@ -372,6 +386,16 @@ function submit() {
                 </div>
               </label>
             </fieldset>
+          </div>
+
+          <div class="divider text-base-content/30">搜尋條件</div>
+
+          <div>
+            <p class="mb-3 text-xs text-base-content/55">
+              留空表示套用系統預設；航空公司全部未選則不作限制。
+            </p>
+
+            <FetchFilters v-model="filters" />
           </div>
 
           <div class="mt-8 flex flex-col gap-3 border-t border-base-300/70 pt-5 sm:flex-row">

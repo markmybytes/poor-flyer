@@ -39,7 +39,6 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then S6_ARCH="x86_64"; \
 
 COPY pyproject.toml .
 RUN pip install --no-cache-dir .
-RUN patchright install chrome --with-deps
 
 COPY . .
 COPY --from=frontend-builder /app/src/static/dist ./src/static/dist
