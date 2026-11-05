@@ -61,7 +61,6 @@ export interface Settings {
     defaultCabinClass?: string
     defaultMaxStops?: string
     defaultAirlines?: string | string[] | null
-    cacheTtl?: string | number
   }
   smtp?: {
     host?: string

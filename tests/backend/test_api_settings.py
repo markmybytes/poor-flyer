@@ -109,7 +109,7 @@ def test_get_settings_search_defaults(client, app):
     data = resp.get_json()['data']['search']
     assert data['defaultCabinClass'] == 'ECONOMY'
     assert data['defaultMaxStops'] == 'ANY'
-    assert data['cacheTtl'] == '43200'
+    assert data['defaultAirlines'] == ''
 
 
 def test_patch_settings_updates_search_defaults(client, app):
@@ -124,7 +124,6 @@ def test_patch_settings_updates_search_defaults(client, app):
                                 'default_cabin_class': 'business',
                                 'default_max_stops': 'NON_STOP',
                                 'default_airlines': ['cx', 'jl'],
-                                'cache_ttl': 3600,
                             }
                         }
                     ),
@@ -136,7 +135,6 @@ def test_patch_settings_updates_search_defaults(client, app):
     assert values['default_cabin_class'] == 'BUSINESS'
     assert values['default_max_stops'] == 'NON_STOP'
     assert values['default_airlines'] == 'CX,JL'
-    assert values['cache_ttl'] == '3600'
 
 
 def test_patch_settings_invalid_search_enum_returns_400(client, app):

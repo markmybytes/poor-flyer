@@ -4,14 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from src.services import fli_search
-from src.services.fli_search import (
-    Flight,
-    FlightQuery,
-    ScrapeResult,
-    cache_key,
-    is_cache_fresh,
-    scrape_prices,
-)
+from src.services.fli_search import FlightQuery, ScrapeResult, scrape_prices
 from src.utils.filters import CabinClass, MaxStops, SearchFilters, resolve_filters
 
 DEPARTURE = datetime(2025, 12, 1, 9, 0, tzinfo=UTC)
@@ -44,11 +37,10 @@ class _FakeSearchFlights:
 
 
 @pytest.fixture
-def fake_search(monkeypatch, tmp_path):
+def fake_search(monkeypatch):
     _FakeSearchFlights.calls = []
     _FakeSearchFlights.results = []
     monkeypatch.setattr(fli_search, 'SearchFlights', _FakeSearchFlights)
-    monkeypatch.setattr(fli_search, '_resolve_cache_path', lambda: tmp_path / 'fli_cache.json')
     return _FakeSearchFlights
 
 
@@ -125,58 +117,3 @@ def test_digit_leading_airline_code_resolves(app, fake_search, query):
 
     sent = fake_search.calls[0]['filters']
     assert [airline.name for airline in sent.airlines] == ['_7C']
-
-
-def test_cache_hit_skips_network_and_force_refresh_bypasses(app, fake_search, query):
-    fake_search.results = [_result(100)]
-    with app.app_context():
-        scrape_prices([query])
-        scrape_prices([query])
-        assert len(fake_search.calls) == 1
-
-        scrape_prices([query], force_refresh=True)
-        assert len(fake_search.calls) == 2
-
-
-def test_empty_results_are_not_cached(app, fake_search, query):
-    # a Google blockage/consent wall must not persist as a "no flights" fact
-    fake_search.results = []
-    with app.app_context():
-        scrape_prices([query])
-        scrape_prices([query])
-        assert len(fake_search.calls) == 2
-
-
-def test_cache_disabled_in_production(app, fake_search, query):
-    # cache exists for dev/test rate-limit safety only; production fetches live
-    fake_search.results = [_result(100)]
-    with app.app_context() as ctx:
-        ctx.app.debug = False
-        ctx.app.config['TESTING'] = False
-        scrape_prices([query])
-        scrape_prices([query])
-        assert len(fake_search.calls) == 2
-
-
-def test_cache_key_is_stable_and_filter_sensitive(query):
-    base = resolve_filters(default_cabin_class='ECONOMY', default_max_stops='ANY')
-    assert cache_key(query, base, 'HKD') == cache_key(query, base, 'HKD')
-    assert cache_key(query, base, 'HKD') != cache_key(query, base, 'USD')
-
-    business = resolve_filters('BUSINESS', default_max_stops='ANY')
-    assert cache_key(query, base, 'HKD') != cache_key(query, business, 'HKD')
-
-
-def test_cache_ttl_freshness_round_trip():
-    now = datetime(2025, 12, 1, 12, 0, tzinfo=UTC)
-    entry = {'cached_at': (now - timedelta(hours=11)).isoformat(), 'results': []}
-    assert is_cache_fresh(entry, 12 * 60 * 60, now=now) is True
-
-    stale = {'cached_at': (now - timedelta(hours=13)).isoformat(), 'results': []}
-    assert is_cache_fresh(stale, 12 * 60 * 60, now=now) is False
-    assert is_cache_fresh({'cached_at': 'not-a-date'}, 3600, now=now) is False
-
-
-def test_serialize_deserialize_round_trip():
-    flights = [Flight('UO1', DEPARTURE, ARRIVAL, 123.45, 'HKD')]
-    assert fli_search._deserialize(fli_search._serialize(flights)) == flights

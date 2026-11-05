@@ -117,24 +117,9 @@ New module `src/services/fli_search.py`:
   rows and is indistinguishable from "nothing to see".
 - No new rate or concurrency logic — fli owns it.
 
-### 5.5 Disk cache for fli responses
+### 5.5 Rate limiting — no disk cache
 
-**Revised 2026-11 after live smoke:** the cache exists **only for development and testing** — its purpose is preventing repeated identical fli calls during dev iterations from burning the request budget. Production runs (scheduler, cron, container — `FLASK_DEBUG`/`TESTING` off) ignore the cache entirely and always fetch live data; fare truth is never served from a disk cache in production. Gate for caching + cache-path writes = `current_app.debug or current_app.config['TESTING']`.
-
-Daily scheduler runs happen only once a day, but **development and testing iterate heavily** — re-running a search against Google every time burns the same IP on identical queries and can trigger blockage. Follow the house pattern already used in `src/services/fx_rates.py` (filesystem cache under the instance dir + freshness check):
-
-- Key: hash of canonical (origin, destination, date, filters, currency) — cache per exact query.
-- Value: parsed fli results stored as JSON under the instance path.
-- Freshness: TTL via a setting (default `12h`) — below the scheduler's daily
-  interval so a rerun always refreshes, yet dev-time repeats within a session
-  are zero-cost.
-- The adapter consults the cache first; on hit it short-circuits and returns
-  cached rows. On miss it calls fli and writes the cache.
-- `force_refresh=True` parameter on the fetch entrypoint **bypasses** the
-  cache; the interactive on-demand endpoint (`scrape_flight`) sets it, since a
-  refresh button that re-serves a 12-hour-old cached row is useless.
-- Same mechanism gives deterministic offline tests: a fixture can pre-seed the cache.
-- Not in scope: UI for cache inspection; logs name the hit/miss.
+**Revised 2026-11 (final): there is no fare cache.** fli ships a global 10 req/s token bucket and the adapter issues one fetch per leg per invocation — repeat traffic is bounded by construction, so caching is redundant complexity for a dev-only benefit. Every call to `scrape_prices` fetches live data, production and dev alike. Rate-limit safety relies entirely on fli's built-in limiter.
 
 ### 5.6 Frontend (Vue / Inertia)
 
@@ -177,10 +162,10 @@ Verification:
 1. `uv run pytest` (backend), `npm run lint`, `npm run type-check`, `npm run test`.
 2. Fresh SQLite: `flask db upgrade` applies the new revision cleanly.
 3. Live smoke: one real search (e.g. HKG→NRT via adapter) to confirm legal
-   `tfs` encoding, followed by one scheduler run confirming snapshot rows. Re-run the
-   search and verify it is served from the disk cache (no second fetch).
+   `tfs` encoding, followed by one scheduler run confirming snapshot rows,
+   including one airline-filtered search.
 4. Property tests for the filter-merge helper (per-itinerary vs global default)
-   using hypothesis, and for cache key/TTL round-trip.
+   using hypothesis.
 
 ## 7. Explicitly out of scope
 

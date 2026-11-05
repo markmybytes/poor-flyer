@@ -77,7 +77,7 @@ def test_scheduler_rule37_uses_min_fare_per_date(app, monkeypatch):
         assert captured['values'] == {day_one.date(): 900.0, day_two.date(): 800.0}
 
 
-def test_on_demand_scrape_failed_leg_writes_sentinel_and_forces_refresh(client, app, monkeypatch):
+def test_on_demand_scrape_failed_leg_writes_sentinel(client, app, monkeypatch):
     with app.app_context():
         itinerary, flight = _seed_itinerary()
         iid, fid = itinerary.id, flight.id
@@ -92,7 +92,6 @@ def test_on_demand_scrape_failed_leg_writes_sentinel_and_forces_refresh(client, 
     resp = client.post(f'/api/itineraries/{iid}/scrape')
 
     assert resp.status_code == 200
-    assert calls['force_refresh'] is True
     with app.app_context():
         snapshots = db.session.query(FareSnapshot).filter_by(flight_id=fid).all()
         assert len(snapshots) == 1

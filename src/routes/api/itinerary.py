@@ -235,7 +235,6 @@ def scrape_flight(itinerary_id):
                 [FlightQuery(f.origin, f.destination, f.flight_date) for f in active_flights],
                 currency_code=base_currency,
                 filters=filters_for_itinerary(itinerary),
-                force_refresh=True,
             )
 
             for flight, res in zip(active_flights, results, strict=False):

@@ -49,7 +49,6 @@ def index():
         )
         search_settings['default_max_stops'] = search_settings.get('default_max_stops', 'ANY')
         search_settings['default_airlines'] = search_settings.get('default_airlines', '')
-        search_settings['cache_ttl'] = search_settings.get('cache_ttl', '43200')
 
         return render_inertia(
             'Settings/Index',

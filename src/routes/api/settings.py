@@ -28,7 +28,6 @@ def get_settings():
         search['default_cabin_class'] = search.get('default_cabin_class') or 'ECONOMY'
         search['default_max_stops'] = search.get('default_max_stops') or 'ANY'
         search['default_airlines'] = search.get('default_airlines') or ''
-        search['cache_ttl'] = search.get('cache_ttl') or '43200'
 
         return jsonify(
             {
@@ -107,16 +106,6 @@ def patch_settings():
                 existing['default_airlines'] = ','.join(
                     parse_airlines(search_data.get('default_airlines'))
                 )
-            if 'cache_ttl' in search_data:
-                try:
-                    ttl = int(search_data.get('cache_ttl'))
-                    if ttl <= 0:
-                        raise ValueError
-                    existing['cache_ttl'] = str(ttl)
-                except (TypeError, ValueError):
-                    return jsonify(
-                        {'success': False, 'message': 'Cache TTL must be an integer greater than 0'}
-                    ), 400
             setting.set_many('search', existing)
 
         if 'smtp' in data and (smtp_data := data['smtp'] or {}):
