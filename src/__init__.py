@@ -6,6 +6,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from flask import Flask, current_app, g, request
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from src.cli import dev, run_scheduler
 from src.extensions import init_extensions
@@ -115,6 +116,8 @@ def create_app():
         app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'connect_args': {'check_same_thread': False}}
 
     app.json = CamelCaseJSONProvider(app)
+
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
     _setup_logging(app)
 
