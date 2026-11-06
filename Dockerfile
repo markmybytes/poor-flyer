@@ -12,7 +12,7 @@ RUN npm run build-only
 
 # ---
 
-FROM python:3.12-slim
+FROM python:3.15-slim
 
 ARG S6_OVERLAY_VERSION=3.2.2.0
 ARG TARGETARCH

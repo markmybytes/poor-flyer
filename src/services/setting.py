@@ -102,7 +102,7 @@ def update(data: Mapping[str, Any]) -> None:
         if 'cache_ttl' in currency_data:
             try:
                 ttl = int(currency_data.get('cache_ttl'))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 raise ValueError('Cache TTL must be an integer greater than 0') from None
             if ttl <= 0:
                 raise ValueError('Cache TTL must be an integer greater than 0')
@@ -137,7 +137,7 @@ def update(data: Mapping[str, Any]) -> None:
         if 'port' in smtp_data:
             try:
                 existing['port'] = str(int(smtp_data.get('port')))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 raise ValueError('SMTP port must be an integer') from None
         if 'require_auth' in smtp_data:
             existing['require_auth'] = (

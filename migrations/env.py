@@ -14,7 +14,7 @@ if config.config_file_name is not None:
 def get_engine():
     try:
         return current_app.extensions['migrate'].db.engine
-    except (TypeError, AttributeError):
+    except TypeError, AttributeError:
         return current_app.extensions['migrate'].db.get_engine()
 
 
