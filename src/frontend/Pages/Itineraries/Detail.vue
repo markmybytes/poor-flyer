@@ -48,6 +48,7 @@ const openEditModal = () => {
 
 const showDeleteModal = ref(false)
 const showRestoreModal = ref(false)
+const showArchiveModal = ref(false)
 const isArchived = computed(() => !!props.itinerary.archivedAt)
 
 const submitDeadline = async (clear = false) => {
@@ -74,18 +75,21 @@ const submitDeadline = async (clear = false) => {
   }
 }
 
-const runAction = async (action: 'toggle' | 'scrape' | 'delete' | 'restore') => {
+const runAction = async (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive') => {
   if (action === 'delete') {
     showDeleteModal.value = false
   }
   if (action === 'restore') {
     showRestoreModal.value = false
   }
+  if (action === 'archive') {
+    showArchiveModal.value = false
+  }
   loading.value = action
 
   const opts: RequestInit = {
     method:
-      action === 'toggle' || action === 'restore'
+      action === 'toggle' || action === 'restore' || action === 'archive'
         ? 'PATCH'
         : action === 'scrape'
           ? 'POST'
@@ -98,6 +102,10 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete' | 'restore') => 
   if (action === 'restore') {
     opts.headers = { 'Content-Type': 'application/json' }
     opts.body = JSON.stringify({ archived: false })
+  }
+  if (action === 'archive') {
+    opts.headers = { 'Content-Type': 'application/json' }
+    opts.body = JSON.stringify({ archived: true })
   }
 
   try {
@@ -115,11 +123,24 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete' | 'restore') => 
       if (action === 'restore') {
         toast.success('已恢復追蹤')
       }
+      if (action === 'archive') {
+        toast.success('已封存')
+      }
       router.reload()
     }
   } catch {
     toast.error(
-      `${action === 'scrape' ? '更新票價' : action === 'delete' ? '刪除' : action === 'restore' ? '恢復追蹤' : '操作'}失敗，請稍後再試`,
+      `${
+        action === 'scrape'
+          ? '更新票價'
+          : action === 'delete'
+            ? '刪除'
+            : action === 'restore'
+              ? '恢復追蹤'
+              : action === 'archive'
+                ? '封存'
+                : '操作'
+      }失敗，請稍後再試`,
     )
   } finally {
     loading.value = null
@@ -235,6 +256,17 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete' | 'restore') => 
               @click="openEditModal"
             >
               <Icon icon="mdi:calendar-edit" />
+            </button>
+
+            <button
+              v-if="!isArchived"
+              type="button"
+              title="封存此追蹤"
+              class="btn join-item btn-sm"
+              :disabled="loading !== null"
+              @click="showArchiveModal = true"
+            >
+              <Icon icon="mdi:archive-outline" />
             </button>
 
             <button
@@ -624,6 +656,37 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete' | 'restore') => 
       <div
         class="modal-backdrop bg-black/10 backdrop-blur-xs"
         @click="showRestoreModal = false"
+      ></div>
+    </dialog>
+
+    <dialog class="modal" :class="{ 'modal-open': showArchiveModal }">
+      <div class="modal-box max-w-sm rounded-2xl border border-base-200 bg-base-100 shadow-xl">
+        <h3 class="mb-2 text-lg font-extrabold text-base-content">封存？</h3>
+
+        <p class="text-sm text-base-content/60">
+          確定封存「{{ fmtItineraryName(itinerary) }}」？追蹤將停止，並移至已封存列表。
+        </p>
+
+        <div class="modal-action mt-6 justify-end gap-2 border-t border-base-200 pt-4">
+          <button type="button" class="btn btn-ghost btn-sm" @click="showArchiveModal = false">
+            取消
+          </button>
+
+          <button
+            type="button"
+            class="btn px-5 shadow-sm btn-sm btn-primary"
+            :disabled="loading === 'archive'"
+            @click="runAction('archive')"
+          >
+            <span v-if="loading === 'archive'" class="loading loading-xs loading-spinner"></span>
+            確認封存
+          </button>
+        </div>
+      </div>
+
+      <div
+        class="modal-backdrop bg-black/10 backdrop-blur-xs"
+        @click="showArchiveModal = false"
       ></div>
     </dialog>
 

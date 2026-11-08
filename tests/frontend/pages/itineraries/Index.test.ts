@@ -100,6 +100,21 @@ describe('Itineraries/Index', () => {
     expect(wrapper.findAll('.card').length).toBe(2)
   })
 
+  it('makes the whole archived card clickable with the restore button outside the anchor', () => {
+    const wrapper = mountArchivedView()
+
+    const card = wrapper.find('.card')
+    const overlay = card.find('a.absolute.inset-0')
+    expect(overlay.exists()).toBe(true)
+    expect(overlay.attributes('href')).toBe('/itineraries/it1')
+
+    const restoreBtn = card
+      .findAll('button')
+      .find((b) => b.text().trim() === '恢復追蹤')!
+    expect(restoreBtn.exists()).toBe(true)
+    expect(overlay.element.contains(restoreBtn.element)).toBe(false)
+  })
+
   it('shows paused badge when itinerary is inactive', () => {
     const wrapper = mount(IndexPage, {
       props: {
@@ -126,7 +141,7 @@ describe('Itineraries/Index', () => {
     expect(router.get).toHaveBeenCalledWith(
       '/itineraries/',
       { archived: '1' },
-      expect.objectContaining({ preserveState: true, preserveScroll: true, replace: true }),
+      expect.objectContaining({ replace: true }),
     )
   })
 
@@ -185,5 +200,27 @@ describe('Itineraries/Index', () => {
     await flushPromises()
 
     expect(toast.error).toHaveBeenCalledWith('恢復追蹤失敗，請稍後再試')
+  })
+
+  it('keeps the summary stats panel rendered in the archived view, showing only the archived count', () => {
+    const wrapper = mountArchivedView()
+
+    const panel = wrapper.find('.stats-horizontal')
+    expect(panel.exists()).toBe(true)
+    expect(panel.findAll('.stat-title').map((el) => el.text())).toEqual(['已封存'])
+  })
+
+  it('renders the archived empty state with the same shape as the active one', () => {
+    window.history.replaceState({}, '', '/itineraries/')
+    const activeEmpty = mountIndex({ itineraries: [], baseCurrency: 'HKD' })
+    window.history.replaceState({}, '', '/itineraries/?archived=1')
+    const archivedEmpty = mountIndex({ itineraries: [], baseCurrency: 'HKD' })
+
+    const activeHero = activeEmpty.find('.tracker-panel.hero')
+    const archivedHero = archivedEmpty.find('.tracker-panel.hero')
+
+    expect(activeHero.exists()).toBe(true)
+    expect(activeHero.classes()).toEqual(archivedHero.classes())
+    expect(archivedEmpty.find('.placeholder.avatar').exists()).toBe(true)
   })
 })
