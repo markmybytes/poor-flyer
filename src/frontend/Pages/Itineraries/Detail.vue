@@ -47,6 +47,8 @@ const openEditModal = () => {
 }
 
 const showDeleteModal = ref(false)
+const showRestoreModal = ref(false)
+const isArchived = computed(() => !!props.itinerary.archivedAt)
 
 const submitDeadline = async (clear = false) => {
   loading.value = 'update_deadline'
@@ -72,18 +74,30 @@ const submitDeadline = async (clear = false) => {
   }
 }
 
-const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
+const runAction = async (action: 'toggle' | 'scrape' | 'delete' | 'restore') => {
   if (action === 'delete') {
     showDeleteModal.value = false
+  }
+  if (action === 'restore') {
+    showRestoreModal.value = false
   }
   loading.value = action
 
   const opts: RequestInit = {
-    method: action === 'toggle' ? 'PATCH' : action === 'scrape' ? 'POST' : 'DELETE',
+    method:
+      action === 'toggle' || action === 'restore'
+        ? 'PATCH'
+        : action === 'scrape'
+          ? 'POST'
+          : 'DELETE',
   }
   if (action === 'toggle') {
     opts.headers = { 'Content-Type': 'application/json' }
     opts.body = JSON.stringify({ is_active: !props.itinerary.isActive })
+  }
+  if (action === 'restore') {
+    opts.headers = { 'Content-Type': 'application/json' }
+    opts.body = JSON.stringify({ archived: false })
   }
 
   try {
@@ -98,11 +112,14 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
     if (action === 'delete') {
       router.visit('/itineraries/')
     } else {
+      if (action === 'restore') {
+        toast.success('已恢復追蹤')
+      }
       router.reload()
     }
   } catch {
     toast.error(
-      `${action === 'scrape' ? '更新票價' : action === 'delete' ? '刪除' : '操作'}失敗，請稍後再試`,
+      `${action === 'scrape' ? '更新票價' : action === 'delete' ? '刪除' : action === 'restore' ? '恢復追蹤' : '操作'}失敗，請稍後再試`,
     )
   } finally {
     loading.value = null
@@ -122,8 +139,12 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
               </div>
 
               <div class="shrink-0">
+                <span v-if="isArchived" class="badge badge-soft badge-neutral max-sm:p-1">
+                  已封存
+                </span>
+
                 <span
-                  v-if="!itinerary.isActive"
+                  v-else-if="!itinerary.isActive"
                   class="badge gap-2 badge-soft badge-warning max-sm:p-1"
                 >
                   已暫停
@@ -187,13 +208,25 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
 
         <div class="flex justify-end px-6 py-5">
           <div class="join gap-2">
-            <button
-              class="btn join-item btn-sm"
-              :disabled="loading === 'toggle'"
-              @click="runAction('toggle')"
-            >
-              {{ itinerary.isActive ? '暫停追蹤' : '開始追蹤' }}
-            </button>
+            <template v-if="isArchived">
+              <button
+                class="btn join-item btn-sm btn-primary"
+                :disabled="loading === 'restore'"
+                @click="showRestoreModal = true"
+              >
+                恢復追蹤
+              </button>
+            </template>
+
+            <template v-else>
+              <button
+                class="btn join-item btn-sm"
+                :disabled="loading === 'toggle'"
+                @click="runAction('toggle')"
+              >
+                {{ itinerary.isActive ? '暫停追蹤' : '開始追蹤' }}
+              </button>
+            </template>
 
             <button
               title="修改購票限期"
@@ -213,6 +246,7 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
             </button>
 
             <button
+              v-if="!isArchived"
               class="btn join-item btn-sm btn-primary"
               :disabled="loading === 'scrape'"
               @click="runAction('scrape')"
@@ -556,6 +590,41 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete') => {
       </div>
 
       <div class="modal-backdrop bg-black/10 backdrop-blur-xs" @click="showModal = false"></div>
+    </dialog>
+
+    <dialog class="modal" :class="{ 'modal-open': showRestoreModal }">
+      <div class="modal-box max-w-sm rounded-2xl border border-base-200 bg-base-100 shadow-xl">
+        <h3 class="mb-2 text-lg font-extrabold text-base-content">恢復追蹤？</h3>
+
+        <p class="text-sm text-base-content/60">
+          確定恢復追蹤「{{ fmtItineraryName(itinerary) }}」？
+        </p>
+
+        <p class="mt-1.5 text-sm text-base-content/60">
+          若出發日期已過 30 天，此旅程會在下次自動更新時重新封存。
+        </p>
+
+        <div class="modal-action mt-6 justify-end gap-2 border-t border-base-200 pt-4">
+          <button type="button" class="btn btn-ghost btn-sm" @click="showRestoreModal = false">
+            取消
+          </button>
+
+          <button
+            type="button"
+            class="btn px-5 shadow-sm btn-sm btn-primary"
+            :disabled="loading === 'restore'"
+            @click="runAction('restore')"
+          >
+            <span v-if="loading === 'restore'" class="loading loading-xs loading-spinner"></span>
+            恢復追蹤
+          </button>
+        </div>
+      </div>
+
+      <div
+        class="modal-backdrop bg-black/10 backdrop-blur-xs"
+        @click="showRestoreModal = false"
+      ></div>
     </dialog>
 
     <dialog class="modal" :class="{ 'modal-open': showDeleteModal }">

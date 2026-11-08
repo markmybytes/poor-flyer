@@ -1,3 +1,5 @@
+import { fmtDate } from './index'
+
 /**
  * Parses a pure calendar date string (YYYY-MM-DD) safely as a local date block,
  * preventing Javascript from treating it as UTC midnight and shifting the day.
@@ -23,6 +25,18 @@ export function formatLocalDateTime(value: string | null | undefined, fallback =
   const normalized = value.replace(' ', 'T').replace(',', '.')
   const parsed = new Date(normalized)
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString()
+}
+
+/**
+ * Standardizes display of wire-timestamp dates (e.g., 判決期, archived stamps) in the
+ * viewer's local calendar day — wire stamps are UTC instants, slicing the ISO string
+ * would show UTC's day, not the user's.
+ */
+export function formatLocalDate(value: string | null | undefined, fallback = '—'): string {
+  if (!value) return fallback
+  const normalized = value.replace(' ', 'T').replace(',', '.')
+  const parsed = new Date(normalized)
+  return Number.isNaN(parsed.getTime()) ? value : fmtDate(parsed.toLocaleDateString('en-CA'))
 }
 
 /**

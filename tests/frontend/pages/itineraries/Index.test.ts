@@ -1,7 +1,9 @@
 import IndexPage from '@/Pages/Itineraries/Index.vue'
 import type { Itinerary } from '@/types'
-import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
+import { router } from '@inertiajs/vue3'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useToast } from 'vue-toast-notification'
 
 const mockItinerary: Itinerary = {
   id: 'it1',
@@ -22,7 +24,30 @@ const mockItinerary: Itinerary = {
   rule37Analysis: null,
 }
 
+const archivedItinerary: Itinerary = {
+  ...mockItinerary,
+  archivedAt: '2026-10-01T04:05:06Z',
+  rule37Analysis: undefined,
+}
+
+function mountIndex(props: Record<string, unknown> = {}) {
+  return mount(IndexPage, {
+    props: { itineraries: [mockItinerary], baseCurrency: 'HKD', ...props },
+    global: { stubs: { AppLayout: { template: '<div><slot /></div>' } } },
+  })
+}
+
+function mountArchivedView(props: Record<string, unknown> = {}) {
+  window.history.replaceState({}, '', '/itineraries/?archived=1')
+  return mountIndex({ itineraries: [archivedItinerary], ...props })
+}
+
 describe('Itineraries/Index', () => {
+  beforeEach(() => {
+    window.history.replaceState({}, '', '/itineraries/')
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({}) } as Response)
+  })
+
   it('renders without crashing with empty list', () => {
     const wrapper = mount(IndexPage, {
       props: { itineraries: [], baseCurrency: 'HKD' },
@@ -92,5 +117,73 @@ describe('Itineraries/Index', () => {
       global: { stubs: { AppLayout: { template: '<div><slot /></div>' } } },
     })
     expect(wrapper.text()).toContain('新增監察項目')
+  })
+
+  it('switches to the archived view via router.get', async () => {
+    const wrapper = mountIndex()
+    await wrapper.findAll('button').find((b) => b.text() === '已封存')!.trigger('click')
+
+    expect(router.get).toHaveBeenCalledWith(
+      '/itineraries/',
+      { archived: '1' },
+      expect.objectContaining({ preserveState: true, preserveScroll: true, replace: true }),
+    )
+  })
+
+  it('shows archived cards with 已封存 badge and no rule37 card in archived view', () => {
+    const wrapper = mountArchivedView()
+
+    expect(wrapper.text()).toContain('已封存')
+    expect(wrapper.text()).toContain('封存於 2026/10/01')
+    expect(wrapper.text()).not.toContain('購買時機分析')
+    expect(wrapper.text()).not.toContain('可入手提示')
+  })
+
+  it('shows the archived empty state when no itineraries are archived', () => {
+    const wrapper = mountArchivedView({ itineraries: [], baseCurrency: 'HKD' })
+
+    expect(wrapper.text()).toContain('沒有已封存的旅程')
+    expect(wrapper.findAll('.card').length).toBe(0)
+  })
+
+  it('asks for confirmation with re-archive notice before restoring', async () => {
+    const wrapper = mountArchivedView()
+    await wrapper.findAll('button').find((b) => b.text().trim() === '恢復追蹤')!.trigger('click')
+
+    expect(wrapper.text()).toContain('恢復追蹤？')
+    expect(wrapper.text()).toContain('重新封存')
+  })
+
+  it('restores via PATCH and reloads', async () => {
+    const wrapper = mountArchivedView()
+    await wrapper.findAll('button').find((b) => b.text().trim() === '恢復追蹤')!.trigger('click')
+
+    const confirmBtn = wrapper.findAll('button').find((b) => b.text().trim() === '恢復追蹤' && b.attributes('type') === 'button')
+    await confirmBtn!.trigger('click')
+    await flushPromises()
+
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/itineraries/it1',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ archived: false }),
+      }),
+    )
+    expect(vi.mocked(router.reload)).toHaveBeenCalled()
+  })
+
+  it('shows a toast on restore failure', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: false } as Response)
+    const toast = useToast() as unknown as { error: ReturnType<typeof vi.fn> }
+    const wrapper = mountArchivedView()
+    await wrapper.findAll('button').find((b) => b.text().trim() === '恢復追蹤')!.trigger('click')
+
+    const confirmBtn = wrapper
+      .findAll('button')
+      .find((b) => b.text().trim() === '恢復追蹤' && b.attributes('type') === 'button')
+    await confirmBtn!.trigger('click')
+    await flushPromises()
+
+    expect(toast.error).toHaveBeenCalledWith('恢復追蹤失敗，請稍後再試')
   })
 })
