@@ -102,10 +102,16 @@ def _serialize_itinerary(itinerary: Itinerary, base_currency: str, *, today: dat
 @itineraries_bp.route('/')
 def index():
     base_currency = get_configured_base_currency()
+    archived_filter = (
+        Itinerary.archived_at.is_not(None)
+        if request.args.get('archived') == '1'
+        else Itinerary.archived_at.is_(None)
+    )
     itineraries = (
         db.session.execute(
             select(Itinerary)
             .options(selectinload(Itinerary.flights).selectinload(Flight.fare_snapshots))
+            .where(archived_filter)
             .order_by(Itinerary.created_at)
         )
         .scalars()

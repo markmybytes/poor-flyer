@@ -14,11 +14,12 @@ _MOCK_RATES = {
 }
 
 
-def _seed_itinerary(origin='HKG', destination='NRT', with_fare=False):
+def _seed_itinerary(origin='HKG', destination='NRT', with_fare=False, archived=False):
     it = Itinerary(
         trip_type='SINGLE',
         is_active=True,
         created_at=datetime.now(UTC),
+        archived_at=datetime.now(UTC) if archived else None,
     )
     db.session.add(it)
     db.session.flush()
@@ -89,6 +90,28 @@ def test_itinerary_index_returns_seeded_itinerary(client, app):
     data = resp.get_json()
     assert len(data['props']['itineraries']) == 1
     assert data['props']['itineraries'][0]['tripType'] == 'SINGLE'
+
+
+def test_itinerary_index_excludes_archived_by_default(client, app):
+    with app.app_context():
+        _seed_itinerary()
+        _seed_itinerary(archived=True)
+        with patch('src.routes.pages.itinerary.get_configured_base_currency', return_value='HKD'):
+            resp = client.get('/itineraries/', headers=INERTIA_HEADERS)
+    itineraries = resp.get_json()['props']['itineraries']
+    assert len(itineraries) == 1
+    assert itineraries[0]['archivedAt'] is None
+
+
+def test_itinerary_index_archived_filter_returns_only_archived(client, app):
+    with app.app_context():
+        _seed_itinerary()
+        _seed_itinerary(archived=True)
+        with patch('src.routes.pages.itinerary.get_configured_base_currency', return_value='HKD'):
+            resp = client.get('/itineraries/?archived=1', headers=INERTIA_HEADERS)
+    itineraries = resp.get_json()['props']['itineraries']
+    assert len(itineraries) == 1
+    assert itineraries[0]['archivedAt'] is not None
 
 
 def test_itinerary_create_renders_correct_component(client, app):

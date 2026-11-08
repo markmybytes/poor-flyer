@@ -177,6 +177,31 @@ def test_patch_itinerary_not_found(client, app):
     assert resp.get_json()['success'] is False
 
 
+def test_patch_itinerary_archive_and_unarchive(client, app):
+    with app.app_context():
+        it = _make_itinerary()
+        db.session.commit()
+        iid = it.id
+
+    resp = client.patch(
+        f'/api/itineraries/{iid}',
+        data=json.dumps({'archived': True}),
+        content_type='application/json',
+    )
+    assert resp.status_code == 200
+    with app.app_context():
+        assert db.session.get(Itinerary, iid).archived_at is not None
+
+    resp = client.patch(
+        f'/api/itineraries/{iid}',
+        data=json.dumps({'archived': False}),
+        content_type='application/json',
+    )
+    assert resp.status_code == 200
+    with app.app_context():
+        assert db.session.get(Itinerary, iid).archived_at is None
+
+
 def test_delete_itinerary(client, app):
     with app.app_context():
         it = _make_itinerary()

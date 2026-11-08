@@ -109,6 +109,10 @@ def update_flight(itinerary_id):
             entry.is_active = data['is_active']
             logger.info('Updated itinerary: id=%s is_active=%s', itinerary_id, data['is_active'])
 
+        if 'archived' in data:
+            entry.archived_at = datetime.now(UTC) if data['archived'] else None
+            logger.info('Updated itinerary: id=%s archived=%s', itinerary_id, data['archived'])
+
         if 'deadline' in data:
             deadline_str = data['deadline']
             if deadline_str:
