@@ -1,5 +1,5 @@
 import json
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from unittest.mock import patch
 
 from src.extensions.database import FareSnapshot, Flight, Itinerary, db
@@ -14,12 +14,15 @@ _MOCK_RATES = {
 }
 
 
-def _seed_itinerary(origin='HKG', destination='NRT', with_fare=False, archived=False):
+def _seed_itinerary(
+    origin='HKG', destination='NRT', with_fare=False, archived=False, deadline=None
+):
     it = Itinerary(
         trip_type='SINGLE',
         is_active=True,
         created_at=datetime.now(UTC),
         archived_at=datetime.now(UTC) if archived else None,
+        deadline=deadline,
     )
     db.session.add(it)
     db.session.flush()
@@ -112,6 +115,36 @@ def test_itinerary_index_archived_filter_returns_only_archived(client, app):
     itineraries = resp.get_json()['props']['itineraries']
     assert len(itineraries) == 1
     assert itineraries[0]['archivedAt'] is not None
+
+
+def test_serialize_itinerary_skips_rule37_when_disabled(app):
+    with app.app_context():
+        it = _seed_itinerary(with_fare=True, deadline=date.today() + timedelta(days=60))
+        with patch('src.routes.pages.itinerary.convert_amount', side_effect=lambda a, s, t: a):
+            result = _serialize_itinerary(it, 'HKD', today=date.today(), include_rule37=False)
+    assert result['rule37_analysis'] is None
+    assert result['statistics'] is not None
+
+
+def test_itinerary_index_default_view_includes_rule37_analysis(client, app):
+    with app.app_context():
+        _seed_itinerary(with_fare=True, deadline=date.today() + timedelta(days=60))
+        with patch('src.routes.pages.itinerary.get_configured_base_currency', return_value='HKD'):
+            with patch('src.routes.pages.itinerary.convert_amount', side_effect=lambda a, s, t: a):
+                resp = client.get('/itineraries/', headers=INERTIA_HEADERS)
+    itineraries = resp.get_json()['props']['itineraries']
+    assert itineraries[0]['rule37Analysis'] is not None
+
+
+def test_itinerary_index_archived_view_skips_rule37_analysis(client, app):
+    with app.app_context():
+        _seed_itinerary(with_fare=True, archived=True, deadline=date.today() + timedelta(days=60))
+        with patch('src.routes.pages.itinerary.get_configured_base_currency', return_value='HKD'):
+            with patch('src.routes.pages.itinerary.convert_amount', side_effect=lambda a, s, t: a):
+                resp = client.get('/itineraries/?archived=1', headers=INERTIA_HEADERS)
+    itineraries = resp.get_json()['props']['itineraries']
+    assert itineraries[0]['rule37Analysis'] is None
+    assert itineraries[0]['statistics'] is not None
 
 
 def test_itinerary_create_renders_correct_component(client, app):

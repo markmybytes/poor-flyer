@@ -202,6 +202,47 @@ def test_patch_itinerary_archive_and_unarchive(client, app):
         assert db.session.get(Itinerary, iid).archived_at is None
 
 
+def test_patch_itinerary_form_encoded_archived_false_restores(client, app):
+    with app.app_context():
+        it = _make_itinerary()
+        db.session.commit()
+        iid = it.id
+
+    resp = client.patch(
+        f'/api/itineraries/{iid}',
+        data=json.dumps({'archived': True}),
+        content_type='application/json',
+    )
+    assert resp.status_code == 200
+
+    resp = client.patch(
+        f'/api/itineraries/{iid}',
+        data={'archived': 'false', 'is_active': 'false'},
+    )
+    assert resp.status_code == 200
+    with app.app_context():
+        entry = db.session.get(Itinerary, iid)
+        assert entry.archived_at is None
+        assert entry.is_active is False
+
+
+def test_patch_itinerary_archive_twice_keeps_first_archived_at(client, app):
+    with app.app_context():
+        it = _make_itinerary()
+        it.archived_at = datetime(2020, 1, 1, tzinfo=UTC)
+        db.session.commit()
+        iid = it.id
+
+    resp = client.patch(
+        f'/api/itineraries/{iid}',
+        data=json.dumps({'archived': True}),
+        content_type='application/json',
+    )
+    assert resp.status_code == 200
+    with app.app_context():
+        assert db.session.get(Itinerary, iid).archived_at.year == 2020
+
+
 def test_delete_itinerary(client, app):
     with app.app_context():
         it = _make_itinerary()

@@ -163,7 +163,8 @@ def scrape_fares():
 
 
 def disable_departured_itineraries():
-    """Daily job to disable itineraries once their first flight date has passed."""
+    """Daily job to pause itineraries whose first flight has departed and archive those whose
+    last flight is older than AUTO_ARCHIVE_AFTER_DAYS."""
     from src.extensions.scheduler import scheduler
 
     if not setting.get_bool('itinerary', 'disable_departured_itineraries', False):
@@ -209,7 +210,7 @@ def disable_departured_itineraries():
                 AUTO_ARCHIVE_AFTER_DAYS,
             )
         except Exception:
-            logger.exception('Failed to disable past itineraries')
+            logger.exception('Failed to disable or archive past itineraries')
             db.session.rollback()
         finally:
             db.session.remove()

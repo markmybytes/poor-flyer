@@ -73,12 +73,18 @@ def _get_combined_totals(itinerary: Itinerary, currency: str) -> dict[date, floa
     return combined_totals
 
 
-def _serialize_itinerary(itinerary: Itinerary, base_currency: str, *, today: date) -> dict:
+def _serialize_itinerary(
+    itinerary: Itinerary,
+    base_currency: str,
+    *,
+    today: date,
+    include_rule37: bool = True,
+) -> dict:
     combined = _get_combined_totals(itinerary, base_currency)
     stats = compute_price_stats(combined)
     stats_dict = asdict(stats) if stats else None
     r37_dict = None
-    if itinerary.deadline and combined:
+    if include_rule37 and itinerary.deadline and combined:
         it_created_at = (
             itinerary.created_at.date()
             if isinstance(itinerary.created_at, datetime)
@@ -102,10 +108,9 @@ def _serialize_itinerary(itinerary: Itinerary, base_currency: str, *, today: dat
 @itineraries_bp.route('/')
 def index():
     base_currency = get_configured_base_currency()
+    archived_view = request.args.get('archived') == '1'
     archived_filter = (
-        Itinerary.archived_at.is_not(None)
-        if request.args.get('archived') == '1'
-        else Itinerary.archived_at.is_(None)
+        Itinerary.archived_at.is_not(None) if archived_view else Itinerary.archived_at.is_(None)
     )
     itineraries = (
         db.session.execute(
@@ -123,7 +128,12 @@ def index():
         'Itineraries/Index',
         props={
             'itineraries': [
-                _serialize_itinerary(it, base_currency, today=datetime.now(g.tz).date())
+                _serialize_itinerary(
+                    it,
+                    base_currency,
+                    today=datetime.now(g.tz).date(),
+                    include_rule37=not archived_view,
+                )
                 for it in itineraries
             ],
             'base_currency': base_currency,

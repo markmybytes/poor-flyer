@@ -206,7 +206,8 @@ function sendTestEmail() {
                 <p class="text-sm font-bold text-base-content">暫停追蹤過期的旅程</p>
 
                 <p class="text-xs font-medium text-base-content/55">
-                  當旅程中最後航班出發日期過後，暫停該項目的票價追蹤。<br />
+                  當旅程中最後航班出發日期過後，暫停該項目的票價追蹤，出發後 30
+                  天的旅程會自動封存。<br />
                 </p>
               </div>
             </label>
