@@ -300,8 +300,7 @@ function clearLogs() {
                     <pre
                       v-if="entry.traceback"
                       class="m-0 rounded bg-base-200 p-3 font-mono text-xs break-all whitespace-pre-wrap text-error/80"
-                      >{{ entry.traceback }}</pre
-                    >
+                      >{{ entry.traceback }}</pre>
                   </div>
                 </td>
               </tr>
