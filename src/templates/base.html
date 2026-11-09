@@ -31,7 +31,8 @@
   </head>
   <body>
     <!-- prettier-ignore -->
-    <div id="app" data-page='{{ page | tojson }}'></div>
+    <script type="application/json" data-page="app">{{ page | tojson }}</script>
+    <div id="app"></div>
 
     {% if vite_dev_url %}
     <script type="module" src="{{ vite_dev_url }}/src/frontend/main.ts"></script>
