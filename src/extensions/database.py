@@ -97,7 +97,7 @@ class Itinerary(db.Model):
 
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=lambda: datetime.now(UTC))
 
-    flights: Mapped[list['Flight']] = relationship(
+    flights: Mapped[list[Flight]] = relationship(
         'Flight',
         cascade='all, delete-orphan',
         back_populates='itinerary',
@@ -117,8 +117,8 @@ class Flight(db.Model):
     destination: Mapped[str] = mapped_column(String, nullable=False)
     flight_date: Mapped[date] = mapped_column(Date, nullable=False)
 
-    itinerary: Mapped['Itinerary'] = relationship('Itinerary', back_populates='flights')
-    fare_snapshots: Mapped[list['FareSnapshot']] = relationship(
+    itinerary: Mapped[Itinerary] = relationship('Itinerary', back_populates='flights')
+    fare_snapshots: Mapped[list[FareSnapshot]] = relationship(
         'FareSnapshot', cascade='all, delete-orphan', back_populates='flight'
     )
 
@@ -143,7 +143,7 @@ class FareSnapshot(db.Model):
 
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=lambda: datetime.now(UTC))
 
-    flight: Mapped['Flight'] = relationship('Flight', back_populates='fare_snapshots')
+    flight: Mapped[Flight] = relationship('Flight', back_populates='fare_snapshots')
 
 
 class Config(db.Model):

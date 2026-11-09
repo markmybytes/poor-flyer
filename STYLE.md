@@ -84,6 +84,7 @@ class ScrapeStatus(StrEnum):
     SUCCESS = 'success'
     ERROR = 'error'
 
+
 # Model
 scrape_status: Mapped[ScrapeStatus] = mapped_column(String, default=ScrapeStatus.SUCCESS)
 ```
@@ -155,15 +156,15 @@ Inertia routes are the default for page reads, forms, CRUD, redirects, and mutat
 
 ```python
 # src/routes/api/itinerary.py — Cohesive grouping within a single blueprint
-itineraries_bp = Blueprint("itineraries", __name__, url_prefix="/itineraries")
+itineraries_bp = Blueprint('itineraries', __name__, url_prefix='/itineraries')
 
-@itineraries_bp.patch("/<itinerary_id>/status")
-def update_status(itinerary_id: str):
-    ...
 
-@itineraries_bp.patch("/<itinerary_id>/ordering")
-def update_sort_order(itinerary_id: str):
-    ...
+@itineraries_bp.patch('/<itinerary_id>/status')
+def update_status(itinerary_id: str): ...
+
+
+@itineraries_bp.patch('/<itinerary_id>/ordering')
+def update_sort_order(itinerary_id: str): ...
 ```
 
 - Form CRUD posts to the page URL that renders the form (e.g. `POST /itineraries`, `POST /settings`); `router.post` carries the submission so validation errors return in the Inertia error bag.
@@ -174,16 +175,14 @@ Express ownership at the route layer, business rules in the view:
 
 ```python
 # Good: parent-child ownership via URL prefix + scoped view
-@itineraries_bp.route("/<itinerary_id>/packages", ...)
+@itineraries_bp.route('/<itinerary_id>/packages', ...)
 def packages_index(itinerary_id: str): ...
 
 
 # Good: domain invariant inside the view (using a guarded query)
-package = (
-    db.session.execute(
-        select(Package).where(Package.id == pkg_id, Package.itinerary_id == itinerary_id)
-    ).scalar_one_or_none()
-)
+package = db.session.execute(
+    select(Package).where(Package.id == pkg_id, Package.itinerary_id == itinerary_id)
+).scalar_one_or_none()
 
 
 # Avoid: ownership concern leaked into the view body

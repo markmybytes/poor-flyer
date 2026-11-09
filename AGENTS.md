@@ -15,7 +15,7 @@ Flask 3 + Vue 3 (Inertia SPA) flight-price tracker. Scrapes airline fares daily 
 
 ### Tech Stack
 
-- **Python 3.12** via [uv](https://docs.astral.sh/uv/). Lockfile: `uv.lock`. Install: `uv sync --all-extras`. Never `pip`.
+- **Python 3.15** via [uv](https://docs.astral.sh/uv/). Lockfile: `uv.lock`. Install: `uv sync --all-extras`. Never `pip`.
 - **Node** via [Volta](https://volta.sh/) (declared in `package.json`).
 - **Database**: SQLite by default (`instance/db.sqlite`); overridable via `PF_DATABASE_URL`.
 - **Frontend tooling**: Tailwind v4 + DaisyUI 5, configured inline in [`src/frontend/css/app.css`](src/frontend/css/app.css).

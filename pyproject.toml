@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "hk-poor-flyer"
 version = "0.1.0"
 description = "PoorFlyer - Flight price tracker with daily scraping"
-requires-python = ">=3.12"
+requires-python = ">=3.15"
 dependencies = [
     "flask-apscheduler>=1.13.1",
     "flask-caching>=2.3.1",
