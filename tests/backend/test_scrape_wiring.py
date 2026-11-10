@@ -48,6 +48,23 @@ def test_scheduler_failed_leg_writes_one_sentinel(app, monkeypatch):
         assert snapshots[0].error_message == 'blocked'
 
 
+def test_scheduler_skips_archived_itineraries(app, monkeypatch):
+    with app.app_context():
+        itinerary, flight = _seed_itinerary()
+        itinerary.archived_at = datetime.now(UTC)
+        db.session.commit()
+
+        scraped = []
+        monkeypatch.setattr(
+            scheduler_module, 'scrape_prices', lambda *args, **kwargs: scraped.append(args) or []
+        )
+
+        scheduler_module.scrape_fares()
+
+        assert scraped == []
+        assert db.session.query(FareSnapshot).filter_by(flight_id=flight.id).count() == 0
+
+
 def test_scheduler_rule37_uses_min_fare_per_date(app, monkeypatch):
     with app.app_context():
         day_one = datetime(2025, 6, 1, 10, 0, tzinfo=UTC)

@@ -33,6 +33,11 @@ def _is_active(it_id: str) -> bool:
     return db.session.get(Itinerary, it_id).is_active
 
 
+def _archived_at(it_id: str):
+    db.session.expire_all()
+    return db.session.get(Itinerary, it_id).archived_at
+
+
 def _enable_job() -> None:
     setting.set('itinerary', 'disable_departured_itineraries', 'true')
     cache.clear()
@@ -84,3 +89,36 @@ def test_keeps_already_inactive_itinerary_inactive(app):
         _enable_job()
         disable_departured_itineraries()
         assert _is_active(it.id) is False
+
+
+def test_auto_archives_itinerary_when_all_flights_older_than_threshold(app):
+    with app.app_context():
+        it = _seed_itinerary([-40, -35])
+        _enable_job()
+        disable_departured_itineraries()
+        assert _archived_at(it.id) is not None
+
+
+def test_does_not_archive_when_latest_flight_within_threshold(app):
+    with app.app_context():
+        it = _seed_itinerary([-40, -5])
+        _enable_job()
+        disable_departured_itineraries()
+        assert _archived_at(it.id) is None
+
+
+def test_does_not_archive_itinerary_with_future_flight(app):
+    with app.app_context():
+        it = _seed_itinerary([-40, 20])
+        _enable_job()
+        disable_departured_itineraries()
+        assert _archived_at(it.id) is None
+
+
+def test_does_not_auto_archive_when_setting_disabled(app):
+    with app.app_context():
+        it = _seed_itinerary([-40])
+        setting.set('itinerary', 'disable_departured_itineraries', 'false')
+        cache.clear()
+        disable_departured_itineraries()
+        assert _archived_at(it.id) is None

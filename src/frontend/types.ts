@@ -37,6 +37,7 @@ export interface Itinerary {
   isActive: boolean
   deadline: string | null
   createdAt: string
+  archivedAt?: string | null
   flights: Flight[]
   cabinClass?: string | null
   maxStops?: string | null

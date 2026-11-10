@@ -2,6 +2,7 @@ import DetailPage from '@/Pages/Itineraries/Detail.vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { router } from '@inertiajs/vue3'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useToast } from 'vue-toast-notification'
 
 const itinerary = {
   id: 'it-1',
@@ -88,5 +89,105 @@ describe('Itineraries/Detail filters', () => {
       expect.objectContaining({ method: 'DELETE' }),
     )
     expect(vi.mocked(router.visit)).toHaveBeenCalled()
+  })
+})
+
+describe('Itineraries/Detail archived state', () => {
+  beforeEach(() => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({}) } as Response)
+  })
+
+  it('shows 已封存 badge and hides tracking actions when archived', () => {
+    const wrapper = mountDetail({ archivedAt: '2026-11-01T00:00:00Z' })
+
+    expect(wrapper.text()).toContain('已封存')
+    expect(wrapper.text()).not.toContain('下載最新票價')
+    expect(wrapper.findAll('button').some((b) => ['暫停追蹤', '開始追蹤'].includes(b.text().trim()))).toBe(false)
+    expect(wrapper.find('button[title="修改購票限期"]').exists()).toBe(true)
+  })
+
+  it('keeps 已封存 badge precedence when itinerary is also inactive', () => {
+    const wrapper = mountDetail({ archivedAt: '2026-11-01T00:00:00Z', isActive: false })
+
+    expect(wrapper.text()).toContain('已封存')
+    expect(wrapper.text()).not.toContain('已暫停')
+  })
+
+  it('keeps the active/unarchived actions when not archived', () => {
+    const wrapper = mountDetail({ archivedAt: null })
+
+    // archived badge (badge-neutral) is not rendered, active actions intact
+    expect(wrapper.findAll('.badge.badge-neutral').length).toBe(0)
+    expect(wrapper.text()).toContain('下載最新票價')
+  })
+
+  it('confirms before restoring and PATCHes archived:false', async () => {
+    const wrapper = mountDetail({ archivedAt: '2026-11-01T00:00:00Z' })
+    vi.mocked(fetch).mockClear()
+
+    // open the confirm modal from the join button group
+    await wrapper.findAll('button').find((b) => b.text().trim() === '恢復追蹤')!.trigger('click')
+    expect(wrapper.text()).toContain('重新封存')
+    expect(fetch).not.toHaveBeenCalled()
+
+    const confirmBtn = wrapper
+      .findAll('button')
+      .find((b) => b.text().trim() === '恢復追蹤' && b.attributes('type') === 'button')
+    await confirmBtn!.trigger('click')
+    await flushPromises()
+
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/itineraries/it-1',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ archived: false }),
+      }),
+    )
+    expect(vi.mocked(router.reload)).toHaveBeenCalled()
+  })
+
+  it('offers archive in the header join for non-archived itineraries', () => {
+    const wrapper = mountDetail()
+
+    expect(wrapper.find('button[title="封存此追蹤"]').exists()).toBe(true)
+  })
+
+  it('asks for confirmation with 停止追蹤 copy before archiving, without fetching', async () => {
+    const wrapper = mountDetail()
+    vi.mocked(fetch).mockClear()
+
+    await wrapper.find('button[title="封存此追蹤"]').trigger('click')
+
+    expect(wrapper.text()).toContain('封存？')
+    expect(wrapper.text()).toContain('追蹤將停止，並移至已封存列表')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('archives via PATCH and reloads', async () => {
+    const toast = useToast() as unknown as { success: ReturnType<typeof vi.fn> }
+    const wrapper = mountDetail()
+    vi.mocked(fetch).mockClear()
+
+    await wrapper.find('button[title="封存此追蹤"]').trigger('click')
+
+    const confirmBtn = wrapper.findAll('button').find((b) => b.text().trim() === '確認封存')
+    await confirmBtn!.trigger('click')
+    await flushPromises()
+
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/itineraries/it-1',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ archived: true }),
+      }),
+    )
+    expect(toast.success).toHaveBeenCalledWith('已封存')
+    expect(vi.mocked(router.reload)).toHaveBeenCalled()
+  })
+
+  it('hides the archive action when already archived', () => {
+    const wrapper = mountDetail({ archivedAt: '2026-11-01T00:00:00Z' })
+
+    expect(wrapper.find('button[title="封存此追蹤"]').exists()).toBe(false)
   })
 })

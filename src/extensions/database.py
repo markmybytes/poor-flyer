@@ -96,6 +96,7 @@ class Itinerary(db.Model):
     airlines: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=lambda: datetime.now(UTC))
+    archived_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
     flights: Mapped[list[Flight]] = relationship(
         'Flight',

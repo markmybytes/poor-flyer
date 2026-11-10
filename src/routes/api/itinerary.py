@@ -16,6 +16,21 @@ logger = logging.getLogger(__name__)
 itineraries_bp = Blueprint('itineraries', __name__, url_prefix='/itineraries')
 
 
+def _as_bool(value) -> bool:
+    """Coerce JSON booleans and form-encoded strings ('false', '0', '', 'none') to bool."""
+    return (
+        value
+        if isinstance(value, bool)
+        else str(value).strip().lower()
+        not in (
+            'false',
+            '0',
+            'none',
+            '',
+        )
+    )
+
+
 @itineraries_bp.route('', methods=['POST'])
 def create_flight():
     try:
@@ -106,8 +121,17 @@ def update_flight(itinerary_id):
             return jsonify({'message': '搜尋條件於建立後不可修改', 'data': None}), 400
 
         if 'is_active' in data:
-            entry.is_active = data['is_active']
-            logger.info('Updated itinerary: id=%s is_active=%s', itinerary_id, data['is_active'])
+            entry.is_active = _as_bool(data['is_active'])
+            logger.info('Updated itinerary: id=%s is_active=%s', itinerary_id, entry.is_active)
+
+        if 'archived' in data:
+            archived = _as_bool(data['archived'])
+            if archived:
+                if entry.archived_at is None:
+                    entry.archived_at = datetime.now(UTC)
+            else:
+                entry.archived_at = None
+            logger.info('Updated itinerary: id=%s archived=%s', itinerary_id, archived)
 
         if 'deadline' in data:
             deadline_str = data['deadline']

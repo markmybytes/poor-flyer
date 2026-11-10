@@ -84,7 +84,6 @@
 
 @layer base {
   html {
-    overflow-y: scroll;
     background:
       radial-gradient(
         circle at top,
@@ -141,4 +140,13 @@
       @apply text-xs;
     }
   }
+}
+
+/* Scrollbar rig, unlayered on purpose: daisyUI's rootscrollgutter sets a
+   conditional :root scrollbar-gutter in @layer base (if(style(--page-has-scroll)))
+   that drops to unset on scroll-less views, making the layout jump. Unlayered
+   rules outrank every layer, keeping the gutter pinned in both views. */
+html {
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
 }

@@ -1,7 +1,7 @@
 import logging
 import threading
 import uuid
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 
 from flask import render_template
 from sqlalchemy import func, select
@@ -15,6 +15,8 @@ from src.utils.rule37 import Phase, compute_37_best
 
 logger = logging.getLogger(__name__)
 
+AUTO_ARCHIVE_AFTER_DAYS = 30  # ponytail: fixed threshold, hoist to settings when the user asks
+
 
 def scrape_fares():
     """Daily job to scrape flight prices and send notifications if buy signal triggered."""
@@ -26,7 +28,11 @@ def scrape_fares():
             logger.info('Daily scrape job started')
             today = date.today()
             base_currency = get_configured_base_currency()
-            itineraries = db.session.query(Itinerary).filter(Itinerary.is_active).all()
+            itineraries = (
+                db.session.query(Itinerary)
+                .filter(Itinerary.is_active, Itinerary.archived_at.is_(None))
+                .all()
+            )
             logger.debug('Processing %d active itineraries', len(itineraries))
 
             scraped_count = 0
@@ -157,7 +163,8 @@ def scrape_fares():
 
 
 def disable_departured_itineraries():
-    """Daily job to disable itineraries once their first flight date has passed."""
+    """Daily job to pause itineraries whose first flight has departed and archive those whose
+    last flight is older than AUTO_ARCHIVE_AFTER_DAYS."""
     from src.extensions.scheduler import scheduler
 
     if not setting.get_bool('itinerary', 'disable_departured_itineraries', False):
@@ -183,8 +190,27 @@ def disable_departured_itineraries():
 
             db.session.commit()
             logger.info('Disabled %d itineraries with past departure dates', updated_count)
+
+            cutoff = today - timedelta(days=AUTO_ARCHIVE_AFTER_DAYS)
+            stale_itinerary_ids = (
+                select(Flight.itinerary_id)
+                .group_by(Flight.itinerary_id)
+                .having(func.max(Flight.flight_date) < cutoff)
+            )
+            archived_count = (
+                db.session.query(Itinerary)
+                .filter(Itinerary.archived_at.is_(None))
+                .filter(Itinerary.id.in_(stale_itinerary_ids))
+                .update({Itinerary.archived_at: datetime.now(UTC)}, synchronize_session=False)
+            )
+            db.session.commit()
+            logger.info(
+                'Archived %d itineraries with all flights older than %d days',
+                archived_count,
+                AUTO_ARCHIVE_AFTER_DAYS,
+            )
         except Exception:
-            logger.exception('Failed to disable past itineraries')
+            logger.exception('Failed to disable or archive past itineraries')
             db.session.rollback()
         finally:
             db.session.remove()
