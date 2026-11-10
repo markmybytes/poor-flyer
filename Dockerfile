@@ -24,6 +24,7 @@ ENV DISPLAY=:99
 VOLUME ["/app/instance"]
 
 RUN apt-get update && apt-get install -y \
+    git \
     xvfb \
     xauth \
     curl \
