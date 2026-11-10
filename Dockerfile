@@ -1,4 +1,4 @@
-FROM node:24-slim AS frontend-builder
+FROM node:26-slim AS frontend-builder
 
 WORKDIR /app
 
@@ -14,7 +14,7 @@ RUN npm run build-only
 
 FROM python:3.15-slim
 
-ARG S6_OVERLAY_VERSION=3.2.2.0
+ARG S6_OVERLAY_VERSION=3.2.3.2
 ARG TARGETARCH
 
 WORKDIR /app
