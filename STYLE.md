@@ -262,6 +262,24 @@ function submitData() {
 </template>
 ```
 
+### Responsive Breakpoints
+
+Use Tailwind's default breakpoints. Do not add `--breakpoint-*` overrides or arbitrary variants. Write mobile-first: unqualified classes are the `< sm` tier.
+
+Three layout tiers, changed at two breakpoints:
+
+- `< sm` — mobile.
+- `sm` to `xl` — tablet. Too wide for one design, so `md` and `lg` are allowed inside it.
+- `>= xl` — desktop.
+
+`md` and `lg` make small adjustments only: density, sizes, spacing. They never introduce a new layout. Structural change happens at `sm` and `xl`.
+
+- The layout container caps at `xl` (`max-w-7xl`), so growth stops with structure.
+- Grid gaps and card padding stop increasing at `lg`.
+- Forms: one column below `md`. A form grid is the one place `md` carries structure.
+- Type follows the box, not the viewport: when a breakpoint makes a box narrower, step its type down there.
+- Check both sides of every breakpoint you use.
+
 ## API Response Contract
 
 All API endpoints mounted under `src/routes/api/` (served at `/api/...`) **must** adhere to this envelope. This does **not** apply to page views under `src/routes/pages/` (served by Inertia).
