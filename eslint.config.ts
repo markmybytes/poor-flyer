@@ -18,7 +18,10 @@ export default defineConfigWithVueTs(
       'vue/define-emits-declaration': ['error', 'type-based'],
       'vue/define-macros-order': [
         'error',
-        { order: ['defineProps', 'defineEmits', 'defineModel', 'defineExpose'] },
+        {
+          order: ['defineOptions', 'defineProps', 'defineEmits', 'defineModel', 'defineSlots'],
+          defineExposeLast: true,
+        },
       ],
       'vue/require-typed-ref': ['error'],
       'vue/no-required-prop-with-default': ['warn', { autofix: false }],
