@@ -40,7 +40,7 @@ def index():
         start_idx = (page - 1) * per_page
 
         logger.debug(
-            'Rendered logs page: entries=%d page=%d levels=%s', len(all_logs), page, selected_levels
+            'rendered logs page: entries=%d page=%d levels=%s', len(all_logs), page, selected_levels
         )
         return render_inertia(
             'Logs/Index',
@@ -55,5 +55,5 @@ def index():
             },
         )
     except Exception:
-        logger.exception('Error rendering logs page')
+        logger.exception('render logs page failed')
         raise

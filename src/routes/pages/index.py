@@ -9,5 +9,5 @@ index_bp = Blueprint('index', __name__)
 
 @index_bp.route('/')
 def index():
-    logger.debug('Redirecting root to itineraries page')
+    logger.debug('redirecting root to itineraries page')
     return redirect('/itineraries/')

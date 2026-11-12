@@ -28,7 +28,7 @@ def scrape_fares():
 
     with scheduler.app.app_context():
         try:
-            logger.info('Daily scrape job started')
+            logger.info('daily scrape job started')
             today = date.today()
             base_currency = get_configured_base_currency()
             itineraries = (
@@ -36,7 +36,7 @@ def scrape_fares():
                 .filter(Itinerary.is_active, Itinerary.archived_at.is_(None))
                 .all()
             )
-            logger.debug('Processing %d active itineraries', len(itineraries))
+            logger.debug('processing %d active itineraries', len(itineraries))
 
             scraped_count = 0
             for itinerary in itineraries:
@@ -76,13 +76,13 @@ def scrape_fares():
                             )
                         )
             db.session.commit()
-            logger.info('Scraped prices for %d itineraries', scraped_count)
+            logger.info('scraped prices for %d itineraries', scraped_count)
 
             smtp_cfg = get_smtp_config()
             recipients = [
                 r.strip() for r in setting.get('email', 'recipients', '').split(',') if r.strip()
             ]
-            logger.debug('Email recipients count=%d', len(recipients))
+            logger.debug('email recipients count=%d', len(recipients))
 
             all_active_legs = [
                 f
@@ -102,7 +102,7 @@ def scrape_fares():
                     try:
                         fare = convert_amount(float(snapshot.fare), src_currency, base_currency)
                     except FXRatesError:
-                        logger.warning('Failed to convert fare for rule37: flight_id=%s', flight.id)
+                        logger.warning('failed to convert fare for rule37: flight_id=%s', flight.id)
                         continue
                     day = snapshot.created_at.date()
                     fare_by_date[day] = min(fare_by_date.get(day, fare), fare)
@@ -133,7 +133,7 @@ def scrape_fares():
                     lowest_fare = convert_amount(lowest_fare, src_currency, base_currency)
                 except FXRatesError:
                     logger.warning(
-                        'Failed to convert fare for buy signal email: flight_id=%s',
+                        'failed to convert fare for buy signal email: flight_id=%s',
                         flight.id,
                     )
 
@@ -157,10 +157,10 @@ def scrape_fares():
                         daemon=True,
                     ).start()
 
-            logger.info('Daily scrape job completed: buy_signals_sent=%d', buy_signals_sent)
+            logger.info('daily scrape job completed: buy_signals_sent=%d', buy_signals_sent)
 
         except Exception:
-            logger.exception('Daily scrape job failed')
+            logger.exception('daily scrape job failed')
             db.session.rollback()
         finally:
             db.session.remove()
@@ -176,7 +176,7 @@ def disable_departured_itineraries():
     try:
         if not setting.get_bool('itinerary', 'disable_departured_itineraries', False):
             logger.debug(
-                'Skipping disable_departured_itineraries job since it is disabled in settings'
+                'skipping disable_departured_itineraries job since it is disabled in settings'
             )
             return
 
@@ -198,7 +198,7 @@ def disable_departured_itineraries():
                 )
 
                 db.session.commit()
-                logger.info('Disabled %d itineraries with past departure dates', updated_count)
+                logger.info('disabled %d itineraries with past departure dates', updated_count)
 
                 cutoff = today - timedelta(days=AUTO_ARCHIVE_AFTER_DAYS)
                 stale_itinerary_ids = (
@@ -214,12 +214,12 @@ def disable_departured_itineraries():
                 )
                 db.session.commit()
                 logger.info(
-                    'Archived %d itineraries with all flights older than %d days',
+                    'archived %d itineraries with all flights older than %d days',
                     archived_count,
                     AUTO_ARCHIVE_AFTER_DAYS,
                 )
             except Exception:
-                logger.exception('Failed to disable or archive past itineraries')
+                logger.exception('failed to disable or archive past itineraries')
                 db.session.rollback()
             finally:
                 db.session.remove()

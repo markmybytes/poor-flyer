@@ -16,10 +16,10 @@ logger = logging.getLogger(__name__)
 def _terminate_process(proc: subprocess.Popen, label: str) -> None:
     try:
         proc.wait(timeout=3)
-        logger.debug('Process terminated gracefully: label=%s', label)
+        logger.debug('process terminated gracefully: label=%s', label)
     except subprocess.TimeoutExpired:
         click.echo(click.style(f'Force stopping {label}...', fg='yellow'))
-        logger.warning('Force terminating process: label=%s', label)
+        logger.warning('force terminating process: label=%s', label)
         proc.terminate()
         proc.wait(timeout=5)
 
@@ -41,7 +41,7 @@ def dev():
     # child output (vite arrows, unicode logs) can hit cp950 limits on Windows consoles
     sys.stdout.reconfigure(errors='replace')
     click.echo(click.style('Starting development environment...', fg='cyan'))
-    logger.info('Development environment startup initiated')
+    logger.info('development environment startup initiated')
 
     hot_file = Path(current_app.config['VITE_HOT_FILE'])
     hot_file.unlink(missing_ok=True)
@@ -84,10 +84,10 @@ def dev():
             raise subprocess.CalledProcessError(server_exit_code, processes['server'].args)
     except KeyboardInterrupt:
         click.echo(click.style('\nShutting down development services...', fg='yellow'))
-        logger.info('Development environment shutdown: triggered_by=user_interrupt')
+        logger.info('development environment shutdown: triggered_by=user_interrupt')
     except subprocess.CalledProcessError as exc:
         click.echo(click.style(f'Error starting Flask dev server: {exc}', fg='red'))
-        logger.exception('Flask dev server exited with error')
+        logger.exception('dev server exited with error')
     finally:
         for label, process in processes.items():
             if process.poll() is None:
@@ -98,7 +98,7 @@ def dev():
             thread.join(timeout=1)
 
         hot_file.unlink(missing_ok=True)
-        logger.info('Development environment shutdown completed')
+        logger.info('development environment shutdown completed')
         sys.exit(0)
 
 

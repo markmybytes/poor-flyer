@@ -71,7 +71,7 @@ def _read_cache() -> dict[str, Any] | None:
         d = json.loads(p.read_text(encoding='utf-8'))
         if isinstance(d, dict) and isinstance(d.get('rates'), dict):
             logger.debug(
-                'FX cache loaded: base=%s entries=%d', d.get('base'), len(d.get('rates', {}))
+                'loaded FX cache: base=%s entries=%d', d.get('base'), len(d.get('rates', {}))
             )
             return d
     except json.JSONDecodeError:
@@ -87,7 +87,7 @@ def _write_cache(data: dict[str, Any]) -> None:
             json.dumps(data, ensure_ascii=True, indent=2), encoding='utf-8'
         )
         logger.debug(
-            'FX cache written: base=%s entries=%d', data.get('base'), len(data.get('rates', {}))
+            'wrote FX cache: base=%s entries=%d', data.get('base'), len(data.get('rates', {}))
         )
     except OSError as e:
         logger.warning('write fx cache failed: error=%s', type(e).__name__)
@@ -138,14 +138,14 @@ def get_rates(base_currency: str, force_refresh: bool = False) -> dict[str, Any]
         and c_data
         and _is_cache_fresh(c_data, get_int('currency', 'cache_ttl', 86400) or 86400, nb)
     ):
-        logger.debug('Using cached FX rates: base=%s', nb)
+        logger.debug('using cached FX rates: base=%s', nb)
         return {**c_data}
     try:
         return _fetch_live_rates(nb, get('currency', 'fxrates_api_key'))
     except (httpx.HTTPError, FXRatesError, ValueError) as e:
         if c_data and c_data.get('base') == nb:
             logger.warning(
-                'Falling back to stale FX cache: base=%s error_type=%s', nb, type(e).__name__
+                'falling back to stale FX cache: base=%s error_type=%s', nb, type(e).__name__
             )
             return {**c_data}
         logger.warning('load fx rates failed: no_cache=true error=%s', type(e).__name__)

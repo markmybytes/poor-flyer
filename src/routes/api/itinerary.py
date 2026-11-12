@@ -122,7 +122,7 @@ def update_flight(itinerary_id):
 
         if 'is_active' in data:
             entry.is_active = _as_bool(data['is_active'])
-            logger.info('Updated itinerary: id=%s is_active=%s', itinerary_id, entry.is_active)
+            logger.info('updated itinerary: id=%s is_active=%s', itinerary_id, entry.is_active)
 
         if 'archived' in data:
             archived = _as_bool(data['archived'])
@@ -131,7 +131,7 @@ def update_flight(itinerary_id):
                     entry.archived_at = datetime.now(UTC)
             else:
                 entry.archived_at = None
-            logger.info('Updated itinerary: id=%s archived=%s', itinerary_id, archived)
+            logger.info('updated itinerary: id=%s archived=%s', itinerary_id, archived)
 
         if 'deadline' in data:
             deadline_str = data['deadline']
@@ -139,7 +139,7 @@ def update_flight(itinerary_id):
                 entry.deadline = datetime.strptime(deadline_str, '%Y-%m-%d').date()
             else:
                 entry.deadline = None
-            logger.info('Updated itinerary: id=%s deadline=%s', itinerary_id, entry.deadline)
+            logger.info('updated itinerary: id=%s deadline=%s', itinerary_id, entry.deadline)
 
         db.session.commit()
         return jsonify({'success': True, 'message': 'Entry updated', 'data': entry.id})
@@ -162,7 +162,7 @@ def delete_flight(itinerary_id):
 
         db.session.delete(entry)
         db.session.commit()
-        logger.info('Deleted itinerary: id=%s', itinerary_id)
+        logger.info('deleted itinerary: id=%s', itinerary_id)
         return jsonify({'success': True, 'message': 'Entry deleted', 'data': None})
     except Exception as e:
         db.session.rollback()
@@ -248,7 +248,7 @@ def scrape_flight(itinerary_id):
             ), 400
 
         db.session.commit()
-        logger.info('Scrape completed: itinerary_id=%s', itinerary_id)
+        logger.info('scrape completed: itinerary_id=%s', itinerary_id)
         return jsonify({'success': True, 'message': 'Scrape completed', 'data': itinerary.id})
     except Exception as e:
         db.session.rollback()

@@ -60,7 +60,7 @@ def read_logs(
 ) -> list[dict]:
     path = _log_path()
     if not path.exists():
-        logger.debug('Log file not found: path=%s', path)
+        logger.debug('log file not found: path=%s', path)
         return []
 
     level_set = set(levels) if levels else None
@@ -84,7 +84,7 @@ def read_logs(
     filtered_entries.reverse()
 
     logger.debug(
-        'Read logs: total_entries=%d levels=%s start_date=%s end_date=%s',
+        'read logs: total_entries=%d levels=%s start_date=%s end_date=%s',
         len(filtered_entries),
         levels,
         start_date,
@@ -97,6 +97,6 @@ def clear_logs() -> None:
     try:
         if (path := _log_path()).exists():
             path.write_text('', encoding='utf-8')
-            logger.info('Application logs cleared')
+            logger.info('application logs cleared')
     except Exception:
-        logger.exception('Error clearing logs')
+        logger.exception('clear logs failed')

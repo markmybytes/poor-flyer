@@ -37,7 +37,7 @@ def send_email(cfg: SMTPConfig, msg: Message) -> bool:
         protocol = cfg.get('protocol', 'STARTTLS')
         require_auth = cfg.get('require_auth', True)
 
-        logger.debug('Sending email via protocol=%s require_auth=%s', protocol, require_auth)
+        logger.debug('sending email via protocol=%s require_auth=%s', protocol, require_auth)
 
         if protocol == 'SMTP_SSL':
             with smtplib.SMTP_SSL(cfg['host'], cfg['port'], timeout=15) as server:

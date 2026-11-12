@@ -74,5 +74,5 @@ def save():
         response.status_code = 422
         return response
 
-    logger.info('Settings updated from page form')
+    logger.info('settings updated from page form')
     return redirect('/settings/')

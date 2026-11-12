@@ -94,10 +94,10 @@ def create_app():
     app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
     configure_logging(app)
-    logger.info('Initializing Flask application')
+    logger.info('initializing Flask application')
 
     init_extensions(app)
-    logger.info('Extensions initialized')
+    logger.info('extensions initialized')
 
     app.before_request(_resolve_timezone)
 

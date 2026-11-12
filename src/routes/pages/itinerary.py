@@ -121,7 +121,7 @@ def index():
         .unique()
         .all()
     )
-    logger.debug('Rendered itineraries index: itineraries=%d', len(itineraries))
+    logger.debug('rendered itineraries index: itineraries=%d', len(itineraries))
     return render_inertia(
         'Itineraries/Index',
         props={
@@ -162,7 +162,7 @@ def create_submit():
         response.status_code = 422
         return response
 
-    logger.info('Created itinerary from page form: id=%s', itinerary.id)
+    logger.info('created itinerary from page form: id=%s', itinerary.id)
     return redirect('/')
 
 
@@ -176,7 +176,7 @@ def show(itinerary_id):
             .where(Itinerary.id == itinerary_id)
         ).scalar_one_or_none()
         if not itinerary:
-            logger.debug('Itinerary not found: id=%s', itinerary_id)
+            logger.debug('itinerary not found: id=%s', itinerary_id)
             return redirect('/itineraries/')
         return render_inertia(
             'Itineraries/Detail',
