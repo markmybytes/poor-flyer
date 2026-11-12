@@ -51,31 +51,31 @@ const showRestoreModal = ref(false)
 const showArchiveModal = ref(false)
 const isArchived = computed(() => !!props.itinerary.archivedAt)
 
-const submitDeadline = async (clear = false) => {
+const submitDeadline = (clear = false) => {
   loading.value = 'update_deadline'
   const targetDeadline = clear ? null : deadlineValue.value || null
 
-  try {
-    const res = await fetch(`/api/itineraries/${props.itinerary.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ deadline: targetDeadline }),
-    })
-    if (!res.ok) {
-      throw new Error()
-    }
+  fetch(`/api/itineraries/${props.itinerary.id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ deadline: targetDeadline }),
+  })
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error()
+      }
 
-    toast.success(clear ? '已移除購票限期' : '已更新購票限期')
-    showModal.value = false
-    router.reload()
-  } catch {
-    toast.error('更新限期失敗，請稍後再試')
-  } finally {
-    loading.value = null
-  }
+      toast.success(clear ? '已移除購票限期' : '已更新購票限期')
+      showModal.value = false
+      router.reload()
+    })
+    .catch(() => toast.error('更新限期失敗，請稍後再試'))
+    .finally(() => {
+      loading.value = null
+    })
 }
 
-const runAction = async (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive') => {
+const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive') => {
   if (action === 'delete') {
     showDeleteModal.value = false
   }
@@ -108,43 +108,42 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'a
     opts.body = JSON.stringify({ archived: true })
   }
 
-  try {
-    const res = await fetch(
-      `/api/itineraries/${props.itinerary.id}${action === 'scrape' ? '/scrape' : ''}`,
-      opts,
-    )
-    if (!res.ok) {
-      throw new Error()
-    }
+  fetch(`/api/itineraries/${props.itinerary.id}${action === 'scrape' ? '/scrape' : ''}`, opts)
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error()
+      }
 
-    if (action === 'delete') {
-      router.visit('/itineraries/')
-    } else {
-      if (action === 'restore') {
-        toast.success('已恢復追蹤')
+      if (action === 'delete') {
+        router.visit('/itineraries/')
+      } else {
+        if (action === 'restore') {
+          toast.success('已恢復追蹤')
+        }
+        if (action === 'archive') {
+          toast.success('已封存')
+        }
+        router.reload()
       }
-      if (action === 'archive') {
-        toast.success('已封存')
-      }
-      router.reload()
-    }
-  } catch {
-    toast.error(
-      `${
-        action === 'scrape'
-          ? '更新票價'
-          : action === 'delete'
-            ? '刪除'
-            : action === 'restore'
-              ? '恢復追蹤'
-              : action === 'archive'
-                ? '封存'
-                : '操作'
-      }失敗，請稍後再試`,
-    )
-  } finally {
-    loading.value = null
-  }
+    })
+    .catch(() => {
+      toast.error(
+        `${
+          action === 'scrape'
+            ? '更新票價'
+            : action === 'delete'
+              ? '刪除'
+              : action === 'restore'
+                ? '恢復追蹤'
+                : action === 'archive'
+                  ? '封存'
+                  : '操作'
+        }失敗，請稍後再試`,
+      )
+    })
+    .finally(() => {
+      loading.value = null
+    })
 }
 </script>
 

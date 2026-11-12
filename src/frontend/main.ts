@@ -27,11 +27,11 @@ createInertiaApp({
     const pages = import.meta.glob<DefineComponent>('./Pages/**/*.vue', { eager: true })
     return pages[`./Pages/${name}.vue`] as DefineComponent
   },
-  setup({ el, App, props, plugin }) {
-    const app = createApp({ render: () => h(App, props) })
-    app.use(plugin)
-    app.use(routePlugin)
-    app.use(VueToast, { position: 'top-right' })
-    app.mount(el)
+  setup({ el, App: app, props, plugin }) {
+    const root = createApp({ render: () => h(app, props) })
+    root.use(plugin)
+    root.use(routePlugin)
+    root.use(VueToast, { position: 'top-right' })
+    root.mount(el)
   },
 })
