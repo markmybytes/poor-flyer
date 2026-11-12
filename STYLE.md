@@ -26,7 +26,7 @@ A higher rule wins a conflict. Ask when a requirement is ambiguous.
 - Columns: `snake_case`. `CamelCaseJSONProvider` (`src/utils/transform.py`) exposes them as `camelCase`; never rename a column for the frontend.
 - Routes: `kebab-case` segments.
 - Python modules, functions, variables: `snake_case`. Classes, Pydantic models, dataclasses, type aliases: `PascalCase`. Constants: `UPPER_SNAKE_CASE`.
-- TypeScript functions, methods, variables: `camelCase`. Types, interfaces, component files: `PascalCase` (`PascalCase.vue`).
+- Component files: `PascalCase.vue`.
 
 ## Placement
 
@@ -190,12 +190,11 @@ package = db.session.execute(
 
 ## Vue / TypeScript
 
-- TypeScript, `<script setup lang="ts">`. DaisyUI before custom CSS.
+- DaisyUI before custom CSS.
 - Lay out with `flex` or `grid` plus `gap-*`.
 - Type component-local shapes inline at the point of use (props, grouped refs, computed). A shared `interface` only when several files need it.
 - Prefer `ref` over `reactive`. Group related values into one object `ref` per context (fields, filters, UI state).
 - Named functions for component methods and root handlers. Arrow functions for inline handlers, callbacks, and `.then()` chains.
-- Prefer `.then().catch()` over `await`. An `async` function that never awaits is allowed.
 - Toast messages come from the server flash (prop shared by Inertia). Hardcode one in `onSuccess` / `onError` only with a reason, such as a fallback when nothing was flashed.
 - Name a shared component for what it is (`LineChart`, `DateTimePicker`), never for its first user. No domain prefixes on generic components.
 - Wrapping a third-party library: accept a library-native options prop to spread over defaults, not one prop per knob.
