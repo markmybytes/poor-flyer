@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 AUTO_ARCHIVE_AFTER_DAYS = 30  # ponytail: fixed threshold, hoist to settings when the user asks
 
 
-def scrape_fares():
+def scrape_fares():  # noqa: C901, PLR0915 - split into scrape + notify steps next time it grows
     """Daily job to scrape flight prices and send notifications if buy signal triggered."""
     bind_correlation_id()
     # Get the app context from current_app through the scheduler

@@ -40,7 +40,28 @@ where = ["."]
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "W", "F", "I", "B", "C4", "UP", "G", "LOG", "FA", "SIM105", "BLE", "PTH", "N"]
+select = [
+  "E",
+  "W",
+  "F",
+  "I",
+  "B",
+  "C4",
+  "UP",
+  "G",
+  "LOG",
+  "FA",
+  "SIM105",
+  "BLE",
+  "PTH",
+  "N",
+  "C901",
+  "PLR0915",
+  "RUF100",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/**" = ["PLR0915"] # fixture generator: one linear setup script
 
 [tool.ruff.format]
 quote-style = "single"
