@@ -55,6 +55,20 @@ def test_logs_index_level_filter_applied(client, app, tmp_path):
     assert data['props']['logs'][0]['level'] == 'ERROR'
 
 
+def test_logs_index_parses_correlation_prefix(client, app, tmp_path):
+    log_file = tmp_path / 'app.log'
+    log_file.write_text(
+        '2024-06-15 10:00:00,000 - INFO - src.routes - [cid:1a2b3c4d] Request received\n'
+        '2024-06-15 10:01:00,000 - INFO - src.routes - Plain message\n'
+    )
+    with app.app_context():
+        app.config['LOG_FILE'] = str(log_file)
+        resp = client.get('/logs/', headers=INERTIA_HEADERS)
+    entries = {entry['message']: entry for entry in resp.get_json()['props']['logs']}
+    assert entries['Request received']['correlation'] == '1a2b3c4d'
+    assert entries['Plain message']['correlation'] is None
+
+
 def test_logs_index_pagination_total_reflects_all_entries(client, app, tmp_path):
     log_file = tmp_path / 'app.log'
     lines = '\n'.join(

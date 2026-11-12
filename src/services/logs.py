@@ -16,6 +16,7 @@ _LOG_ENTRY_RE = re.compile(
     r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})'
     r' - (DEBUG|INFO|WARNING|ERROR|CRITICAL) - (.+?) - (.*)$'
 )
+_CORRELATION_RE = re.compile(r'^\[cid:(?P<correlation>[\w-]+)\] ')
 
 
 def _log_path() -> Path:
@@ -36,7 +37,13 @@ def _iter_log_entries(path: Path) -> Iterator[dict]:
                 current = dict(
                     zip(('timestamp', 'level', 'logger', 'message'), match.groups(), strict=True),
                     traceback=None,
+                    correlation=None,
                 )
+
+                # Older lines carry no prefix; those keep message and correlation as-is.
+                if (corr := _CORRELATION_RE.match(current['message'])) is not None:
+                    current['correlation'] = corr['correlation']
+                    current['message'] = current['message'][corr.end() :]
             elif current is not None:
                 current['traceback'] = (
                     line if current['traceback'] is None else current['traceback'] + '\n' + line
