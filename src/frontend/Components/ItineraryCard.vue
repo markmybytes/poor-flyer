@@ -54,11 +54,13 @@ const emit = defineEmits<{ restore: [itinerary: Itinerary] }>()
 
           <template v-if="archived">
             <span class="text-base-content/30">·</span>
+
             <span class="truncate text-base-content/55">已封存</span>
           </template>
 
           <template v-else-if="!itinerary.isActive">
             <span class="text-base-content/30">·</span>
+
             <span class="truncate font-medium text-warning">已暫停</span>
           </template>
 
@@ -86,6 +88,7 @@ const emit = defineEmits<{ restore: [itinerary: Itinerary] }>()
 
           <template v-else-if="itinerary.deadline && itinerary.statistics?.latestVal == null">
             <span class="text-base-content/30">·</span>
+
             <span class="truncate text-base-content/55">收集數據中</span>
           </template>
         </div>
