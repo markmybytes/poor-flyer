@@ -1,7 +1,6 @@
 # src/__init__.py
 import logging
 import os
-from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -11,6 +10,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from src.cli import dev, run_scheduler
 from src.extensions import init_extensions
 from src.extensions.scheduler import create_cron_trigger
+from src.logging_config import configure_logging
 from src.routes.api import api_bp
 from src.routes.pages import pages_bp
 from src.utils.transform import CamelCaseJSONProvider
@@ -39,34 +39,8 @@ def _inject_vite_url():
     return {'vite_dev_url': vite_dev_url}
 
 
-def _setup_logging(app: Flask):
-    """Handles log rotation files and system-wide logging level attachments."""
-    log_path = Path(app.config['LOG_FILE'])
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-
-    file_handler = RotatingFileHandler(
-        log_path,
-        maxBytes=app.config['LOG_MAX_BYTES'],
-        backupCount=1,
-    )
-    file_handler.setFormatter(
-        logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
-    )
-    file_handler.setLevel(app.config['LOG_LEVEL'])
-
-    # Sync custom handlers across target application scopes
-    app.logger.addHandler(file_handler)
-    app.logger.setLevel(app.config['LOG_LEVEL'])
-
-    src_logger = logging.getLogger('src')
-    src_logger.addHandler(file_handler)
-    src_logger.setLevel(app.config['LOG_LEVEL'])
-
-
 def create_app():
     """Application factory to initialize and configure the Flask app."""
-    logger.info('Initializing Flask application')
-
     base_dir = Path(__file__).resolve().parent.parent
     app = Flask(
         __name__,
@@ -119,7 +93,8 @@ def create_app():
 
     app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-    _setup_logging(app)
+    configure_logging(app)
+    logger.info('Initializing Flask application')
 
     init_extensions(app)
     logger.info('Extensions initialized')
