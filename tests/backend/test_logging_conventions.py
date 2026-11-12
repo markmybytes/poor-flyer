@@ -15,6 +15,8 @@ SRC = Path(__file__).resolve().parents[2] / 'src'
 LEVELS = {'debug', 'info', 'warning', 'warn', 'error', 'exception', 'critical'}
 ACRONYM_OPEN = re.compile(r'^[A-Z][A-Z0-9]{1,}\b')
 SENTENCE_BREAK = re.compile(r'\.\s+[A-Z]')
+LOGGING_OWNER = 'src/logging_config.py'
+OWNED_CALLS = {'addHandler', 'setLevel', 'basicConfig', 'dictConfig'}
 
 
 def _log_messages() -> list[tuple[str, int, ast.expr]]:
@@ -93,3 +95,24 @@ def test_violation_flags_bad_shapes(source):
 def test_violation_accepts_good_shapes(source):
     arg = ast.parse(source, mode='eval').body
     assert _violation('src/demo.py', 1, arg) is None
+
+
+def _logging_ownership_violations() -> list[str]:
+    problems = []
+    for path in sorted(SRC.rglob('*.py')):
+        relative = str(path.relative_to(SRC.parent)).replace('\\', '/')
+        if relative == LOGGING_OWNER:
+            continue
+        for node in ast.walk(ast.parse(path.read_text(encoding='utf-8'))):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+                if node.func.attr in OWNED_CALLS:
+                    problems.append(f'{relative}:{node.lineno}: {node.func.attr}()')
+    return problems
+
+
+def test_only_logging_config_owns_handlers_and_levels():
+    assert (SRC / 'logging_config.py').exists(), 'logging guard lost its reference module'
+    problems = _logging_ownership_violations()
+    assert not problems, 'handler and level calls belong in src/logging_config.py:\n' + '\n'.join(
+        problems
+    )
