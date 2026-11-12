@@ -93,7 +93,45 @@ _PoorFlyer 窮人想飛_ 是一款專為精打細算旅客而設的機票價格�
 
 ## 部署
 
-本項目可通過 Docker 部署。詳細的部署說明請參考項目文件。
+### Docker
+
+```bash
+docker run -d --name poor-flyer -p 8000:8000 \
+  ghcr.io/markmybytes/poor-flyer:latest
+```
+
+`/app/instance` 存放資料庫與日誌；需要保留資料就加 `-v ./instance:/app/instance`。
+
+| 變數           | 預設  | 用途                                                                                                    |
+| -------------- | ----- | ------------------------------------------------------------------------------------------------------- |
+| `TZ`           | `UTC` | 容器時區：排程觸發時刻，及未設時區 cookie 時的時間顯示                                                  |
+| `PUID`／`PGID` | `911` | 同 [LinuxServer.io](https://docs.linuxserver.io/general/understanding-puid-and-pgid/)，設定容器執行身分 |
+
+### 原始碼
+
+下載 `poor-flyer-<版本>.zip`，以 Python 直接執行。
+
+```bash
+unzip poor-flyer-<版本>.zip && cd poor-flyer
+pip install -e .
+flask --app wsgi.py db upgrade      # 建立／更新資料庫
+flask --app wsgi.py run-scheduler & # 每日收集票價（獨立程序）
+gunicorn --bind 0.0.0.0:8000 --workers 1 --timeout 120 wsgi:app
+```
+
+- Windows 可改用 `pip install waitress` 與 `waitress-serve --port=8000 wsgi:app`。
+- `run-scheduler` 是獨立於 Web 伺服器的排程程序，執行定時任務。
+
+### 環境變數
+
+| 變數               | 預設                           | 用途                           |
+| ------------------ | ------------------------------ | ------------------------------ |
+| `PF_DATABASE_URL`  | `instance/db.sqlite`（sqlite） | 資料庫連線（SQLAlchemy URL）   |
+| `PF_SCRAPE_CRON`   | `0 9 * * *`                    | 票價收集排程（crontab）        |
+| `PF_SCRAPE_JITTER` | `1800`                         | 收集票價時刻隨機延後上限（秒） |
+| `PF_LOG_FILE`      | `instance/app.log`             | 日誌檔路徑                     |
+| `PF_LOG_LEVEL`     | `INFO`                         | 日誌等級                       |
+| `PF_LOG_MAX_BYTES` | `10485760`                     | 日誌檔輪替大小（位元組）       |
 
 <p align="right">(<a href="#readme-top">回到最頂</a>)</p>
 

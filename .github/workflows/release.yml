@@ -4,7 +4,6 @@ on:
   push:
     tags:
       - v*
-  workflow_dispatch:
 
 permissions:
   contents: write
@@ -49,8 +48,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: package.json
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - name: Package source with compiled frontend
+        run: |
+          git checkout-index -a --prefix=dist/poor-flyer/
+          cp -r src/static/dist dist/poor-flyer/src/static/dist
+          cd dist && zip -qr "poor-flyer-${GITHUB_REF_NAME#v}.zip" poor-flyer
+
       - uses: ncipollo/release-action@v1
         with:
           generateReleaseNotes: true
           tag: ${{ github.ref_name }}
+          artifacts: "dist/*.zip"
           prerelease: ${{ contains(github.ref_name, '-alpha') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-rc') }}
