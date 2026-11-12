@@ -78,6 +78,7 @@ class ScrapeStatus(StrEnum):
     SUCCESS = 'success'
     ERROR = 'error'
 
+
 scrape_status: Mapped[ScrapeStatus] = mapped_column(String, default=ScrapeStatus.SUCCESS)
 ```
 
