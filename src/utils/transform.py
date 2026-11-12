@@ -77,7 +77,7 @@ class CamelCaseJSONProvider(DefaultJSONProvider):
                 # naive datetimes are flight-local wall-clock times everywhere in
                 # this schema (UTCDateTime covers the UTC ones) — serialize them
                 # without a zone suffix instead of pretending they are UTC
-                logger.debug('Serializing naive datetime as flight-local (no zone suffix).')
+                logger.debug('serialize naive datetime as flight-local')
                 return obj.isoformat()
             normalized = obj.astimezone(UTC)
             return normalized.isoformat().replace('+00:00', 'Z')

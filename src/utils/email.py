@@ -50,16 +50,16 @@ def send_email(cfg: SMTPConfig, msg: Message) -> bool:
                 if require_auth:
                     server.login(cfg['user'], cfg['password'])
                 server.send_message(msg)
-        logger.info('Email sent successfully')
+        logger.info('email sent')
         return True
     except smtplib.SMTPAuthenticationError:
-        logger.error('SMTP authentication failed: invalid credentials')
+        logger.error('smtp auth failed: reason=invalid_credentials')
         return False
     except smtplib.SMTPException:
-        logger.exception('SMTP error occurred')
+        logger.exception('smtp send failed')
         return False
     except Exception:
-        logger.exception('Unexpected error sending email')
+        logger.exception('send email failed: reason=unexpected')
         return False
 
 

@@ -39,12 +39,12 @@ def create_flight():
 
         db.session.commit()
         logger.info(
-            'Created itinerary: id=%s flights=%d', itinerary.id, len(data.get('flights', []))
+            'itinerary created: id=%s flights=%d', itinerary.id, len(data.get('flights', []))
         )
         return jsonify({'success': True, 'message': 'Entry created', 'data': itinerary.id})
     except Exception as e:
         db.session.rollback()
-        logger.exception('Error creating itinerary')
+        logger.exception('create itinerary failed')
         return jsonify({'success': False, 'message': str(e)}), 400
 
 
@@ -59,7 +59,7 @@ def get_flight(itinerary_id):
         ).scalar_one_or_none()
 
         if not entry:
-            logger.debug('Itinerary not found: id=%s', itinerary_id)
+            logger.debug('itinerary not found: id=%s', itinerary_id)
             return jsonify({'success': False, 'message': 'Entry not found'}), 404
 
         latest_success: FareSnapshot | None = None
@@ -77,7 +77,7 @@ def get_flight(itinerary_id):
             try:
                 converted_value = convert_amount(converted_value, src_currency, base_currency)
             except FXRatesError:
-                logger.warning('Failed to convert fare: itinerary_id=%s', itinerary_id)
+                logger.warning('convert fare failed: itinerary_id=%s', itinerary_id)
                 pass
 
             converted_preview = {
@@ -100,7 +100,7 @@ def get_flight(itinerary_id):
         )
     except Exception as e:
         db.session.rollback()
-        logger.exception('Error retrieving itinerary: id=%s', itinerary_id)
+        logger.exception('retrieve itinerary failed: id=%s', itinerary_id)
         return jsonify({'success': False, 'message': str(e)}), 400
 
 
@@ -112,7 +112,7 @@ def update_flight(itinerary_id):
         ).scalar_one_or_none()
 
         if not entry:
-            logger.debug('Itinerary not found for update: %s', itinerary_id)
+            logger.debug('itinerary not found for update: id=%s', itinerary_id)
             return jsonify({'success': False, 'message': 'Entry not found'}), 404
 
         data = request.get_json(silent=True) or request.form.to_dict()
@@ -145,7 +145,7 @@ def update_flight(itinerary_id):
         return jsonify({'success': True, 'message': 'Entry updated', 'data': entry.id})
     except Exception as e:
         db.session.rollback()
-        logger.exception('Error updating itinerary: id=%s', itinerary_id)
+        logger.exception('update itinerary failed: id=%s', itinerary_id)
         return jsonify({'success': False, 'message': str(e)}), 400
 
 
@@ -157,7 +157,7 @@ def delete_flight(itinerary_id):
         ).scalar_one_or_none()
 
         if not entry:
-            logger.debug('Itinerary not found for deletion: %s', itinerary_id)
+            logger.debug('itinerary not found for deletion: id=%s', itinerary_id)
             return jsonify({'success': False, 'message': 'Entry not found'}), 404
 
         db.session.delete(entry)
@@ -166,7 +166,7 @@ def delete_flight(itinerary_id):
         return jsonify({'success': True, 'message': 'Entry deleted', 'data': None})
     except Exception as e:
         db.session.rollback()
-        logger.exception('Error deleting itinerary: id=%s', itinerary_id)
+        logger.exception('delete itinerary failed: id=%s', itinerary_id)
         return jsonify({'success': False, 'message': str(e)}), 400
 
 
@@ -180,7 +180,7 @@ def scrape_flight(itinerary_id):
         ).scalar_one_or_none()
 
         if not itinerary:
-            logger.debug('Itinerary not found for scraping: %s', itinerary_id)
+            logger.debug('itinerary not found for scraping: id=%s', itinerary_id)
             return jsonify({'success': False, 'message': 'Entry not found'}), 404
 
         today_local = datetime.now(g.tz).date()
@@ -202,7 +202,7 @@ def scrape_flight(itinerary_id):
         any_scraped_or_attempted = False
         if active_flights := [f for f in itinerary.flights if f.flight_date >= today_local]:
             any_scraped_or_attempted = True
-            logger.info('Scraping %d flights for itinerary %s', len(active_flights), itinerary_id)
+            logger.info('scrape itinerary: id=%s flights=%d', itinerary_id, len(active_flights))
 
             base_currency = get_configured_base_currency()
             results = scrape_prices(
@@ -242,7 +242,7 @@ def scrape_flight(itinerary_id):
 
         if not any_scraped_or_attempted:
             db.session.rollback()
-            logger.warning('No active flights to scrape: itinerary_id=%s', itinerary_id)
+            logger.info('scrape skipped: itinerary_id=%s reason=no_active_flights', itinerary_id)
             return jsonify(
                 {'success': False, 'message': 'Cannot scrape: flight date has passed for all legs'}
             ), 400
@@ -252,5 +252,5 @@ def scrape_flight(itinerary_id):
         return jsonify({'success': True, 'message': 'Scrape completed', 'data': itinerary.id})
     except Exception as e:
         db.session.rollback()
-        logger.exception('Error scraping itinerary: id=%s', itinerary_id)
+        logger.exception('scrape itinerary failed: id=%s', itinerary_id)
         return jsonify({'success': False, 'message': str(e)}), 400

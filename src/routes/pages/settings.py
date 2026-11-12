@@ -28,7 +28,7 @@ def _index_props() -> dict:
             'error': None,
         }
     except FXRatesError as exc:
-        logger.warning('Unable to load FX rates for settings page: %s', type(exc).__name__)
+        logger.warning('load fx rates for settings page failed: error=%s', type(exc).__name__)
         fx_status = {
             'base_currency': base_currency,
             'last_updated': None,
@@ -55,11 +55,7 @@ def _index_props() -> dict:
 
 @settings_bp.route('/')
 def index():
-    try:
-        return render_inertia('Settings/Index', props=_index_props())
-    except Exception:
-        logger.exception('Error rendering settings page')
-        raise
+    return render_inertia('Settings/Index', props=_index_props())
 
 
 @settings_bp.route('', methods=['POST'])

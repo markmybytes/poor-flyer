@@ -33,6 +33,7 @@ def get_settings():
             }
         )
     except Exception as e:
+        logger.exception('read settings failed')
         return jsonify({'success': False, 'message': str(e)}), 400
 
 
@@ -45,7 +46,7 @@ def patch_settings():
     except ValueError as e:
         return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
-        logger.exception('Error patching settings')
+        logger.exception('patch settings failed')
         return jsonify({'success': False, 'message': str(e)}), 400
 
 
@@ -67,10 +68,10 @@ def refresh_fx_rates():
             }
         )
     except FXRatesError as e:
-        logger.warning('FX rates refresh failed: %s', e)
+        logger.warning('fx rates refresh failed: error=%s', e)
         return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
-        logger.exception('Unexpected error refreshing FX rates')
+        logger.exception('refresh fx rates failed: reason=unexpected')
         return jsonify({'success': False, 'message': str(e)}), 400
 
 
@@ -93,5 +94,5 @@ def test_email():
             return jsonify({'success': True, 'message': f'Test email sent to {recipient}'})
         return jsonify({'success': False, 'message': 'Failed to send test email.'}), 400
     except Exception as e:
-        logger.exception('Error sending test email')
+        logger.exception('send test email failed')
         return jsonify({'success': False, 'message': str(e)}), 400

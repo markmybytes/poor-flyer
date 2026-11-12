@@ -31,7 +31,7 @@ def _serialize_snapshot(snapshot: FareSnapshot, currency: str) -> dict:
             data['fare'] = convert_amount(snapshot.fare, snapshot.currency, currency)
             data['currency'] = currency
         except FXRatesError:
-            logger.warning('Failed to convert fare snapshot: snapshot_id=%s', snapshot.id)
+            logger.warning('convert fare snapshot failed: snapshot_id=%s', snapshot.id)
     return data
 
 
@@ -45,9 +45,7 @@ def _get_combined_totals(itinerary: Itinerary, currency: str) -> dict[date, floa
                 try:
                     fare_value = convert_amount(s.fare, src_currency, currency)
                 except FXRatesError:
-                    logger.warning(
-                        'Failed to convert itinerary fare snapshot: snapshot_id=%s', s.id
-                    )
+                    logger.warning('convert itinerary fare snapshot failed: snapshot_id=%s', s.id)
                     continue
 
                 s_date = (
@@ -154,7 +152,7 @@ def create_submit():
         db.session.commit()
     except (KeyError, TypeError, ValueError) as exc:
         db.session.rollback()
-        logger.warning('Invalid itinerary submission: %s', exc)
+        logger.info('invalid itinerary submission: error=%s', exc)
         response = make_response(
             render_inertia(
                 'Itineraries/Create',
@@ -190,5 +188,5 @@ def show(itinerary_id):
             },
         )
     except Exception:
-        logger.exception('Error rendering itineraries detail page: id=%s', itinerary_id)
+        logger.exception('render itinerary detail failed: id=%s', itinerary_id)
         return redirect('/itineraries/')
