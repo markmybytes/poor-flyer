@@ -6,6 +6,7 @@ from datetime import UTC, date, datetime, timedelta
 
 from flask import render_template
 from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
 
 from src.extensions.database import FareSnapshot, Flight, Itinerary, db
 from src.logging_config import bind_correlation_id, reset_correlation_id
@@ -32,8 +33,12 @@ def scrape_fares():
             today = date.today()
             base_currency = get_configured_base_currency()
             itineraries = (
-                db.session.query(Itinerary)
-                .filter(Itinerary.is_active, Itinerary.archived_at.is_(None))
+                db.session.execute(
+                    select(Itinerary)
+                    .options(selectinload(Itinerary.flights).selectinload(Flight.fare_snapshots))
+                    .where(Itinerary.is_active, Itinerary.archived_at.is_(None))
+                )
+                .scalars()
                 .all()
             )
             logger.debug('processing %d active itineraries', len(itineraries))
@@ -78,6 +83,18 @@ def scrape_fares():
             db.session.commit()
             logger.info('scraped prices for %d itineraries', scraped_count)
 
+            # the scrape commit expires every instance, so reload the notify inputs in
+            # one eager query instead of letting the loop lazy-load per itinerary
+            notify_inputs = (
+                db.session.execute(
+                    select(Itinerary)
+                    .options(selectinload(Itinerary.flights).selectinload(Flight.fare_snapshots))
+                    .where(Itinerary.is_active, Itinerary.archived_at.is_(None))
+                )
+                .scalars()
+                .all()
+            )
+
             smtp_cfg = get_smtp_config()
             recipients = [
                 r.strip() for r in setting.get('email', 'recipients', '').split(',') if r.strip()
@@ -86,7 +103,7 @@ def scrape_fares():
 
             all_active_legs = [
                 f
-                for itinerary in itineraries
+                for itinerary in notify_inputs
                 if itinerary.deadline
                 for f in itinerary.flights
                 if f.flight_date >= today
