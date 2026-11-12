@@ -30,7 +30,7 @@ A higher rule wins a conflict. Ask when a requirement is ambiguous.
 
 ## Placement
 
-- Build routes through blueprints. Never register a view on `app` directly.
+- Build routes through blueprints. Never register a view on `app` directly. `tests/backend/test_structure_conventions.py` enforces it.
 
 | Content                                      | Location                     |
 | -------------------------------------------- | ---------------------------- |
@@ -216,7 +216,7 @@ Three layout tiers, changed at two breakpoints:
 - Gaps and card padding stop increasing at `lg`.
 - Forms: one column below `md` — the one place `md` carries structure.
 - Type follows the box: when a breakpoint narrows a box, step the type down there.
-- Check both sides of every breakpoint you use.
+- Check both sides of every breakpoint you use. `tests/frontend/breakpoints.test.ts` enforces the rules above.
 
 ## API Response Contract
 
@@ -242,8 +242,6 @@ interface ApiResponse<T = unknown> {
 - **Mutation (`200` / `201`)** — `data: null`, `message` holds the success text, when the client expects no entity back.
 - **Validation failure (`422`)** — `data: null`, `message` summarises, `errors` maps field to messages. Flask does not emit this by itself: wire `@app.errorhandler(ValidationError)` before exposing a write endpoint.
 - **Application error (`4xx` / `5xx`)** — `data: null`, `message` carries the summary.
-
-Endpoints that still emit `success` are grandfathered. Never add the flag to a new endpoint; migrating the old ones is a dedicated pass.
 
 ### Frontend
 

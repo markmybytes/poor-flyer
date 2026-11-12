@@ -35,7 +35,7 @@ describe('Itineraries/Detail filters', () => {
   beforeEach(() => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
-      json: async () => ({ success: true }),
+      json: async () => ({ message: null, data: null }),
     } as Response)
   })
 

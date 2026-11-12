@@ -7,7 +7,8 @@ def test_clear_logs_success(client, app, tmp_path):
         resp = client.delete('/api/logs')
 
     assert resp.status_code == 200
-    assert resp.get_json()['success'] is True
+    assert resp.get_json()['message'] == 'Logs cleared'
+    assert resp.get_json()['data'] is None
     assert not log_file.exists() or log_file.read_text() == ''
 
 
@@ -17,4 +18,4 @@ def test_clear_logs_missing_file_still_succeeds(client, app, tmp_path):
         resp = client.delete('/api/logs')
 
     assert resp.status_code == 200
-    assert resp.get_json()['success'] is True
+    assert resp.get_json()['message'] == 'Logs cleared'

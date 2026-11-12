@@ -14,7 +14,7 @@ def test_get_settings_returns_structure(client, app):
             resp = client.get('/api/settings')
     assert resp.status_code == 200
     data = resp.get_json()
-    assert data['success'] is True
+    assert data['message'] is None
     assert 'smtp' in data['data']
     assert 'email' in data['data']
     assert 'currency' in data['data']
@@ -39,7 +39,7 @@ def test_patch_settings_updates_base_currency(client, app):
                     content_type='application/json',
                 )
     assert resp.status_code == 200
-    assert resp.get_json()['success'] is True
+    assert resp.get_json()['message'] == 'Settings updated successfully'
 
 
 def test_patch_settings_unsupported_currency_returns_400(client, app):
@@ -51,7 +51,9 @@ def test_patch_settings_unsupported_currency_returns_400(client, app):
                 content_type='application/json',
             )
     assert resp.status_code == 400
-    assert resp.get_json()['success'] is False
+    body = resp.get_json()
+    assert body['message']
+    assert body['data'] is None
 
 
 def test_patch_settings_invalid_cache_ttl_returns_400(client, app):
@@ -87,7 +89,7 @@ def test_patch_settings_updates_email_recipients(client, app):
                     content_type='application/json',
                 )
     assert resp.status_code == 200
-    assert resp.get_json()['success'] is True
+    assert resp.get_json()['message'] == 'Settings updated successfully'
 
 
 def test_patch_settings_invalid_smtp_port_returns_400(client, app):

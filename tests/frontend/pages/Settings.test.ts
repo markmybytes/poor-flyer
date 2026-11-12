@@ -36,7 +36,7 @@ describe('Settings/Index', () => {
     vi.clearAllMocks()
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
-      json: async () => ({ success: true }),
+      json: async () => ({ message: 'ok', data: {} }),
     } as Response)
   })
 

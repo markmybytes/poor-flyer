@@ -14,7 +14,7 @@ def clear():
     try:
         log_svc.clear_logs()
         logger.info('application logs cleared via API')
-        return jsonify({'success': True})
+        return jsonify({'message': 'Logs cleared', 'data': None})
     except Exception:
         logger.exception('clear application logs failed')
-        return jsonify({'success': False, 'message': 'Failed to clear logs'}), 500
+        return jsonify({'message': 'Failed to clear logs', 'data': None}), 500

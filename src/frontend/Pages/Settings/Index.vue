@@ -121,13 +121,13 @@ function refreshFxRates() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ base_currency: form.currency.base_currency }),
   })
-    .then((res) => res.json())
-    .then((res) => {
-      if (!res.success) {
-        throw new Error(res.message || '無法更新匯率數據')
+    .then((res) => res.json().then((body) => ({ ok: res.ok, body })))
+    .then(({ ok, body }) => {
+      if (!ok) {
+        throw new Error(body.message || '無法更新匯率數據')
       }
 
-      const d = res.data || {}
+      const d = body.data || {}
       Object.assign(fxStatusState, {
         base_currency: d.baseCurrency ?? form.currency.base_currency,
         last_updated: d.lastUpdated ?? null,
@@ -157,13 +157,13 @@ function sendTestEmail() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ recipient: ui.testAddress }),
   })
-    .then((res) => res.json())
-    .then((data) => {
-      if (data.success) {
-        toast.success(data.message || '測試電郵已發送')
+    .then((res) => res.json().then((body) => ({ ok: res.ok, body })))
+    .then(({ ok, body }) => {
+      if (ok) {
+        toast.success(body.message || '測試電郵已發送')
         ui.testAddress = ''
       } else {
-        toast.error(data.message || '發送失敗')
+        toast.error(body.message || '發送失敗')
       }
     })
     .catch(() => toast.error('發送測試電郵時發生錯誤'))

@@ -41,11 +41,11 @@ def create_flight():
         logger.info(
             'itinerary created: id=%s flights=%d', itinerary.id, len(data.get('flights', []))
         )
-        return jsonify({'success': True, 'message': 'Entry created', 'data': itinerary.id})
+        return jsonify({'message': 'Entry created', 'data': itinerary.id})
     except Exception as e:
         db.session.rollback()
         logger.exception('create itinerary failed')
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'message': str(e), 'data': None}), 400
 
 
 @itineraries_bp.route('/<itinerary_id>', methods=['GET'])
@@ -60,7 +60,7 @@ def get_flight(itinerary_id):
 
         if not entry:
             logger.debug('itinerary not found: id=%s', itinerary_id)
-            return jsonify({'success': False, 'message': 'Entry not found'}), 404
+            return jsonify({'message': 'Entry not found', 'data': None}), 404
 
         latest_success: FareSnapshot | None = None
         for flight in entry.flights:
@@ -89,8 +89,7 @@ def get_flight(itinerary_id):
 
         return jsonify(
             {
-                'success': True,
-                'message': 'Entry retrieved',
+                'message': None,
                 'data': {
                     'id': entry.id,
                     'base_currency': base_currency,
@@ -101,7 +100,7 @@ def get_flight(itinerary_id):
     except Exception as e:
         db.session.rollback()
         logger.exception('retrieve itinerary failed: id=%s', itinerary_id)
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'message': str(e), 'data': None}), 400
 
 
 @itineraries_bp.route('/<itinerary_id>', methods=['PATCH'])
@@ -113,7 +112,7 @@ def update_flight(itinerary_id):
 
         if not entry:
             logger.debug('itinerary not found for update: id=%s', itinerary_id)
-            return jsonify({'success': False, 'message': 'Entry not found'}), 404
+            return jsonify({'message': 'Entry not found', 'data': None}), 404
 
         data = request.get_json(silent=True) or request.form.to_dict()
 
@@ -142,11 +141,11 @@ def update_flight(itinerary_id):
             logger.info('updated itinerary: id=%s deadline=%s', itinerary_id, entry.deadline)
 
         db.session.commit()
-        return jsonify({'success': True, 'message': 'Entry updated', 'data': entry.id})
+        return jsonify({'message': 'Entry updated', 'data': entry.id})
     except Exception as e:
         db.session.rollback()
         logger.exception('update itinerary failed: id=%s', itinerary_id)
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'message': str(e), 'data': None}), 400
 
 
 @itineraries_bp.route('/<itinerary_id>', methods=['DELETE'])
@@ -158,16 +157,16 @@ def delete_flight(itinerary_id):
 
         if not entry:
             logger.debug('itinerary not found for deletion: id=%s', itinerary_id)
-            return jsonify({'success': False, 'message': 'Entry not found'}), 404
+            return jsonify({'message': 'Entry not found', 'data': None}), 404
 
         db.session.delete(entry)
         db.session.commit()
         logger.info('deleted itinerary: id=%s', itinerary_id)
-        return jsonify({'success': True, 'message': 'Entry deleted', 'data': None})
+        return jsonify({'message': 'Entry deleted', 'data': None})
     except Exception as e:
         db.session.rollback()
         logger.exception('delete itinerary failed: id=%s', itinerary_id)
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'message': str(e), 'data': None}), 400
 
 
 @itineraries_bp.route('/<itinerary_id>/scrape', methods=['POST'])
@@ -181,7 +180,7 @@ def scrape_flight(itinerary_id):
 
         if not itinerary:
             logger.debug('itinerary not found for scraping: id=%s', itinerary_id)
-            return jsonify({'success': False, 'message': 'Entry not found'}), 404
+            return jsonify({'message': 'Entry not found', 'data': None}), 404
 
         today_local = datetime.now(g.tz).date()
 
@@ -244,13 +243,13 @@ def scrape_flight(itinerary_id):
             db.session.rollback()
             logger.info('scrape skipped: itinerary_id=%s reason=no_active_flights', itinerary_id)
             return jsonify(
-                {'success': False, 'message': 'Cannot scrape: flight date has passed for all legs'}
+                {'message': 'Cannot scrape: flight date has passed for all legs', 'data': None}
             ), 400
 
         db.session.commit()
         logger.info('scrape completed: itinerary_id=%s', itinerary_id)
-        return jsonify({'success': True, 'message': 'Scrape completed', 'data': itinerary.id})
+        return jsonify({'message': 'Scrape completed', 'data': itinerary.id})
     except Exception as e:
         db.session.rollback()
         logger.exception('scrape itinerary failed: id=%s', itinerary_id)
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'message': str(e), 'data': None}), 400

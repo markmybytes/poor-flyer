@@ -140,9 +140,9 @@ const pageNumbers = computed((): (number | '...')[] => {
 function clearLogs() {
   clearing.value = true
   fetch('/api/logs', { method: 'DELETE' })
-    .then((r) => r.json())
-    .then((d: { success: boolean; message?: string }) => {
-      if (!d.success) throw new Error(d.message || '清除失敗')
+    .then((r) => r.json().then((body: { message?: string }) => ({ ok: r.ok, body })))
+    .then(({ ok, body }) => {
+      if (!ok) throw new Error(body.message || '清除失敗')
       toast.success('已刪除所有紀錄')
       confirmModal.value?.close()
       router.reload()
