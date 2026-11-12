@@ -9,7 +9,7 @@ export default defineConfigWithVueTs(
   {
     rules: {
       'vue/multi-word-component-names': 'off',
-      'vue/block-lang': ['warn', { script: { lang: 'ts' } }],
+      'vue/block-lang': ['error', { script: { lang: 'ts' } }],
       'vue/block-order': ['error', { order: ['script', 'template', 'style'] }],
       'vue/component-api-style': ['error', ['script-setup']],
       'vue/prefer-define-options': ['error'],
@@ -32,6 +32,22 @@ export default defineConfigWithVueTs(
             next: '*',
           },
         ],
+      ],
+      '@typescript-eslint/naming-convention': [
+        'error',
+        { selector: 'default', format: ['camelCase'], leadingUnderscore: 'allow' },
+        { selector: 'variable', format: ['camelCase', 'PascalCase', 'UPPER_CASE'] },
+        { selector: 'typeLike', format: ['PascalCase'] },
+        { selector: 'property', format: null },
+        { selector: 'objectLiteralProperty', format: null },
+        { selector: 'import', format: null },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'AwaitExpression',
+          message: 'Use .then().catch() instead of await.',
+        },
       ],
     },
     languageOptions: {
