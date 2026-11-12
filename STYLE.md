@@ -60,7 +60,7 @@ A higher rule wins a conflict. Ask when a requirement is ambiguous.
 ### Logging
 
 - One module-level logger per file: `logging.getLogger(__name__)`. Never add handlers, set levels, or call `basicConfig` in a module — `src/logging_config.py` owns them.
-- Message shape: lowercase event first, then `key=value` fields, passed as arguments: `logger.info('scraped fares: itinerary_id=%s count=%d', id, n)`. No f-strings.
+- Message shape: lowercase event first (an acronym may open: `API token expired`), then `key=value` fields, passed as arguments: `logger.info('scraped fares: itinerary_id=%s count=%d', id, n)`. No f-strings, no second sentence, no trailing period.
 - One log per handled failure, at the boundary that handles it. A caught-and-re-raised error is logged by its caller, not twice.
 - `ERROR` only when a human must act. Expected conditions (`invalid input`, `not found`, `no active flights`) are `INFO` or `DEBUG`.
 - `logger.exception(...)` only inside an `except` block. Use `logger.warning(..., exc_info=False)` when an exception is named outside its handler.
