@@ -31,7 +31,7 @@ class Base(DeclarativeBase):
 db = SQLAlchemy(model_class=Base, session_options={'autoflush': False})
 
 
-class floating_datetime(datetime):
+class FloatingDateTime(datetime):
     """A marker subclass indicating this datetime is INTENTIONALLY timezone-unaware."""
 
     pass
@@ -60,10 +60,10 @@ class UTCDateTime(types.TypeDecorator):  # Timezone-Aware Force Type for SQLite
         return value
 
 
-class FloatingDateTime(types.TypeDecorator):
+class FloatingDateTimeType(types.TypeDecorator):
     """
     Maps to standard DateTime(timezone=False).
-    Returns a 'floating_datetime' instance so the serializer knows not to alarm logs.
+    Returns a 'FloatingDateTime' instance so the serializer knows not to alarm logs.
     """
 
     impl = DateTime(timezone=False)
@@ -72,7 +72,7 @@ class FloatingDateTime(types.TypeDecorator):
     def process_result_value(self, value, dialect):
         if value is not None:
             # Reconstruct as our explicit marker subclass
-            return floating_datetime(
+            return FloatingDateTime(
                 value.year,
                 value.month,
                 value.day,
@@ -134,8 +134,8 @@ class FareSnapshot(db.Model):
 
     flight_number: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    departure_at: Mapped[datetime | None] = mapped_column(FloatingDateTime, nullable=True)
-    arrival_at: Mapped[datetime | None] = mapped_column(FloatingDateTime, nullable=True)
+    departure_at: Mapped[datetime | None] = mapped_column(FloatingDateTimeType, nullable=True)
+    arrival_at: Mapped[datetime | None] = mapped_column(FloatingDateTimeType, nullable=True)
 
     fare: Mapped[float | None] = mapped_column(Float, nullable=True)
     currency: Mapped[str | None] = mapped_column(String, nullable=True)

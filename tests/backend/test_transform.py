@@ -1,7 +1,7 @@
 import logging
 from datetime import UTC, date, datetime
 
-from src.extensions.database import FareSnapshot, Flight, Itinerary, db, floating_datetime
+from src.extensions.database import FareSnapshot, Flight, FloatingDateTime, Itinerary, db
 from src.utils.transform import CamelCaseJSONProvider, camelize, model_to_dict, to_camel
 
 
@@ -94,7 +94,7 @@ def test_camelcase_json_provider_utc_datetime(app):
 def test_camelcase_json_provider_floating_datetime_no_warning(app, caplog):
     with app.app_context():
         provider = CamelCaseJSONProvider(app)
-        fd = floating_datetime(2024, 6, 15, 10, 30, 0)
+        fd = FloatingDateTime(2024, 6, 15, 10, 30, 0)
         with caplog.at_level(logging.WARNING, logger='src.utils.transform'):
             result = provider.default(fd)
         assert result == '2024-06-15T10:30:00'

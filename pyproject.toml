@@ -40,7 +40,7 @@ where = ["."]
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "W", "F", "I", "B", "C4", "UP"]
+select = ["E", "W", "F", "I", "B", "C4", "UP", "G", "LOG", "FA", "SIM105", "BLE", "PTH", "N"]
 
 [tool.ruff.format]
 quote-style = "single"
