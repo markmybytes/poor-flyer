@@ -77,7 +77,7 @@ function airlineName(code: string) {
 </script>
 
 <template>
-  <div class="grid gap-4 sm:grid-cols-2">
+  <div class="grid gap-4 md:grid-cols-2">
     <fieldset class="fieldset">
       <legend class="fieldset-legend text-sm font-bold">
         艙等 <span class="font-normal text-base-content/50">（選填）</span>

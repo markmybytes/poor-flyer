@@ -123,22 +123,8 @@
     @apply sm:gap-0;
   }
 
-  @media (max-width: 639px) {
-    .stats-vertical > .stat {
-      @apply px-2 py-2;
-    }
-
-    .stats-vertical > .stat .stat-title {
-      @apply text-xs;
-    }
-
-    .stats-vertical > .stat .stat-value {
-      @apply text-2xl;
-    }
-
-    .stats-vertical > .stat .stat-desc {
-      @apply text-xs;
-    }
+  .stats-vertical > .stat .stat-title {
+    @apply max-sm:text-xs;
   }
 }
 
