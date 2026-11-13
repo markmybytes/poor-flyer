@@ -39,7 +39,7 @@ def get_int(namespace: str, key: str, default: int | None = None) -> int | None:
     try:
         return int(val)
     except ValueError:
-        logger.warning('Invalid integer value for %s.%s: val=%s', namespace, key, val)
+        logger.warning('invalid integer setting: namespace=%s key=%s value=%s', namespace, key, val)
         return default
 
 
@@ -68,10 +68,11 @@ def set_many(namespace: str, settings: dict[str, str]) -> None:
         db.session.commit()
         for key in settings:
             cache.delete_memoized(_fetch, namespace, key)
-        logger.info('Updated %d configuration settings in namespace=%s', len(settings), namespace)
+        logger.info(
+            'updated configuration settings: namespace=%s count=%d', namespace, len(settings)
+        )
     except Exception:
         db.session.rollback()
-        logger.exception('Failed to update configuration in namespace=%s', namespace)
         raise
 
 

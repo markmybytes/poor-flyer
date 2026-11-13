@@ -71,13 +71,13 @@ def _read_cache() -> dict[str, Any] | None:
         d = json.loads(p.read_text(encoding='utf-8'))
         if isinstance(d, dict) and isinstance(d.get('rates'), dict):
             logger.debug(
-                'FX cache loaded: base=%s entries=%d', d.get('base'), len(d.get('rates', {}))
+                'loaded FX cache: base=%s entries=%d', d.get('base'), len(d.get('rates', {}))
             )
             return d
     except json.JSONDecodeError:
-        logger.warning('Failed to parse FX cache file')
+        logger.warning('parse fx cache failed: reason=invalid_json')
     except OSError as e:
-        logger.warning('Unable to read FX cache file: error=%s', type(e).__name__)
+        logger.warning('read fx cache failed: error=%s', type(e).__name__)
     return None
 
 
@@ -87,10 +87,10 @@ def _write_cache(data: dict[str, Any]) -> None:
             json.dumps(data, ensure_ascii=True, indent=2), encoding='utf-8'
         )
         logger.debug(
-            'FX cache written: base=%s entries=%d', data.get('base'), len(data.get('rates', {}))
+            'wrote FX cache: base=%s entries=%d', data.get('base'), len(data.get('rates', {}))
         )
     except OSError as e:
-        logger.warning('Failed to write FX cache: error=%s', type(e).__name__)
+        logger.warning('write fx cache failed: error=%s', type(e).__name__)
 
 
 def _is_cache_fresh(data: dict[str, Any], ttl: int, base: str) -> bool:
@@ -106,7 +106,7 @@ def _fetch_live_rates(base: str, api_key: str | None) -> dict[str, Any]:
     params = {'base': base}
     if api_key:
         params['api_key'] = api_key
-    logger.info('Fetching live FX rates: base=%s', base)
+    logger.info('fetch live fx rates: base=%s', base)
     with httpx.Client(timeout=15) as c:
         r = c.get(f'{FX_RATES_BASE_URL}/latest', params=params)
         r.raise_for_status()
@@ -126,9 +126,7 @@ def _fetch_live_rates(base: str, api_key: str | None) -> dict[str, Any]:
         'last_updated': last_updated,
     }
     _write_cache(res)
-    logger.info(
-        'Live FX rates fetched and cached: base=%s entries=%d', nb, len(res.get('rates', {}))
-    )
+    logger.info('cached live fx rates: base=%s entries=%d', nb, len(res.get('rates', {})))
     return res
 
 
@@ -140,17 +138,17 @@ def get_rates(base_currency: str, force_refresh: bool = False) -> dict[str, Any]
         and c_data
         and _is_cache_fresh(c_data, get_int('currency', 'cache_ttl', 86400) or 86400, nb)
     ):
-        logger.debug('Using cached FX rates: base=%s', nb)
+        logger.debug('using cached FX rates: base=%s', nb)
         return {**c_data}
     try:
         return _fetch_live_rates(nb, get('currency', 'fxrates_api_key'))
     except (httpx.HTTPError, FXRatesError, ValueError) as e:
         if c_data and c_data.get('base') == nb:
             logger.warning(
-                'Falling back to stale FX cache: base=%s error_type=%s', nb, type(e).__name__
+                'falling back to stale FX cache: base=%s error_type=%s', nb, type(e).__name__
             )
             return {**c_data}
-        logger.error('Unable to load FX rates from API and no local cache available')
+        logger.warning('load fx rates failed: no_cache=true error=%s', type(e).__name__)
         raise FXRatesError(
             'Unable to load FX rates from API and no local cache is available'
         ) from e
@@ -162,11 +160,11 @@ def convert_amount(amount: float | int, src: str, tgt: str) -> float:
         return float(round(amount, 2))
     rates = get_rates(t).get('rates', {})
     if not isinstance(rates, dict) or s not in rates:
-        logger.warning('No FX rate available for conversion: src=%s tgt=%s', s, t)
+        logger.debug('no fx rate for conversion: src=%s tgt=%s', s, t)
         raise FXRatesError(f'No FX rate found for source currency: {s}')
     r = float(rates[s])
     if r == 0:
-        logger.warning('Invalid FX rate (zero): src=%s tgt=%s', s, t)
+        logger.warning('zero fx rate for conversion: src=%s tgt=%s', s, t)
         raise FXRatesError(f'FX rate for source currency is zero: {s}')
     return round(float(amount) / r, 2)
 

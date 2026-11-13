@@ -121,15 +121,15 @@ def _scrape_leg(query: FlightQuery, currency_code: str, filters: SearchFilters) 
         flights = _search_leg(query, currency_code, filters)
     except (SearchClientError, ValueError) as exc:
         logger.warning(
-            'Flight search failed: route=%s-%s error=%s',
+            'scrape leg failed: origin=%s dest=%s error=%s',
             query.origin,
             query.destination,
             exc,
         )
         return ScrapeResult(success=False, error_message=str(exc))
 
-    logger.info(
-        'Flight search completed: route=%s-%s rows=%d',
+    logger.debug(
+        'scrape leg completed: origin=%s dest=%s rows=%d',
         query.origin,
         query.destination,
         len(flights),
@@ -145,7 +145,7 @@ def scrape_prices(
     """Price each leg independently via fli; one live fetch per leg (no disk cache)."""
     filters = filters or resolve_filters()
     logger.info(
-        'Starting flight scrape: legs=%d currency=%s cabin=%s stops=%s airlines=%s',
+        'start scrape: legs=%d currency=%s cabin=%s stops=%s airlines=%s',
         len(queries),
         currency_code,
         filters.cabin_class,

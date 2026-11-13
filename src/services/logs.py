@@ -16,6 +16,7 @@ _LOG_ENTRY_RE = re.compile(
     r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})'
     r' - (DEBUG|INFO|WARNING|ERROR|CRITICAL) - (.+?) - (.*)$'
 )
+_CORRELATION_RE = re.compile(r'^\[cid:(?P<correlation>[\w-]+)\] ')
 
 
 def _log_path() -> Path:
@@ -36,7 +37,13 @@ def _iter_log_entries(path: Path) -> Iterator[dict]:
                 current = dict(
                     zip(('timestamp', 'level', 'logger', 'message'), match.groups(), strict=True),
                     traceback=None,
+                    correlation=None,
                 )
+
+                # Older lines carry no prefix; those keep message and correlation as-is.
+                if (corr := _CORRELATION_RE.match(current['message'])) is not None:
+                    current['correlation'] = corr['correlation']
+                    current['message'] = current['message'][corr.end() :]
             elif current is not None:
                 current['traceback'] = (
                     line if current['traceback'] is None else current['traceback'] + '\n' + line
@@ -53,7 +60,7 @@ def read_logs(
 ) -> list[dict]:
     path = _log_path()
     if not path.exists():
-        logger.debug('Log file not found: path=%s', path)
+        logger.debug('log file not found: path=%s', path)
         return []
 
     level_set = set(levels) if levels else None
@@ -77,7 +84,7 @@ def read_logs(
     filtered_entries.reverse()
 
     logger.debug(
-        'Read logs: total_entries=%d levels=%s start_date=%s end_date=%s',
+        'read logs: total_entries=%d levels=%s start_date=%s end_date=%s',
         len(filtered_entries),
         levels,
         start_date,
@@ -90,6 +97,6 @@ def clear_logs() -> None:
     try:
         if (path := _log_path()).exists():
             path.write_text('', encoding='utf-8')
-            logger.info('Application logs cleared')
+            logger.info('application logs cleared')
     except Exception:
-        logger.exception('Error clearing logs')
+        logger.exception('clear logs failed')

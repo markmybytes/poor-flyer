@@ -131,7 +131,7 @@ gunicorn --bind 0.0.0.0:8000 --workers 1 --timeout 120 wsgi:app
 | `PF_SCRAPE_JITTER` | `1800`                         | 收集票價時刻隨機延後上限（秒） |
 | `PF_LOG_FILE`      | `instance/app.log`             | 日誌檔路徑                     |
 | `PF_LOG_LEVEL`     | `INFO`                         | 日誌等級                       |
-| `PF_LOG_MAX_BYTES` | `10485760`                     | 日誌檔輪替大小（位元組）       |
+| `PF_LOG_MAX_BYTES` | `10485760`                     | 日誌檔上限（啟動時超過即保留較新一半） |
 
 <p align="right">(<a href="#readme-top">回到最頂</a>)</p>
 

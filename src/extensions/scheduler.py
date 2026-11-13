@@ -24,19 +24,19 @@ def start_scheduler() -> None:
     When configured with BlockingScheduler, this call blocks until shutdown.
     """
     if not scheduler.running:
-        logger.info('Starting APScheduler')
+        logger.info('starting APScheduler')
         scheduler.start()
     else:
-        logger.debug('Scheduler already running, skipping start request')
+        logger.debug('scheduler already running, skipping start request')
 
 
 def stop_scheduler() -> None:
     """Stop the APScheduler instance."""
     if scheduler.running:
-        logger.info('Stopping APScheduler')
+        logger.info('stopping APScheduler')
         scheduler.shutdown(wait=False)
     else:
-        logger.debug('Scheduler not running, skipping stop request')
+        logger.debug('scheduler not running, skipping stop request')
 
 
 def get_scheduler():

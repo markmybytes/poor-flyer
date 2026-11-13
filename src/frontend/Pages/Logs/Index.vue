@@ -14,6 +14,7 @@ const props = defineProps<{
     logger: string
     message: string
     traceback: string | null
+    correlation: string | null
   }[]
   pagination: { total: number; page: number; perPage: number }
   filters: { levels?: string[]; startDate: string; endDate: string }
@@ -250,10 +251,19 @@ function clearLogs() {
                   }}</span>
                 </td>
 
-                <td
-                  class="hidden max-w-xs truncate font-mono text-xs text-base-content/50 md:table-cell"
-                >
-                  {{ entry.logger }}
+                <td class="hidden max-w-xs md:table-cell">
+                  <div class="flex items-center gap-2">
+                    <span class="truncate font-mono text-xs text-base-content/50">
+                      {{ entry.logger }}
+                    </span>
+
+                    <span
+                      v-if="entry.correlation"
+                      class="badge shrink-0 badge-ghost font-mono badge-xs"
+                    >
+                      {{ entry.correlation }}
+                    </span>
+                  </div>
                 </td>
 
                 <td class="text-sm break-all">{{ entry.message }}</td>
@@ -294,6 +304,12 @@ function clearLogs() {
                         <span class="mr-1 font-semibold text-base-content/70">來源:</span>
 
                         <span class="font-mono text-base-content/50">{{ entry.logger }}</span>
+
+                        <span
+                          v-if="entry.correlation"
+                          class="badge badge-ghost font-mono badge-xs"
+                          >{{ entry.correlation }}</span
+                        >
                       </div>
                     </div>
 

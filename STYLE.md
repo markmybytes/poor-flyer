@@ -59,9 +59,10 @@ A higher rule wins a conflict. Ask when a requirement is ambiguous.
 
 ### Logging
 
-- One module-level logger per file: `logging.getLogger(__name__)`.
-- Pass data as an argument: `logger.info('x=%s', x)`. No f-strings — lazy formatters and aggregators key off the format string.
-- `logger.exception(...)` only inside an `except` block. Use `logger.warning(..., exc_info=False)` when an exception is named outside its handler.
+- One module-level logger per file: `logging.getLogger(__name__)`. Never add handlers, set levels, or call `basicConfig` — `src/logging_config.py` owns them.
+- Messages are one lowercase event plus `key=value` fields passed as arguments: `logger.info('scraped fares: itinerary_id=%s count=%d', id, n)`. `tests/backend/test_logging_conventions.py` enforces the shape.
+- One log per handled failure, at the boundary that handles it. `ERROR` only when a human must act; expected conditions are `INFO` or `DEBUG`, and `logger.exception(...)` belongs inside the handler that catches.
+- The correlation id is attached automatically; never format one into a message.
 
 ### Exceptions
 

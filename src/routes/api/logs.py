@@ -13,8 +13,8 @@ logs_api_bp = Blueprint('logs', __name__, url_prefix='/logs')
 def clear():
     try:
         log_svc.clear_logs()
-        logger.info('Application logs cleared via API')
+        logger.info('application logs cleared via API')
         return jsonify({'success': True})
     except Exception:
-        logger.exception('Error clearing application logs')
+        logger.exception('clear application logs failed')
         return jsonify({'success': False, 'message': 'Failed to clear logs'}), 500

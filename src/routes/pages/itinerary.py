@@ -31,7 +31,7 @@ def _serialize_snapshot(snapshot: FareSnapshot, currency: str) -> dict:
             data['fare'] = convert_amount(snapshot.fare, snapshot.currency, currency)
             data['currency'] = currency
         except FXRatesError:
-            logger.warning('Failed to convert fare snapshot: snapshot_id=%s', snapshot.id)
+            logger.warning('convert fare snapshot failed: snapshot_id=%s', snapshot.id)
     return data
 
 
@@ -45,9 +45,7 @@ def _get_combined_totals(itinerary: Itinerary, currency: str) -> dict[date, floa
                 try:
                     fare_value = convert_amount(s.fare, src_currency, currency)
                 except FXRatesError:
-                    logger.warning(
-                        'Failed to convert itinerary fare snapshot: snapshot_id=%s', s.id
-                    )
+                    logger.warning('convert itinerary fare snapshot failed: snapshot_id=%s', s.id)
                     continue
 
                 s_date = (
@@ -123,7 +121,7 @@ def index():
         .unique()
         .all()
     )
-    logger.debug('Rendered itineraries index: itineraries=%d', len(itineraries))
+    logger.debug('rendered itineraries index: itineraries=%d', len(itineraries))
     return render_inertia(
         'Itineraries/Index',
         props={
@@ -154,7 +152,7 @@ def create_submit():
         db.session.commit()
     except (KeyError, TypeError, ValueError) as exc:
         db.session.rollback()
-        logger.warning('Invalid itinerary submission: %s', exc)
+        logger.info('invalid itinerary submission: error=%s', exc)
         response = make_response(
             render_inertia(
                 'Itineraries/Create',
@@ -164,7 +162,7 @@ def create_submit():
         response.status_code = 422
         return response
 
-    logger.info('Created itinerary from page form: id=%s', itinerary.id)
+    logger.info('created itinerary from page form: id=%s', itinerary.id)
     return redirect('/')
 
 
@@ -178,7 +176,7 @@ def show(itinerary_id):
             .where(Itinerary.id == itinerary_id)
         ).scalar_one_or_none()
         if not itinerary:
-            logger.debug('Itinerary not found: id=%s', itinerary_id)
+            logger.debug('itinerary not found: id=%s', itinerary_id)
             return redirect('/itineraries/')
         return render_inertia(
             'Itineraries/Detail',
@@ -190,5 +188,5 @@ def show(itinerary_id):
             },
         )
     except Exception:
-        logger.exception('Error rendering itineraries detail page: id=%s', itinerary_id)
+        logger.exception('render itinerary detail failed: id=%s', itinerary_id)
         return redirect('/itineraries/')

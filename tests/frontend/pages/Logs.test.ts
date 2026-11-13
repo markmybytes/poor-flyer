@@ -44,6 +44,7 @@ describe('Logs/Index', () => {
             logger: 'src.routes',
             message: 'Request received',
             traceback: null,
+            correlation: null,
           },
           {
             timestamp: '2024-06-15 10:01:00,000',
@@ -51,6 +52,7 @@ describe('Logs/Index', () => {
             logger: 'src.services',
             message: 'Something failed',
             traceback: null,
+            correlation: null,
           },
         ],
         pagination: { total: 2, page: 1, perPage: 50 },
@@ -71,6 +73,7 @@ describe('Logs/Index', () => {
             logger: 'src',
             message: 'err',
             traceback: null,
+            correlation: null,
           },
         ],
         pagination: { total: 1, page: 1, perPage: 50 },
@@ -109,6 +112,28 @@ describe('Logs/Index', () => {
     expect(wrapper.text()).toContain('142')
   })
 
+  it('renders correlation chip only when present', () => {
+    const base = {
+      timestamp: '2024-06-15 10:00:00,000',
+      level: 'INFO',
+      logger: 'src.routes',
+      traceback: null,
+    }
+    const wrapper = mount(LogsIndexPage, {
+      props: {
+        ...defaultProps,
+        logs: [
+          { ...base, message: 'with cid', correlation: '1a2b3c4d' },
+          { ...base, message: 'without cid', correlation: null },
+        ],
+        pagination: { total: 2, page: 1, perPage: 50 },
+      },
+      global: { stubs: globalStubs },
+    })
+    expect(wrapper.findAll('span.badge.font-mono').length).toBe(1)
+    expect(wrapper.text()).toContain('1a2b3c4d')
+  })
+
   it('expands traceback row on click', async () => {
     const wrapper = mount(LogsIndexPage, {
       props: {
@@ -120,6 +145,7 @@ describe('Logs/Index', () => {
             logger: 'src',
             message: 'err',
             traceback: 'Traceback (most recent call last):\n  ...',
+            correlation: null,
           },
         ],
         pagination: { total: 1, page: 1, perPage: 50 },
