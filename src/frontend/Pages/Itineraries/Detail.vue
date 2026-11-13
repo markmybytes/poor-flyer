@@ -152,26 +152,21 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'a
   <AppLayout>
     <div class="tracker-panel card mb-6 rounded-lg">
       <div class="card-body p-0">
-        <div class="border-b border-base-300/70 px-6 py-5">
+        <div class="border-b border-base-300/70 px-4 py-4 md:px-6 md:py-5">
           <div class="flex flex-col gap-2">
-            <div class="flex justify-between gap-2">
-              <div class="text-base font-bold text-base-content">
-                <span>{{ fmtItineraryName(itinerary) }}</span>
-              </div>
+            <div class="flex items-start justify-between gap-3">
+              <h1 class="text-lg font-black tracking-tight text-base-content md:text-xl">
+                {{ fmtItineraryName(itinerary) }}
+              </h1>
 
               <div class="shrink-0">
-                <span v-if="isArchived" class="badge badge-soft badge-neutral max-sm:p-1">
-                  已封存
-                </span>
+                <span v-if="isArchived" class="badge badge-soft badge-neutral">已封存</span>
 
-                <span
-                  v-else-if="!itinerary.isActive"
-                  class="badge gap-2 badge-soft badge-warning max-sm:p-1"
-                >
+                <span v-else-if="!itinerary.isActive" class="badge gap-2 badge-soft badge-warning">
                   已暫停
                 </span>
 
-                <span v-else class="badge badge-soft badge-success max-sm:p-1">
+                <span v-else class="badge badge-soft badge-success">
                   <span class="status status-success"></span> 追蹤中
                 </span>
               </div>
@@ -227,66 +222,67 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'a
           </div>
         </div>
 
-        <div class="flex justify-end px-6 py-5">
-          <div class="join gap-2">
-            <template v-if="isArchived">
-              <button
-                class="btn join-item btn-sm btn-primary"
-                :disabled="loading === 'restore'"
-                @click="showRestoreModal = true"
-              >
-                恢復追蹤
-              </button>
-            </template>
-
-            <template v-else>
-              <button
-                class="btn join-item btn-sm"
-                :disabled="loading === 'toggle'"
-                @click="runAction('toggle')"
-              >
-                {{ itinerary.isActive ? '暫停追蹤' : '開始追蹤' }}
-              </button>
-            </template>
-
+        <div class="flex flex-wrap justify-end gap-2 px-4 py-4 md:px-6 md:py-5">
+          <template v-if="isArchived">
             <button
-              title="修改購票限期"
-              class="btn join-item btn-sm"
-              :disabled="loading !== null"
-              @click="openEditModal"
+              class="btn btn-sm btn-primary"
+              :disabled="loading === 'restore'"
+              @click="showRestoreModal = true"
             >
-              <Icon icon="mdi:calendar-edit" />
+              恢復追蹤
             </button>
+          </template>
 
+          <template v-else>
             <button
-              v-if="!isArchived"
-              type="button"
-              title="封存此追蹤"
-              class="btn join-item btn-sm"
-              :disabled="loading !== null"
-              @click="showArchiveModal = true"
+              class="btn btn-sm"
+              :disabled="loading === 'toggle'"
+              @click="runAction('toggle')"
             >
-              <Icon icon="mdi:archive-outline" />
+              {{ itinerary.isActive ? '暫停追蹤' : '開始追蹤' }}
             </button>
+          </template>
 
-            <button
-              title="刪除此追蹤"
-              class="btn join-item btn-soft btn-sm btn-error"
-              @click="showDeleteModal = true"
-            >
-              <Icon icon="mdi:delete" />
-            </button>
+          <button
+            title="修改購票限期"
+            aria-label="修改購票限期"
+            class="btn btn-sm"
+            :disabled="loading !== null"
+            @click="openEditModal"
+          >
+            <Icon icon="mdi:calendar-edit" />
+          </button>
 
-            <button
-              v-if="!isArchived"
-              class="btn join-item btn-sm btn-primary"
-              :disabled="loading === 'scrape'"
-              @click="runAction('scrape')"
-            >
-              <span v-if="loading === 'scrape'" class="loading loading-xs loading-spinner"></span>
-              {{ loading === 'scrape' ? '更新中...' : '下載最新票價' }}
-            </button>
-          </div>
+          <button
+            v-if="!isArchived"
+            type="button"
+            title="封存此追蹤"
+            aria-label="封存此追蹤"
+            class="btn btn-sm"
+            :disabled="loading !== null"
+            @click="showArchiveModal = true"
+          >
+            <Icon icon="mdi:archive-outline" />
+          </button>
+
+          <button
+            title="刪除此追蹤"
+            aria-label="刪除此追蹤"
+            class="btn btn-soft btn-sm btn-error"
+            @click="showDeleteModal = true"
+          >
+            <Icon icon="mdi:delete" />
+          </button>
+
+          <button
+            v-if="!isArchived"
+            class="btn btn-sm btn-primary"
+            :disabled="loading === 'scrape'"
+            @click="runAction('scrape')"
+          >
+            <span v-if="loading === 'scrape'" class="loading loading-xs loading-spinner"></span>
+            {{ loading === 'scrape' ? '更新中...' : '下載最新票價' }}
+          </button>
         </div>
       </div>
     </div>
@@ -300,8 +296,8 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'a
         'border-base-200 bg-base-100': !itinerary.rule37Analysis?.phase,
       }"
     >
-      <div class="flex flex-col lg:flex-row lg:items-stretch">
-        <div class="flex flex-1 flex-col justify-between p-4 sm:p-5">
+      <div class="flex flex-col xl:flex-row xl:items-stretch">
+        <div class="flex flex-1 flex-col justify-between p-4 md:p-5 lg:p-6">
           <div>
             <div class="flex items-center gap-2.5">
               <span
@@ -438,50 +434,57 @@ const runAction = async (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'a
         </div>
 
         <div
-          class="grid shrink-0 grid-cols-2 gap-px bg-base-300/60 sm:grid-cols-4 lg:w-120 xl:w-140"
+          class="grid shrink-0 grid-cols-2 gap-px bg-base-300/60 sm:grid-cols-4 xl:w-140 xl:grid-cols-2"
         >
           <div
-            class="col-span-2 flex flex-col justify-center bg-base-100 p-4 transition-colors sm:p-5"
+            class="col-span-2 flex flex-col justify-center bg-base-100 p-4 transition-colors md:p-5 lg:p-6 xl:col-span-1 xl:row-span-2 xl:p-5"
           >
-            <div class="flex items-center justify-between">
-              <span class="text-[10px] font-bold tracking-widest text-base-content/50 uppercase">
-                最新總計
-              </span>
-            </div>
+            <span class="text-[10px] font-bold tracking-widest text-base-content/50 uppercase">
+              最新總計
+            </span>
 
-            <div class="mt-1 flex items-baseline gap-2">
-              <span class="text-3xl font-black text-primary lg:text-4xl">
-                {{ fmtFare(itinerary.statistics?.latestVal ?? null, baseCurrency) }}
-              </span>
-            </div>
+            <span
+              class="mt-1 text-2xl font-black text-primary tabular-nums md:text-3xl xl:text-2xl"
+            >
+              {{ fmtFare(itinerary.statistics?.latestVal ?? null, baseCurrency) }}
+            </span>
 
-            <div class="mt-1.5 text-xs font-medium text-base-content/40">
-              <template v-if="itinerary.deadline">
-                門檻：{{
-                  itinerary.rule37Analysis?.historyBestVal
-                    ? fmtFare(itinerary.rule37Analysis.historyBestVal, baseCurrency)
-                    : '--'
-                }}
-              </template>
-            </div>
+            <span
+              v-if="itinerary.deadline"
+              class="mt-1.5 text-xs font-medium text-base-content/40 tabular-nums"
+            >
+              門檻：{{
+                itinerary.rule37Analysis?.historyBestVal
+                  ? fmtFare(itinerary.rule37Analysis.historyBestVal, baseCurrency)
+                  : '--'
+              }}
+            </span>
           </div>
 
-          <div class="flex flex-col justify-center bg-base-100 p-4 transition-colors sm:p-5">
+          <div
+            class="flex flex-col justify-center bg-base-100 p-4 transition-colors md:p-5 lg:p-6 xl:flex-row xl:items-center xl:justify-between xl:gap-3 xl:px-5 xl:py-3.5"
+          >
             <span class="text-[10px] font-bold tracking-widest text-base-content/50 uppercase">
               歷史最低
             </span>
 
-            <span class="mt-1 text-xl font-black text-success lg:text-2xl">
+            <span
+              class="mt-1 text-base font-black text-success tabular-nums sm:text-lg md:text-xl xl:mt-0 xl:text-lg"
+            >
               {{ fmtFare(itinerary.statistics?.allTimeLow ?? null, baseCurrency) }}
             </span>
           </div>
 
-          <div class="flex flex-col justify-center bg-base-100 p-4 transition-colors sm:p-5">
+          <div
+            class="flex flex-col justify-center bg-base-100 p-4 transition-colors md:p-5 lg:p-6 xl:flex-row xl:items-center xl:justify-between xl:gap-3 xl:px-5 xl:py-3.5"
+          >
             <span class="text-[10px] font-bold tracking-widest text-base-content/50 uppercase">
               歷史最高
             </span>
 
-            <span class="mt-1 text-xl font-black text-error lg:text-2xl">
+            <span
+              class="mt-1 text-base font-black text-error tabular-nums sm:text-lg md:text-xl xl:mt-0 xl:text-lg"
+            >
               {{ fmtFare(itinerary.statistics?.allTimeHigh ?? null, baseCurrency) }}
             </span>
           </div>

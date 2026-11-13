@@ -4,7 +4,7 @@ import { Link } from '@inertiajs/vue3'
 
 <template>
   <div class="tracker-shell">
-    <div class="mx-auto max-w-6xl px-4 py-2 sm:px-6 sm:py-4">
+    <div class="mx-auto max-w-7xl px-4 py-2 sm:px-6 sm:py-4">
       <nav class="tracker-panel navbar z-30 mb-8 rounded-lg px-4 py-2 sm:px-6 sm:py-4">
         <div class="navbar-start gap-3">
           <Link href="/" class="btn h-auto min-h-0 gap-3 px-2 btn-ghost hover:bg-transparent">
@@ -71,7 +71,7 @@ import { Link } from '@inertiajs/vue3'
         </div>
       </nav>
 
-      <main class="mx-auto max-w-6xl pb-10">
+      <main class="mx-auto max-w-7xl pb-10">
         <slot />
       </main>
     </div>

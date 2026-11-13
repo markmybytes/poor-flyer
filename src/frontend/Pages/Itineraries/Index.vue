@@ -3,7 +3,7 @@ import AppLayout from '@/Layouts/AppLayout.vue'
 import ItineraryCard from '@/Components/ItineraryCard.vue'
 import type { Itinerary } from '@/types'
 import { fmtItineraryName } from '@/utils'
-import { router } from '@inertiajs/vue3'
+import { Link, router } from '@inertiajs/vue3'
 import { computed, ref } from 'vue'
 import { useToast } from 'vue-toast-notification'
 
@@ -141,7 +141,10 @@ function runRestore() {
       <Link href="/itineraries/create" class="btn shadow-sm btn-primary">新增監察項目</Link>
     </div>
 
-    <div v-if="itineraries?.length" class="grid gap-6 lg:grid-cols-2">
+    <div
+      v-if="itineraries?.length"
+      class="divide-y divide-base-200 overflow-hidden rounded-lg border border-base-200 bg-base-100 shadow-sm sm:grid sm:grid-cols-2 sm:gap-4 sm:divide-y-0 sm:overflow-visible sm:rounded-none sm:border-0 sm:bg-transparent sm:shadow-none md:gap-5 lg:gap-6"
+    >
       <ItineraryCard
         v-for="itinerary in itineraries.toSorted((a, b) => a.createdAt.localeCompare(b.createdAt))"
         :key="itinerary.id"

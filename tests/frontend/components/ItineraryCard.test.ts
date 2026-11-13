@@ -63,9 +63,9 @@ describe('ItineraryCard', () => {
     const archived = mountCard({ itinerary: archivedItinerary, archived: true })
     const active = mountCard()
 
-    expect(archived.find('.card').classes()).toContain('bg-base-200/40')
-    expect(archived.find('.card').classes()).not.toContain('hover:-translate-y-1')
-    expect(active.find('.card').classes()).toContain('hover:-translate-y-1')
+    expect(archived.find('.tracker-panel').classes()).toContain('bg-base-200/40')
+    expect(archived.find('.tracker-panel').classes()).not.toContain('sm:hover:-translate-y-1')
+    expect(active.find('.tracker-panel').classes()).toContain('sm:hover:-translate-y-1')
   })
 
   it('shows the paused badge for inactive itineraries', () => {

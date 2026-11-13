@@ -1,4 +1,5 @@
 import IndexPage from '@/Pages/Itineraries/Index.vue'
+import ItineraryCard from '@/Components/ItineraryCard.vue'
 import type { Itinerary } from '@/types'
 import { flushPromises, mount } from '@vue/test-utils'
 import { router } from '@inertiajs/vue3'
@@ -97,13 +98,13 @@ describe('Itineraries/Index', () => {
       props: { itineraries: [mockItinerary, { ...mockItinerary, id: 'it2' }], baseCurrency: 'HKD' },
       global: { stubs: { AppLayout: { template: '<div><slot /></div>' } } },
     })
-    expect(wrapper.findAll('.card').length).toBe(2)
+    expect(wrapper.findAllComponents(ItineraryCard).length).toBe(2)
   })
 
   it('makes the whole archived card clickable with the restore button outside the anchor', () => {
     const wrapper = mountArchivedView()
 
-    const card = wrapper.find('.card')
+    const card = wrapper.findComponent(ItineraryCard)
     const overlay = card.find('a.absolute.inset-0')
     expect(overlay.exists()).toBe(true)
     expect(overlay.attributes('href')).toBe('/itineraries/it1')
@@ -158,7 +159,7 @@ describe('Itineraries/Index', () => {
     const wrapper = mountArchivedView({ itineraries: [], baseCurrency: 'HKD' })
 
     expect(wrapper.text()).toContain('沒有已封存的旅程')
-    expect(wrapper.findAll('.card').length).toBe(0)
+    expect(wrapper.findAllComponents(ItineraryCard).length).toBe(0)
   })
 
   it('asks for confirmation with re-archive notice before restoring', async () => {
