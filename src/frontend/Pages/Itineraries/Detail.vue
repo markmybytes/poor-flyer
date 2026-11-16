@@ -650,7 +650,7 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
             <span class="label-text block text-sm font-bold">逐航段通知</span>
 
             <span class="label-text-alt text-base-content/60">
-              逐航段價格下跌時，獨立發送電郵通知
+              個別航段到達最佳購買時機，亦會另行發送電郵
             </span>
           </div>
         </label>
