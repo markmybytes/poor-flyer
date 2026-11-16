@@ -1,10 +1,9 @@
 <script setup lang="ts">
+import DatePicker from '@/Components/DatePicker.vue'
+import DeadlineDatePicker from '@/Components/DeadlineDatePicker.vue'
 import FetchFilters from '@/Components/FetchFilters.vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import { Link, router } from '@inertiajs/vue3'
-import { VueDatePicker } from '@vuepic/vue-datepicker'
-import '@vuepic/vue-datepicker/dist/main.css'
-import { zhHK } from 'date-fns/locale'
 import { computed, ref, watch } from 'vue'
 import { useToast } from 'vue-toast-notification'
 
@@ -29,11 +28,15 @@ const filters = ref<{
   airlines: null,
 })
 
-const roundTripDates = computed({
-  get: () => [form.value.flights[0]?.flightDate, form.value.flights[1]?.flightDate].filter(Boolean),
+const roundTripDates = computed<string | string[]>({
+  get: () =>
+    [form.value.flights[0]?.flightDate, form.value.flights[1]?.flightDate].filter(
+      Boolean,
+    ) as string[],
   set: (val) => {
-    if (form.value.flights[0]) form.value.flights[0].flightDate = val?.[0] || ''
-    if (form.value.flights[1]) form.value.flights[1].flightDate = val?.[1] || ''
+    const dates = Array.isArray(val) ? val : []
+    if (form.value.flights[0]) form.value.flights[0].flightDate = dates[0] || ''
+    if (form.value.flights[1]) form.value.flights[1].flightDate = dates[1] || ''
   },
 })
 
@@ -41,38 +44,6 @@ const getStartDate = (index: number) => {
   const prevDate = form.value.flights[index - 1]?.flightDate
   return prevDate ? new Date(prevDate) : new Date()
 }
-
-const latestFlightDate = computed(() => {
-  const times = form.value.flights
-    .map((f) => f.flightDate)
-    .filter(Boolean)
-    .map((d) => new Date(d).getTime())
-  return times.length ? new Date(Math.max(...times)) : new Date()
-})
-
-const deadlineMarkers = computed(() =>
-  form.value.flights
-    .map((f, i) =>
-      f.flightDate
-        ? {
-            date: f.flightDate,
-            type: 'dot' as const,
-            color: '#10b981',
-            tooltip: [
-              {
-                text:
-                  form.value.tripType === 'ROUND_TRIP'
-                    ? i === 0
-                      ? '去程'
-                      : '回程'
-                    : `航段 ${i + 1}`,
-              },
-            ],
-          }
-        : null,
-    )
-    .filter(Boolean),
-)
 
 watch(
   () => form.value.tripType,
@@ -268,55 +239,23 @@ function submit() {
                       {{ form.tripType === 'ROUND_TRIP' ? '去程及回程日期' : '出發日期' }}
                     </legend>
 
-                    <VueDatePicker
+                    <DatePicker
                       v-if="form.tripType === 'ROUND_TRIP'"
                       v-model="roundTripDates"
-                      range
-                      :enable-time-picker="false"
-                      :locale="zhHK"
-                      auto-apply
-                      model-type="yyyy-MM-dd"
-                      teleport="body"
-                    >
-                      <template #trigger>
-                        <input
-                          type="text"
-                          :value="
-                            roundTripDates.length === 2
-                              ? `${roundTripDates[0]} 至 ${roundTripDates[1]}`
-                              : ''
-                          "
-                          placeholder="選擇日期"
-                          class="input-bordered input w-full cursor-pointer transition-colors focus:input-primary"
-                          readonly
-                          required
-                          :disabled="form.processing"
-                        />
-                      </template>
-                    </VueDatePicker>
+                      placeholder="選擇日期"
+                      required
+                      :disabled="form.processing"
+                      :options="{ range: true }"
+                    />
 
-                    <VueDatePicker
+                    <DatePicker
                       v-else
                       v-model="leg.flightDate"
-                      :start-date="getStartDate(index)"
-                      :enable-time-picker="false"
-                      :locale="zhHK"
-                      auto-apply
-                      model-type="yyyy-MM-dd"
-                      teleport="body"
-                    >
-                      <template #trigger>
-                        <input
-                          type="text"
-                          :value="leg.flightDate"
-                          placeholder="選擇日期"
-                          class="input-bordered input w-full cursor-pointer transition-colors focus:input-primary"
-                          readonly
-                          required
-                          :disabled="form.processing"
-                        />
-                      </template>
-                    </VueDatePicker>
+                      placeholder="選擇日期"
+                      required
+                      :disabled="form.processing"
+                      :options="{ startDate: getStartDate(index) }"
+                    />
                   </fieldset>
                 </div>
               </div>
@@ -330,26 +269,34 @@ function submit() {
               最遲購票限期 <span class="font-normal text-base-content/50">（選填）</span>
             </legend>
 
-            <VueDatePicker
+            <DeadlineDatePicker
               v-model="form.deadline"
-              :start-date="latestFlightDate"
-              :markers="deadlineMarkers"
-              :enable-time-picker="false"
-              :locale="zhHK"
-              auto-apply
-              model-type="yyyy-MM-dd"
-              teleport="body"
-            >
-              <template #trigger>
-                <input
-                  type="text"
-                  :value="form.deadline"
-                  placeholder="選擇日期"
-                  class="input-bordered input w-full cursor-pointer transition-colors focus:input-primary"
-                  readonly
-                />
-              </template>
-            </VueDatePicker>
+              placeholder="選擇日期"
+              :departure="form.flights[0]?.flightDate"
+              :markers="
+                form.flights
+                  .map((f, i) =>
+                    f.flightDate
+                      ? {
+                          date: f.flightDate,
+                          type: 'dot' as const,
+                          color: '#10b981',
+                          tooltip: [
+                            {
+                              text:
+                                form.tripType === 'ROUND_TRIP'
+                                  ? i === 0
+                                    ? '去程'
+                                    : '回程'
+                                  : `航段 ${i + 1}`,
+                            },
+                          ],
+                        }
+                      : null,
+                  )
+                  .filter((marker) => marker !== null)
+              "
+            />
 
             <p class="label mt-1 p-0 text-xs text-base-content/55">
               設定限期後系統方可計算最佳購買時機

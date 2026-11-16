@@ -9,12 +9,9 @@ import { router } from '@inertiajs/vue3'
 import { computed, ref } from 'vue'
 import { useToast } from 'vue-toast-notification'
 
+import DeadlineDatePicker from '@/Components/DeadlineDatePicker.vue'
 import { calculateDaysRemaining } from '@/utils/timezone'
 import { Icon } from '@iconify/vue'
-import { VueDatePicker } from '@vuepic/vue-datepicker'
-import '@vuepic/vue-datepicker/dist/main.css'
-import * as dateFns from 'date-fns'
-import { zhHK } from 'date-fns/locale'
 
 const props = defineProps<{ itinerary: Itinerary; baseCurrency: string }>()
 const toast = useToast()
@@ -55,16 +52,6 @@ const filterSummary = computed(() => {
     empty: !cabin && !stops && !airlines?.length,
   }
 })
-
-const departureDate = computed(() =>
-  props.itinerary.flights
-    ? props.itinerary.flights
-        .toSorted((a, b) =>
-          dateFns.compareAsc(dateFns.parseISO(a.flightDate), dateFns.parseISO(b.flightDate)),
-        )
-        .at(0).flightDate
-    : null,
-)
 
 function openSettingsModal(): void {
   ui.value.settingsModal = true
@@ -603,72 +590,11 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
         <fieldset class="fieldset">
           <legend class="fieldset-legend text-sm font-bold">購票限期</legend>
 
-          <div class="relative">
-            <VueDatePicker
-              v-model="settings.deadline"
-              :minDate="new Date().toISOString().slice(0, 10)"
-              :maxDate="departureDate ? props.itinerary.flights.at(0).flightDate : undefined"
-              :markers="
-                departureDate
-                  ? [
-                      {
-                        date: departureDate,
-                        type: 'dot' as const,
-                        color: '#007af0',
-                      },
-                    ]
-                  : undefined
-              "
-              :enable-time-picker="false"
-              :locale="zhHK"
-              :preset-dates="[
-                {
-                  label: '前7天',
-                  value: dateFns.subDays(departureDate, 7),
-                },
-                {
-                  label: '前14天',
-                  value: dateFns.subDays(departureDate, 14),
-                },
-                {
-                  label: '前30天',
-                  value: dateFns.subDays(departureDate, 30),
-                },
-                {
-                  label: '前60天',
-                  value: dateFns.subDays(departureDate, 60),
-                },
-                {
-                  label: '前90天',
-                  value: dateFns.subDays(departureDate, 90),
-                },
-              ]"
-              auto-apply
-              model-type="yyyy-MM-dd"
-              teleport="body"
-            >
-              <template #trigger>
-                <input
-                  type="text"
-                  :value="settings.deadline"
-                  placeholder="選擇日期"
-                  class="input-bordered input w-full cursor-pointer transition-colors focus:input-primary"
-                  readonly
-                />
-              </template>
-            </VueDatePicker>
-
-            <button
-              type="button"
-              title="清除限期"
-              aria-label="清除限期"
-              class="btn absolute top-1/2 right-1.5 -translate-y-1/2 text-base-content/40 btn-ghost btn-xs hover:text-base-content/60"
-              :disabled="!settings.deadline || ui.loading === 'update_settings'"
-              @click="settings.deadline = ''"
-            >
-              <Icon icon="mdi:close" />
-            </button>
-          </div>
+          <DeadlineDatePicker
+            v-model="settings.deadline"
+            :departure="props.itinerary.flights[0]?.flightDate"
+            :disabled="ui.loading === 'update_settings'"
+          />
         </fieldset>
 
         <label

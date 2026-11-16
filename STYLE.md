@@ -196,7 +196,7 @@ package = db.session.execute(
 - Prefer `ref` over `reactive`. Group a page's state by what it holds, one object `ref` per context — form values, the values currently shown, and mode/visibility (running action, active tab, dialog visibility) — and never mix form values into visibility state.
 - Named functions for component methods and root handlers. Arrow functions for inline handlers, callbacks, and `.then()` chains.
 - Toast messages come from the server flash (prop shared by Inertia). Hardcode one in `onSuccess` / `onError` only with a reason, such as a fallback when nothing was flashed.
-- Name a shared component for what it is (`LineChart`, `DateTimePicker`), never for its first user. No domain prefixes on generic components.
+- Name a shared component for what it is (`LineChart`, `DatePicker`), never for its first user. No domain prefixes on generic components (`DatePicker`); domain wrappers are named for their domain (`DeadlineDatePicker`).
 - Wrapping a third-party library: accept a library-native options prop to spread over defaults, not one prop per knob.
 
 ### Responsive Breakpoints
