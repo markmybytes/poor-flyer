@@ -256,6 +256,25 @@ def test_itinerary_create_submit_invalid_payload_returns_422(client, app):
         assert db.session.query(Itinerary).count() == 0
 
 
+def test_itinerary_create_submit_past_deadline_returns_422(client, app):
+    resp = client.post(
+        '/itineraries',
+        data=json.dumps(
+            {
+                'trip_type': 'SINGLE',
+                'deadline': (date.today() - timedelta(days=1)).isoformat(),
+                'flights': [{'origin': 'HKG', 'destination': 'NRT', 'flight_date': '2025-12-01'}],
+            }
+        ),
+        content_type='application/json',
+        headers=INERTIA_HEADERS,
+    )
+
+    assert resp.status_code == 422
+    with app.app_context():
+        assert db.session.query(Itinerary).count() == 0
+
+
 def test_itinerary_show_renders_detail_component(client, app):
     with app.app_context():
         it = _seed_itinerary(with_fare=True)

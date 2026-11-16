@@ -1,7 +1,9 @@
 import json
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from unittest.mock import patch
+
+import pytest
 
 from src.extensions.database import FareSnapshot, Flight, Itinerary, db
 
@@ -24,13 +26,13 @@ def _make_itinerary(trip_type='SINGLE', deadline=None):
     return it
 
 
-def _make_flight(itinerary_id, origin='HKG', destination='NRT', sequence=0):
+def _make_flight(itinerary_id, origin='HKG', destination='NRT', sequence=0, flight_date=None):
     f = Flight(
         itinerary_id=itinerary_id,
         sequence=sequence,
         origin=origin,
         destination=destination,
-        flight_date=date(2025, 12, 1),
+        flight_date=flight_date or date.today() + timedelta(days=30),
     )
     db.session.add(f)
     db.session.flush()
@@ -72,15 +74,20 @@ def test_create_itinerary_single_flight(client, app):
 
 
 def test_create_itinerary_with_deadline(client, app):
+    first_departure = date.today() + timedelta(days=30)
     with app.app_context():
         resp = client.post(
             '/api/itineraries',
             data=json.dumps(
                 {
                     'trip_type': 'SINGLE',
-                    'deadline': '2025-11-01',
+                    'deadline': (first_departure - timedelta(days=10)).isoformat(),
                     'flights': [
-                        {'origin': 'HKG', 'destination': 'LHR', 'flight_date': '2025-12-15'}
+                        {
+                            'origin': 'HKG',
+                            'destination': 'LHR',
+                            'flight_date': first_departure.isoformat(),
+                        }
                     ],
                 }
             ),
@@ -88,6 +95,58 @@ def test_create_itinerary_with_deadline(client, app):
         )
     assert resp.status_code == 200
     assert resp.get_json()['message'] == 'Entry created'
+
+
+@pytest.mark.parametrize(
+    ('deadline_offset', 'message'),
+    [
+        (-1, 'Deadline must not be in the past'),
+        (31, 'Deadline must not be after the first departure'),
+    ],
+)
+def test_create_itinerary_rejects_out_of_range_deadline(client, app, deadline_offset, message):
+    payload = {
+        'trip_type': 'SINGLE',
+        'deadline': (date.today() + timedelta(days=deadline_offset)).isoformat(),
+        'flights': [
+            {
+                'origin': 'HKG',
+                'destination': 'NRT',
+                'flight_date': (date.today() + timedelta(days=30)).isoformat(),
+            }
+        ],
+    }
+    resp = client.post(
+        '/api/itineraries', data=json.dumps(payload), content_type='application/json'
+    )
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body['message'] == message
+    assert body['data'] is None
+    with app.app_context():
+        assert db.session.query(Itinerary).count() == 0
+
+
+@pytest.mark.parametrize('deadline_offset', [0, 30])
+def test_create_itinerary_accepts_inclusive_deadline_bounds(client, app, deadline_offset):
+    payload = {
+        'trip_type': 'SINGLE',
+        'deadline': (date.today() + timedelta(days=deadline_offset)).isoformat(),
+        'flights': [
+            {
+                'origin': 'HKG',
+                'destination': 'NRT',
+                'flight_date': (date.today() + timedelta(days=30)).isoformat(),
+            }
+        ],
+    }
+    resp = client.post(
+        '/api/itineraries', data=json.dumps(payload), content_type='application/json'
+    )
+    assert resp.status_code == 200
+    with app.app_context():
+        entry = db.session.get(Itinerary, resp.get_json()['data'])
+        assert entry.deadline == date.today() + timedelta(days=deadline_offset)
 
 
 def test_create_itinerary_invalid_date_returns_400(client, app):
@@ -165,13 +224,40 @@ def test_patch_itinerary_deadline(client, app):
 
     resp = client.patch(
         f'/api/itineraries/{iid}',
-        data=json.dumps({'deadline': '2025-10-01'}),
+        data=json.dumps({'deadline': (date.today() + timedelta(days=30)).isoformat()}),
         content_type='application/json',
     )
     assert resp.status_code == 200
     body = resp.get_json()
     assert body['message'] == 'Entry updated'
     assert body['data'] == iid
+
+
+@pytest.mark.parametrize(
+    ('deadline_offset', 'message'),
+    [
+        (-1, 'Deadline must not be in the past'),
+        (31, 'Deadline must not be after the first departure'),
+    ],
+)
+def test_patch_itinerary_rejects_out_of_range_deadline(client, app, deadline_offset, message):
+    with app.app_context():
+        it = _make_itinerary()
+        _make_flight(it.id, flight_date=date.today() + timedelta(days=30))
+        db.session.commit()
+        iid = it.id
+
+    resp = client.patch(
+        f'/api/itineraries/{iid}',
+        data=json.dumps({'deadline': (date.today() + timedelta(days=deadline_offset)).isoformat()}),
+        content_type='application/json',
+    )
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body['message'] == message
+    assert body['data'] is None
+    with app.app_context():
+        assert db.session.get(Itinerary, iid).deadline is None
 
 
 def test_patch_itinerary_not_found(client, app):

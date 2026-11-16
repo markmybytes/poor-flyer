@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 from src.extensions.database import FareSnapshot, Flight, Itinerary, db
 from src.services.fli_search import FlightQuery, filters_for_itinerary, scrape_prices
 from src.services.fx_rates import FXRatesError, convert_amount, get_configured_base_currency
-from src.services.itinerary import create_itinerary
+from src.services.itinerary import create_itinerary, validate_deadline
 
 logger = logging.getLogger(__name__)
 
@@ -133,13 +133,12 @@ def update_flight(itinerary_id):  # noqa: C901 - notify_per_leg branch; split va
                 entry.archived_at = None
             logger.info('updated itinerary: id=%s archived=%s', itinerary_id, archived)
 
-        if 'deadline' in data:
-            deadline_str = data['deadline']
-            if deadline_str:
-                entry.deadline = datetime.strptime(deadline_str, '%Y-%m-%d').date()
-            else:
-                entry.deadline = None
-            logger.info('updated itinerary: id=%s deadline=%s', itinerary_id, entry.deadline)
+        entry.deadline = None
+        if 'deadline' in data and data['deadline']:
+            deadline = datetime.strptime(data['deadline'], '%Y-%m-%d').date()
+            validate_deadline(deadline, entry.flights[0].flight_date if entry.flights else None)
+            entry.deadline = deadline
+        logger.info('updated itinerary: id=%s deadline=%s', itinerary_id, entry.deadline)
 
         if 'notify_per_leg' in data:
             raw = data['notify_per_leg']

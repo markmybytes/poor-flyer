@@ -24,6 +24,16 @@ def _enum_value(enum_type: type[StrEnum], value: Any, label: str) -> str:
         raise ValueError(f'Invalid {label}') from None
 
 
+def validate_deadline(deadline: date | None, first_departure: date | None) -> None:
+    """Reject a deadline outside today..first departure; both bounds are inclusive."""
+    if deadline is None:
+        return
+    if deadline < date.today():
+        raise ValueError('Deadline must not be in the past')
+    if first_departure is not None and deadline > first_departure:
+        raise ValueError('Deadline must not be after the first departure')
+
+
 def _notify_per_leg(value: Any) -> bool:
     """Coerce the opt-in flag from a JSON boolean or a form-encoded string."""
     if isinstance(value, bool):
@@ -42,6 +52,12 @@ def create_itinerary(data: Mapping[str, Any]) -> Itinerary:
     """
     deadline_str = data.get('deadline')
     deadline = datetime.strptime(deadline_str, '%Y-%m-%d').date() if deadline_str else None
+    flights_data = data.get('flights', [])
+    if deadline is not None:
+        first_date = flights_data[0].get('flight_date') if flights_data else None
+        validate_deadline(
+            deadline, datetime.strptime(first_date, '%Y-%m-%d').date() if first_date else None
+        )
 
     itinerary = Itinerary(
         id=str(uuid.uuid4()),
@@ -63,7 +79,6 @@ def create_itinerary(data: Mapping[str, Any]) -> Itinerary:
 
     db.session.add(itinerary)
 
-    flights_data = data.get('flights', [])
     for i, flight_data in enumerate(flights_data):
         flight = Flight(
             id=str(uuid.uuid4()),
