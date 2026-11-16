@@ -193,7 +193,7 @@ package = db.session.execute(
 - DaisyUI before custom CSS.
 - Lay out with `flex` or `grid` plus `gap-*`.
 - Type component-local shapes inline at the point of use (props, grouped refs, computed). A shared `interface` only when several files need it.
-- Prefer `ref` over `reactive`. Group related values into one object `ref` per context (fields, filters, UI state).
+- Prefer `ref` over `reactive`. Group a page's state by what it holds, one object `ref` per context — form values, the values currently shown, and mode/visibility (running action, active tab, dialog visibility) — and never mix form values into visibility state.
 - Named functions for component methods and root handlers. Arrow functions for inline handlers, callbacks, and `.then()` chains.
 - Toast messages come from the server flash (prop shared by Inertia). Hardcode one in `onSuccess` / `onError` only with a reason, such as a fallback when nothing was flashed.
 - Name a shared component for what it is (`LineChart`, `DateTimePicker`), never for its first user. No domain prefixes on generic components.

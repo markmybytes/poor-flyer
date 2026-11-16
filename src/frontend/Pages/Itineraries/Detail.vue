@@ -18,11 +18,25 @@ import { zhHK } from 'date-fns/locale'
 const props = defineProps<{ itinerary: Itinerary; baseCurrency: string }>()
 const toast = useToast()
 
-const activeTab = ref('graph')
-const loading = ref<string | null>(null)
+const applied = ref({
+  deadline: props.itinerary.deadline,
+  notifyPerLeg: props.itinerary.notifyPerLeg ?? false,
+})
 
-const showModal = ref(false)
-const deadlineValue = ref(props.itinerary.deadline || '')
+const settings = ref({
+  deadline: '',
+  notifyPerLeg: false,
+  error: '',
+})
+
+const ui = ref({
+  loading: null as string | null,
+  activeTab: 'graph' as 'graph' | string,
+  settingsModal: false,
+  deleteModal: false,
+  restoreModal: false,
+  archiveModal: false,
+})
 
 const filterSummary = computed(() => {
   const cabin = CABIN_CLASS_OPTIONS.find(
@@ -41,51 +55,49 @@ const filterSummary = computed(() => {
   }
 })
 
-const openEditModal = () => {
-  deadlineValue.value = props.itinerary.deadline || ''
-  showModal.value = true
+function openSettingsModal(): void {
+  ui.value.settingsModal = true
+  settings.value = {
+    deadline: applied.value.deadline || '',
+    notifyPerLeg: applied.value.notifyPerLeg,
+    error: '',
+  }
 }
 
-const showDeleteModal = ref(false)
-const showRestoreModal = ref(false)
-const showArchiveModal = ref(false)
-const isArchived = computed(() => !!props.itinerary.archivedAt)
-
-const submitDeadline = (clear = false) => {
-  loading.value = 'update_deadline'
-  const targetDeadline = clear ? null : deadlineValue.value || null
+function submitSettings(): void {
+  ui.value.loading = 'update_settings'
+  settings.value.error = ''
+  const targetDeadline = settings.value.deadline || null
 
   fetch(`/api/itineraries/${props.itinerary.id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ deadline: targetDeadline }),
+    body: JSON.stringify({ deadline: targetDeadline, notify_per_leg: settings.value.notifyPerLeg }),
   })
     .then((res) => {
       if (!res.ok) {
         throw new Error()
       }
 
-      toast.success(clear ? '已移除購票限期' : '已更新購票限期')
-      showModal.value = false
+      applied.value = { deadline: targetDeadline, notifyPerLeg: settings.value.notifyPerLeg }
+      // Server flash is English ('Entry updated'); app copy is zh-Hant, so hardcode the fallback.
+      toast.success('已更新設定')
+      ui.value.settingsModal = false
       router.reload()
     })
-    .catch(() => toast.error('更新限期失敗，請稍後再試'))
+    .catch(() => {
+      settings.value.error = '更新失敗，請稍後再試'
+    })
     .finally(() => {
-      loading.value = null
+      ui.value.loading = null
     })
 }
 
-const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive') => {
-  if (action === 'delete') {
-    showDeleteModal.value = false
+function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive'): void {
+  if (action !== 'toggle' && action !== 'scrape') {
+    ui.value[`${action}Modal`] = false
   }
-  if (action === 'restore') {
-    showRestoreModal.value = false
-  }
-  if (action === 'archive') {
-    showArchiveModal.value = false
-  }
-  loading.value = action
+  ui.value.loading = action
 
   const opts: RequestInit = {
     method:
@@ -142,7 +154,7 @@ const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
       )
     })
     .finally(() => {
-      loading.value = null
+      ui.value.loading = null
     })
 }
 </script>
@@ -159,7 +171,9 @@ const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
               </h1>
 
               <div class="shrink-0">
-                <span v-if="isArchived" class="badge badge-soft badge-neutral">已封存</span>
+                <span v-if="itinerary.archivedAt" class="badge badge-soft badge-neutral"
+                  >已封存</span
+                >
 
                 <span v-else-if="!itinerary.isActive" class="badge gap-2 badge-soft badge-warning">
                   已暫停
@@ -222,11 +236,11 @@ const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
         </div>
 
         <div class="flex flex-wrap justify-end gap-2 px-4 py-4 md:px-6 md:py-5">
-          <template v-if="isArchived">
+          <template v-if="itinerary.archivedAt">
             <button
               class="btn btn-sm btn-primary"
-              :disabled="loading === 'restore'"
-              @click="showRestoreModal = true"
+              :disabled="ui.loading === 'restore'"
+              @click="ui.restoreModal = true"
             >
               恢復追蹤
             </button>
@@ -235,7 +249,7 @@ const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
           <template v-else>
             <button
               class="btn btn-sm"
-              :disabled="loading === 'toggle'"
+              :disabled="ui.loading === 'toggle'"
               @click="runAction('toggle')"
             >
               {{ itinerary.isActive ? '暫停追蹤' : '開始追蹤' }}
@@ -243,23 +257,13 @@ const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
           </template>
 
           <button
-            title="修改購票限期"
-            aria-label="修改購票限期"
-            class="btn btn-sm"
-            :disabled="loading !== null"
-            @click="openEditModal"
-          >
-            <Icon icon="mdi:calendar-edit" />
-          </button>
-
-          <button
-            v-if="!isArchived"
+            v-if="!itinerary.archivedAt"
             type="button"
             title="封存此追蹤"
             aria-label="封存此追蹤"
             class="btn btn-sm"
-            :disabled="loading !== null"
-            @click="showArchiveModal = true"
+            :disabled="ui.loading !== null"
+            @click="ui.archiveModal = true"
           >
             <Icon icon="mdi:archive-outline" />
           </button>
@@ -268,19 +272,19 @@ const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
             title="刪除此追蹤"
             aria-label="刪除此追蹤"
             class="btn btn-soft btn-sm btn-error"
-            @click="showDeleteModal = true"
+            @click="ui.deleteModal = true"
           >
             <Icon icon="mdi:delete" />
           </button>
 
           <button
-            v-if="!isArchived"
+            v-if="!itinerary.archivedAt"
             class="btn btn-sm btn-primary"
-            :disabled="loading === 'scrape'"
+            :disabled="ui.loading === 'scrape'"
             @click="runAction('scrape')"
           >
-            <span v-if="loading === 'scrape'" class="loading loading-xs loading-spinner"></span>
-            {{ loading === 'scrape' ? '更新中...' : '下載最新票價' }}
+            <span v-if="ui.loading === 'scrape'" class="loading loading-xs loading-spinner"></span>
+            {{ ui.loading === 'scrape' ? '更新中...' : '下載最新票價' }}
           </button>
         </div>
       </div>
@@ -305,8 +309,8 @@ const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
                   'animate-pulse status-success': itinerary.rule37Analysis?.phase === 'BUY_SIGNAL',
                   'status-info': itinerary.rule37Analysis?.phase === 'WAITING',
                   'status-neutral': itinerary.rule37Analysis?.phase === 'OBSERVING',
-                  'status-warning': !itinerary.rule37Analysis?.phase && itinerary.deadline,
-                  'status-neutral opacity-40': !itinerary.deadline,
+                  'status-warning': !itinerary.rule37Analysis?.phase && applied.deadline,
+                  'status-neutral opacity-40': !applied.deadline,
                 }"
               ></span>
 
@@ -316,8 +320,8 @@ const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
                   'text-success': itinerary.rule37Analysis?.phase === 'BUY_SIGNAL',
                   'text-info': itinerary.rule37Analysis?.phase === 'WAITING',
                   'text-neutral': itinerary.rule37Analysis?.phase === 'OBSERVING',
-                  'text-warning': !itinerary.rule37Analysis?.phase && itinerary.deadline,
-                  'text-base-content/40': !itinerary.deadline,
+                  'text-warning': !itinerary.rule37Analysis?.phase && applied.deadline,
+                  'text-base-content/40': !applied.deadline,
                 }"
               >
                 <template v-if="itinerary.rule37Analysis?.phase === 'BUY_SIGNAL'">
@@ -332,7 +336,7 @@ const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
                   數據觀察期
                 </template>
 
-                <template v-else-if="itinerary.deadline">收集數據中</template>
+                <template v-else-if="applied.deadline">收集數據中</template>
 
                 <template v-else>未啟用數據分析</template>
               </span>
@@ -353,10 +357,10 @@ const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
                 開始。
               </template>
 
-              <template v-else-if="itinerary.deadline">未有足夠數據分析購買時機。</template>
+              <template v-else-if="applied.deadline">未有足夠數據分析購買時機。</template>
 
               <template v-else>
-                <button class="inline-block link font-bold link-primary" @click="openEditModal">
+                <button class="inline-block link font-bold link-primary" @click="openSettingsModal">
                   設定購票限期
                 </button>
                 以啟用購買時機分析。
@@ -390,19 +394,19 @@ const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
                 <span class="hidden text-base-content/25 sm:inline">|</span>
               </template>
 
-              <template v-else-if="itinerary.deadline">
+              <template v-else-if="applied.deadline">
                 <div class="flex items-center gap-1.5">
                   <span class="font-medium text-base-content/50">購票限期</span>
 
                   <span
                     class="rounded bg-base-300/50 px-1.5 py-0.5 font-bold text-base-content"
                     :class="{
-                      'bg-error/10 text-error': calculateDaysRemaining(itinerary.deadline) <= 0,
+                      'bg-error/10 text-error': calculateDaysRemaining(applied.deadline) <= 0,
                     }"
                   >
                     {{
-                      calculateDaysRemaining(itinerary.deadline) > 0
-                        ? calculateDaysRemaining(itinerary.deadline) + '天後'
+                      calculateDaysRemaining(applied.deadline) > 0
+                        ? calculateDaysRemaining(applied.deadline) + '天後'
                         : '已過'
                     }}
                   </span>
@@ -434,11 +438,21 @@ const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
 
                 <span
                   class="rounded bg-base-300/50 px-1.5 py-0.5 font-bold text-base-content"
-                  :class="itinerary.notifyPerLeg ? 'bg-success/10 text-success' : ''"
+                  :class="applied.notifyPerLeg ? 'bg-success/10 text-success' : ''"
                 >
-                  {{ itinerary.notifyPerLeg ? '已開啟' : '未開啟' }}
+                  {{ applied.notifyPerLeg ? '已開啟' : '未開啟' }}
                 </span>
               </div>
+
+              <button
+                type="button"
+                title="設定通知與限期"
+                aria-label="設定通知與限期"
+                class="btn -mr-1.5 self-center text-base-content/40 btn-ghost btn-xs hover:text-base-content/60"
+                @click="openSettingsModal"
+              >
+                <Icon icon="mdi:cog-outline" class="size-4" />
+              </button>
             </div>
           </div>
         </div>
@@ -460,7 +474,7 @@ const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
             </span>
 
             <span
-              v-if="itinerary.deadline"
+              v-if="applied.deadline"
               class="mt-1.5 text-xs font-medium text-base-content/40 tabular-nums"
             >
               門檻：{{
@@ -507,8 +521,8 @@ const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
         <div class="tabs-box tabs flex-nowrap overflow-x-auto bg-base-200/70 p-1 whitespace-nowrap">
           <button
             class="tab h-12 shrink-0 px-6 text-sm font-bold"
-            :class="activeTab === 'graph' ? 'tab-active' : ''"
-            @click="activeTab = 'graph'"
+            :class="ui.activeTab === 'graph' ? 'tab-active' : ''"
+            @click="ui.activeTab = 'graph'"
           >
             價格趨勢圖
           </button>
@@ -516,8 +530,8 @@ const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
           <button
             v-if="itinerary.tripType === 'SINGLE'"
             class="tab h-12 shrink-0 px-6 text-sm font-bold"
-            :class="activeTab === '0' ? 'tab-active' : ''"
-            @click="activeTab = '0'"
+            :class="ui.activeTab === '0' ? 'tab-active' : ''"
+            @click="ui.activeTab = '0'"
           >
             詳細數據列表
           </button>
@@ -527,8 +541,8 @@ const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
               v-for="(f, i) in itinerary.flights"
               :key="f.id"
               class="tab h-12 shrink-0 px-6 text-sm font-bold"
-              :class="activeTab === String(i) ? 'tab-active' : ''"
-              @click="activeTab = String(i)"
+              :class="ui.activeTab === String(i) ? 'tab-active' : ''"
+              @click="ui.activeTab = String(i)"
             >
               {{ f.origin }} → {{ f.destination }}
             </button>
@@ -546,7 +560,7 @@ const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
             leave-from-class="opacity-100 translate-x-0"
             leave-to-class="opacity-0 -translate-x-8"
           >
-            <div v-show="activeTab === String(i)" class="col-start-1 row-start-1">
+            <div v-show="ui.activeTab === String(i)" class="col-start-1 row-start-1">
               <FaretList
                 :flight="f"
                 :rule37-analysis="itinerary.rule37Analysis"
@@ -563,7 +577,7 @@ const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
             leave-from-class="opacity-100 translate-x-0"
             leave-to-class="opacity-0 translate-x-8"
           >
-            <div v-show="activeTab === 'graph'" class="col-start-1 row-start-1 min-w-0">
+            <div v-show="ui.activeTab === 'graph'" class="col-start-1 row-start-1 min-w-0">
               <FareGraph :itinerary="itinerary" />
             </div>
           </Transition>
@@ -571,73 +585,105 @@ const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
       </div>
     </div>
 
-    <dialog class="modal" :class="{ 'modal-open': showModal }">
-      <div class="modal-box max-w-sm rounded-2xl border border-base-200 bg-base-100 shadow-xl">
-        <h3 class="mb-4 text-lg font-extrabold text-base-content">修改購票限期</h3>
+    <dialog class="modal" :class="{ 'modal-open': ui.settingsModal }">
+      <div class="modal-box max-w-md rounded-2xl border border-base-200 bg-base-100 shadow-xl">
+        <h3 class="mb-4 text-lg font-extrabold text-base-content">通知與限期設定</h3>
 
         <fieldset class="fieldset">
-          <legend class="fieldset-legend mb-2 text-sm font-bold">限期</legend>
+          <legend class="fieldset-legend text-sm font-bold">購票限期</legend>
 
-          <VueDatePicker
-            v-model="deadlineValue"
-            :enable-time-picker="false"
-            :locale="zhHK"
-            auto-apply
-            model-type="yyyy-MM-dd"
-            teleport="body"
-          >
-            <template #trigger>
-              <input
-                type="text"
-                :value="deadlineValue"
-                placeholder="選擇日期"
-                class="input-bordered input w-full cursor-pointer transition-colors focus:input-primary"
-                readonly
-              />
-            </template>
-          </VueDatePicker>
+          <div class="relative">
+            <VueDatePicker
+              v-model="settings.deadline"
+              :markers="
+                props.itinerary.flights.length > 0
+                  ? [
+                      {
+                        date: props.itinerary.flights.at(0).flightDate,
+                        type: 'dot' as const,
+                        color: '#007af0',
+                      },
+                    ]
+                  : undefined
+              "
+              :enable-time-picker="false"
+              :locale="zhHK"
+              auto-apply
+              model-type="yyyy-MM-dd"
+              teleport="body"
+            >
+              <template #trigger>
+                <input
+                  type="text"
+                  :value="settings.deadline"
+                  placeholder="選擇日期"
+                  class="input-bordered input w-full cursor-pointer transition-colors focus:input-primary"
+                  readonly
+                />
+              </template>
+            </VueDatePicker>
+
+            <button
+              type="button"
+              title="清除購票限期"
+              aria-label="清除購票限期"
+              class="btn absolute top-1/2 right-1.5 -translate-y-1/2 text-base-content/40 btn-ghost btn-xs hover:text-base-content/60"
+              :disabled="!settings.deadline || ui.loading === 'update_settings'"
+              @click="settings.deadline = ''"
+            >
+              <Icon icon="mdi:close" />
+            </button>
+          </div>
         </fieldset>
 
-        <div
-          class="modal-action mt-6 flex items-center justify-between border-t border-base-200 pt-4"
+        <label
+          class="label mt-4 cursor-pointer flex-wrap justify-start gap-4 rounded-xl border border-base-200 bg-base-200/20 p-4 transition-colors hover:border-success/30"
         >
-          <div>
-            <button
-              v-if="itinerary.deadline"
-              type="button"
-              class="btn btn-soft btn-sm btn-error"
-              :disabled="loading === 'update_deadline'"
-              @click="submitDeadline(true)"
-            >
-              移除限期
-            </button>
-          </div>
+          <input
+            v-model="settings.notifyPerLeg"
+            type="checkbox"
+            class="toggle toggle-success"
+            :disabled="ui.loading === 'update_settings'"
+          />
 
-          <div class="flex gap-2">
-            <button type="button" class="btn btn-ghost btn-sm" @click="showModal = false">
-              取消
-            </button>
+          <div class="whitespace-normal">
+            <span class="label-text block text-sm font-bold">分段價格通知</span>
 
-            <button
-              type="button"
-              class="btn px-5 shadow-sm btn-sm btn-primary"
-              :disabled="loading === 'update_deadline'"
-              @click="submitDeadline(false)"
-            >
-              <span
-                v-if="loading === 'update_deadline'"
-                class="loading loading-xs loading-spinner"
-              ></span>
-              更新
-            </button>
+            <span class="label-text-alt text-base-content/60">
+              每個航段價格下跌時獨立發送電郵通知
+            </span>
           </div>
+        </label>
+
+        <p v-if="settings.error" class="mt-2 text-xs font-bold text-error">{{ settings.error }}</p>
+
+        <div class="modal-action mt-6 justify-end gap-2 border-t border-base-200 pt-4">
+          <button type="button" class="btn btn-ghost btn-sm" @click="ui.settingsModal = false">
+            取消
+          </button>
+
+          <button
+            type="button"
+            class="btn px-5 shadow-sm btn-sm btn-primary"
+            :disabled="ui.loading === 'update_settings'"
+            @click="submitSettings()"
+          >
+            <span
+              v-if="ui.loading === 'update_settings'"
+              class="loading loading-xs loading-spinner"
+            ></span>
+            儲存
+          </button>
         </div>
       </div>
 
-      <div class="modal-backdrop bg-black/10 backdrop-blur-xs" @click="showModal = false"></div>
+      <div
+        class="modal-backdrop bg-black/10 backdrop-blur-xs"
+        @click="ui.settingsModal = false"
+      ></div>
     </dialog>
 
-    <dialog class="modal" :class="{ 'modal-open': showRestoreModal }">
+    <dialog class="modal" :class="{ 'modal-open': ui.restoreModal }">
       <div class="modal-box max-w-sm rounded-2xl border border-base-200 bg-base-100 shadow-xl">
         <h3 class="mb-2 text-lg font-extrabold text-base-content">恢復追蹤？</h3>
 
@@ -650,17 +696,17 @@ const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
         </p>
 
         <div class="modal-action mt-6 justify-end gap-2 border-t border-base-200 pt-4">
-          <button type="button" class="btn btn-ghost btn-sm" @click="showRestoreModal = false">
+          <button type="button" class="btn btn-ghost btn-sm" @click="ui.restoreModal = false">
             取消
           </button>
 
           <button
             type="button"
             class="btn px-5 shadow-sm btn-sm btn-primary"
-            :disabled="loading === 'restore'"
+            :disabled="ui.loading === 'restore'"
             @click="runAction('restore')"
           >
-            <span v-if="loading === 'restore'" class="loading loading-xs loading-spinner"></span>
+            <span v-if="ui.loading === 'restore'" class="loading loading-xs loading-spinner"></span>
             恢復追蹤
           </button>
         </div>
@@ -668,11 +714,11 @@ const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
 
       <div
         class="modal-backdrop bg-black/10 backdrop-blur-xs"
-        @click="showRestoreModal = false"
+        @click="ui.restoreModal = false"
       ></div>
     </dialog>
 
-    <dialog class="modal" :class="{ 'modal-open': showArchiveModal }">
+    <dialog class="modal" :class="{ 'modal-open': ui.archiveModal }">
       <div class="modal-box max-w-sm rounded-2xl border border-base-200 bg-base-100 shadow-xl">
         <h3 class="mb-2 text-lg font-extrabold text-base-content">封存？</h3>
 
@@ -681,17 +727,17 @@ const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
         </p>
 
         <div class="modal-action mt-6 justify-end gap-2 border-t border-base-200 pt-4">
-          <button type="button" class="btn btn-ghost btn-sm" @click="showArchiveModal = false">
+          <button type="button" class="btn btn-ghost btn-sm" @click="ui.archiveModal = false">
             取消
           </button>
 
           <button
             type="button"
             class="btn px-5 shadow-sm btn-sm btn-primary"
-            :disabled="loading === 'archive'"
+            :disabled="ui.loading === 'archive'"
             @click="runAction('archive')"
           >
-            <span v-if="loading === 'archive'" class="loading loading-xs loading-spinner"></span>
+            <span v-if="ui.loading === 'archive'" class="loading loading-xs loading-spinner"></span>
             確認封存
           </button>
         </div>
@@ -699,11 +745,11 @@ const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
 
       <div
         class="modal-backdrop bg-black/10 backdrop-blur-xs"
-        @click="showArchiveModal = false"
+        @click="ui.archiveModal = false"
       ></div>
     </dialog>
 
-    <dialog class="modal" :class="{ 'modal-open': showDeleteModal }">
+    <dialog class="modal" :class="{ 'modal-open': ui.deleteModal }">
       <div class="modal-box max-w-sm rounded-2xl border border-base-200 bg-base-100 shadow-xl">
         <h3 class="mb-2 text-lg font-extrabold text-base-content">刪除此追蹤？</h3>
 
@@ -712,17 +758,17 @@ const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
         </p>
 
         <div class="modal-action mt-6 justify-end gap-2 border-t border-base-200 pt-4">
-          <button type="button" class="btn btn-ghost btn-sm" @click="showDeleteModal = false">
+          <button type="button" class="btn btn-ghost btn-sm" @click="ui.deleteModal = false">
             取消
           </button>
 
           <button
             type="button"
             class="btn btn-soft btn-sm btn-error"
-            :disabled="loading === 'delete'"
+            :disabled="ui.loading === 'delete'"
             @click="runAction('delete')"
           >
-            <span v-if="loading === 'delete'" class="loading loading-xs loading-spinner"></span>
+            <span v-if="ui.loading === 'delete'" class="loading loading-xs loading-spinner"></span>
             刪除
           </button>
         </div>
@@ -730,7 +776,7 @@ const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
 
       <div
         class="modal-backdrop bg-black/10 backdrop-blur-xs"
-        @click="showDeleteModal = false"
+        @click="ui.deleteModal = false"
       ></div>
     </dialog>
   </AppLayout>

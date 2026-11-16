@@ -359,7 +359,7 @@ function submit() {
           <div class="grid gap-4 md:grid-cols-2">
             <fieldset class="fieldset justify-end">
               <label
-                class="cursor-pointer.justify-start label gap-4 rounded-xl border border-base-200 bg-base-200/20 p-4 transition-colors hover:border-success/30"
+                class="label cursor-pointer justify-start gap-4 rounded-xl border border-base-200 bg-base-200/20 p-4 transition-colors hover:border-success/30"
               >
                 <input
                   v-model="form.isActive"
