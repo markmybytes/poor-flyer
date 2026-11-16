@@ -13,6 +13,7 @@ import { calculateDaysRemaining } from '@/utils/timezone'
 import { Icon } from '@iconify/vue'
 import { VueDatePicker } from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
+import * as dateFns from 'date-fns'
 import { zhHK } from 'date-fns/locale'
 
 const props = defineProps<{ itinerary: Itinerary; baseCurrency: string }>()
@@ -54,6 +55,16 @@ const filterSummary = computed(() => {
     empty: !cabin && !stops && !airlines?.length,
   }
 })
+
+const departureDate = computed(() =>
+  props.itinerary.flights
+    ? props.itinerary.flights
+        .toSorted((a, b) =>
+          dateFns.compareAsc(dateFns.parseISO(a.flightDate), dateFns.parseISO(b.flightDate)),
+        )
+        .at(0).flightDate
+    : null,
+)
 
 function openSettingsModal(): void {
   ui.value.settingsModal = true
@@ -595,11 +606,13 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
           <div class="relative">
             <VueDatePicker
               v-model="settings.deadline"
+              :minDate="new Date().toISOString().slice(0, 10)"
+              :maxDate="departureDate ? props.itinerary.flights.at(0).flightDate : undefined"
               :markers="
-                props.itinerary.flights.length > 0
+                departureDate
                   ? [
                       {
-                        date: props.itinerary.flights.at(0).flightDate,
+                        date: departureDate,
                         type: 'dot' as const,
                         color: '#007af0',
                       },
@@ -608,6 +621,28 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
               "
               :enable-time-picker="false"
               :locale="zhHK"
+              :preset-dates="[
+                {
+                  label: '前7天',
+                  value: dateFns.subDays(departureDate, 7),
+                },
+                {
+                  label: '前14天',
+                  value: dateFns.subDays(departureDate, 14),
+                },
+                {
+                  label: '前30天',
+                  value: dateFns.subDays(departureDate, 30),
+                },
+                {
+                  label: '前60天',
+                  value: dateFns.subDays(departureDate, 60),
+                },
+                {
+                  label: '前90天',
+                  value: dateFns.subDays(departureDate, 90),
+                },
+              ]"
               auto-apply
               model-type="yyyy-MM-dd"
               teleport="body"
