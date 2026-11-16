@@ -428,6 +428,17 @@ const runAction = (action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
                   }}
                 </span>
               </div>
+
+              <div class="flex items-center gap-1.5">
+                <span class="font-medium text-base-content/50">分段價格通知</span>
+
+                <span
+                  class="rounded bg-base-300/50 px-1.5 py-0.5 font-bold text-base-content"
+                  :class="itinerary.notifyPerLeg ? 'bg-success/10 text-success' : ''"
+                >
+                  {{ itinerary.notifyPerLeg ? '已開啟' : '未開啟' }}
+                </span>
+              </div>
             </div>
           </div>
         </div>

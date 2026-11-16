@@ -35,6 +35,7 @@ export interface Itinerary {
   id: string
   tripType: string
   isActive: boolean
+  notifyPerLeg?: boolean
   deadline: string | null
   createdAt: string
   archivedAt?: string | null

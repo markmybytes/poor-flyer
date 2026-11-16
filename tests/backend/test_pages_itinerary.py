@@ -55,6 +55,7 @@ def test_serialize_itinerary_with_explicit_today_date(app):
         result = _serialize_itinerary(it, 'HKD', today=date(2024, 6, 15))
         assert result['id'] == it.id
         assert result['trip_type'] == 'SINGLE'
+        assert result['notify_per_leg'] is False
 
 
 def test_itinerary_index_renders_correct_component(client, app):
@@ -93,6 +94,7 @@ def test_itinerary_index_returns_seeded_itinerary(client, app):
     data = resp.get_json()
     assert len(data['props']['itineraries']) == 1
     assert data['props']['itineraries'][0]['tripType'] == 'SINGLE'
+    assert data['props']['itineraries'][0]['notifyPerLeg'] is False
 
 
 def test_itinerary_index_excludes_archived_by_default(client, app):
@@ -212,6 +214,26 @@ def test_itinerary_create_submit_honors_is_active(client, app):
         assert db.session.query(Itinerary).all()[-1].is_active is True
 
 
+def test_itinerary_create_submit_honors_notify_per_leg(client, app):
+    payload = {
+        'trip_type': 'SINGLE',
+        'flights': [{'origin': 'HKG', 'destination': 'NRT', 'flight_date': '2025-12-01'}],
+    }
+    resp = client.post('/itineraries', data=json.dumps(payload), content_type='application/json')
+    assert resp.status_code == 302
+    with app.app_context():
+        assert db.session.query(Itinerary).one().notify_per_leg is False
+
+    resp = client.post(
+        '/itineraries',
+        data=json.dumps({**payload, 'notify_per_leg': True}),
+        content_type='application/json',
+    )
+    assert resp.status_code == 302
+    with app.app_context():
+        assert db.session.query(Itinerary).all()[-1].notify_per_leg is True
+
+
 def test_itinerary_create_submit_invalid_payload_returns_422(client, app):
     resp = client.post(
         '/itineraries',
@@ -245,6 +267,7 @@ def test_itinerary_show_renders_detail_component(client, app):
     data = resp.get_json()
     assert data['component'] == 'Itineraries/Detail'
     assert data['props']['itinerary']['id'] == iid
+    assert data['props']['itinerary']['notifyPerLeg'] is False
 
 
 def test_itinerary_show_not_found_redirects(client, app):

@@ -94,6 +94,9 @@ class Itinerary(db.Model):
     cabin_class: Mapped[str | None] = mapped_column(String, nullable=True)
     max_stops: Mapped[str | None] = mapped_column(String, nullable=True)
     airlines: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    notify_per_leg: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=db.false()
+    )
 
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=lambda: datetime.now(UTC))
     archived_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)

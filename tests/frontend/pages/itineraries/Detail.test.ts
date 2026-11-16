@@ -92,6 +92,27 @@ describe('Itineraries/Detail filters', () => {
   })
 })
 
+describe('Itineraries/Detail per-leg notifications', () => {
+  beforeEach(() => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({}) } as Response)
+  })
+
+  it('shows the flag as 已開啟 when enabled', () => {
+    const wrapper = mountDetail({ notifyPerLeg: true })
+
+    expect(wrapper.text()).toContain('分段價格通知')
+    expect(wrapper.text()).toContain('已開啟')
+  })
+
+  it('shows the flag as 未開啟 when disabled', () => {
+    const wrapper = mountDetail({ notifyPerLeg: false })
+
+    expect(wrapper.text()).toContain('分段價格通知')
+    expect(wrapper.text()).toContain('未開啟')
+    expect(wrapper.text()).not.toContain('已開啟')
+  })
+})
+
 describe('Itineraries/Detail archived state', () => {
   beforeEach(() => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({}) } as Response)

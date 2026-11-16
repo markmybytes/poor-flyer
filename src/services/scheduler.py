@@ -2,6 +2,7 @@ import contextvars
 import logging
 import threading
 import uuid
+from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
 
 from flask import render_template
@@ -13,12 +14,46 @@ from src.logging_config import bind_correlation_id, reset_correlation_id
 from src.services import setting
 from src.services.fli_search import FlightQuery, filters_for_itinerary, scrape_prices
 from src.services.fx_rates import FXRatesError, convert_amount, get_configured_base_currency
-from src.utils.email import get_smtp_config, send_html_email
+from src.services.itinerary import get_combined_totals
+from src.utils.email import SMTPConfig, get_smtp_config, send_html_email
 from src.utils.rule37 import Phase, compute_37_best
 
 logger = logging.getLogger(__name__)
 
 AUTO_ARCHIVE_AFTER_DAYS = 30  # ponytail: fixed threshold, hoist to settings when the user asks
+
+
+def _daily_min_fares(flight: Flight, base_currency: str) -> dict[date, float]:
+    """Day-min base-currency fares for one leg."""
+    fares: dict[date, float] = {}
+    for snapshot in flight.fare_snapshots:
+        if snapshot.scrape_status != 'success' or snapshot.fare is None:
+            continue
+        src_currency = (snapshot.currency or base_currency).upper()
+        try:
+            fare = convert_amount(float(snapshot.fare), src_currency, base_currency)
+        except FXRatesError:
+            logger.warning('failed to convert fare for rule37: flight_id=%s', flight.id)
+            continue
+        day = snapshot.created_at.date()
+        fares[day] = min(fares.get(day, fare), fare)
+    return fares
+
+
+def _value_on_or_before(values: dict[date, float], day: date) -> float:
+    """Latest entry at or before day: the value the 37% comparison judged."""
+    return values[max(d for d in values if d <= day)]
+
+
+def _notify(smtp_cfg: SMTPConfig, recipients: Sequence[str], subject: str, body: str) -> None:
+    """Queue one email per recipient; sends are fire-and-forget daemon threads."""
+    for email in recipients:
+        threading.Thread(
+            # a new thread starts with an empty context, so carry the cid over
+            target=contextvars.copy_context().run,
+            args=(send_html_email, smtp_cfg, email, subject, body),
+            daemon=True,
+        ).start()
 
 
 def scrape_fares():  # noqa: C901, PLR0915 - split into scrape + notify steps next time it grows
@@ -101,78 +136,75 @@ def scrape_fares():  # noqa: C901, PLR0915 - split into scrape + notify steps ne
             ]
             logger.debug('email recipients count=%d', len(recipients))
 
-            all_active_legs = [
-                f
-                for itinerary in notify_inputs
-                if itinerary.deadline
-                for f in itinerary.flights
-                if f.flight_date >= today
-            ]
-
             buy_signals_sent = 0
-            for flight in all_active_legs:
-                fare_by_date: dict[date, float] = {}
-                for snapshot in flight.fare_snapshots:
-                    if snapshot.scrape_status != 'success' or snapshot.fare is None:
-                        continue
-                    src_currency = (snapshot.currency or base_currency).upper()
-                    try:
-                        fare = convert_amount(float(snapshot.fare), src_currency, base_currency)
-                    except FXRatesError:
-                        logger.warning('failed to convert fare for rule37: flight_id=%s', flight.id)
-                        continue
-                    day = snapshot.created_at.date()
-                    fare_by_date[day] = min(fare_by_date.get(day, fare), fare)
-
-                r37 = compute_37_best(
-                    flight.itinerary.created_at.date(),
-                    today,
-                    flight.itinerary.deadline,
-                    fare_by_date,
-                )
-                if not r37 or r37.phase != Phase.BUY_SIGNAL:
+            for itinerary in (i for i in notify_inputs if i.deadline):
+                legs = [f for f in itinerary.flights if f.flight_date >= today]
+                if not legs:
                     continue
 
-                buy_signals_sent += 1
-                snap = max(
-                    (s for s in flight.fare_snapshots if s.scrape_status == 'success'),
-                    key=lambda s: s.created_at,
-                    default=None,
-                )
-                if not snap or not recipients:
-                    continue
+                created_on = itinerary.created_at.date()
+                leg_fares = {f.id: _daily_min_fares(f, base_currency) for f in legs}
+                combined = get_combined_totals(itinerary, base_currency)
+                comparison_day = min(today, itinerary.deadline)
 
-                src_currency = (snap.currency or base_currency).upper()
-                current_fare = float(snap.fare)
-                lowest_fare = float(r37.history_best_val or snap.fare)
-                try:
-                    current_fare = convert_amount(current_fare, src_currency, base_currency)
-                    lowest_fare = convert_amount(lowest_fare, src_currency, base_currency)
-                except FXRatesError:
-                    logger.warning(
-                        'failed to convert fare for buy signal email: flight_id=%s',
-                        flight.id,
+                r37 = compute_37_best(created_on, today, itinerary.deadline, combined)
+                if r37 and r37.phase is Phase.BUY_SIGNAL and recipients:
+                    current_total = _value_on_or_before(combined, comparison_day)
+                    history_low = r37.history_best_val or current_total
+                    savings = history_low - current_total
+                    body = render_template(
+                        'email/buy_signal_itinerary.html',
+                        legs=[
+                            {
+                                'origin': f.origin,
+                                'destination': f.destination,
+                                'flight_date': f.flight_date.strftime('%Y-%m-%d'),
+                                'fare': _value_on_or_before(leg_fares[f.id], comparison_day),
+                            }
+                            for f in legs
+                        ],
+                        current_total=current_total,
+                        history_low=history_low,
+                        savings=savings,
+                        savings_pct=(savings / history_low * 100) if history_low else 0.0,
+                        display_currency=base_currency,
                     )
+                    subj = f'✈️ 購買信號 | {legs[0].origin} → {legs[-1].destination} 全程總價'
+                    _notify(smtp_cfg, recipients, subj, body)
+                    # count the attempt: the daemon send thread never reports its result back
+                    buy_signals_sent += 1
 
-                flight_date_str = flight.flight_date.strftime('%Y-%m-%d')
-                subj = f'✈️ 購買信號 | {flight.origin} → {flight.destination} ({flight_date_str})'
-                body = render_template(
-                    'email/buy_signal.html',
-                    flight_origin=flight.origin,
-                    flight_destination=flight.destination,
-                    flight_date=flight_date_str,
-                    current_fare=current_fare,
-                    lowest_fare=lowest_fare,
-                    display_currency=base_currency,
-                )
+                if not itinerary.notify_per_leg:
+                    continue
 
-                for email in recipients:
-                    threading.Thread(
-                        # a new thread starts with an empty context, so carry the cid over
-                        target=contextvars.copy_context().run,
-                        args=(send_html_email, smtp_cfg, email, subj, body),
-                        daemon=True,
-                    ).start()
+                for flight in legs:
+                    leg_r37 = compute_37_best(
+                        created_on, today, itinerary.deadline, leg_fares[flight.id]
+                    )
+                    if not leg_r37 or leg_r37.phase is not Phase.BUY_SIGNAL or not recipients:
+                        continue
+
+                    current_fare = _value_on_or_before(leg_fares[flight.id], comparison_day)
+                    lowest_fare = leg_r37.history_best_val or current_fare
+                    savings = lowest_fare - current_fare
+                    flight_date_str = flight.flight_date.strftime('%Y-%m-%d')
+                    subj = (
+                        f'✈️ 購買信號 | {flight.origin} → {flight.destination} ({flight_date_str})'
+                    )
+                    body = render_template(
+                        'email/buy_signal.html',
+                        flight_origin=flight.origin,
+                        flight_destination=flight.destination,
+                        flight_date=flight_date_str,
+                        current_fare=current_fare,
+                        lowest_fare=lowest_fare,
+                        savings=savings,
+                        savings_pct=(savings / lowest_fare * 100) if lowest_fare else 0.0,
+                        display_currency=base_currency,
+                    )
+                    _notify(smtp_cfg, recipients, subj, body)
+                    # count the attempt: the daemon send thread never reports its result back
+                    buy_signals_sent += 1
 
             logger.info('daily scrape job completed: buy_signals_sent=%d', buy_signals_sent)
 

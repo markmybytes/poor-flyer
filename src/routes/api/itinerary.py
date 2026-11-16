@@ -92,6 +92,7 @@ def get_flight(itinerary_id):
                 'message': None,
                 'data': {
                     'id': entry.id,
+                    'notify_per_leg': entry.notify_per_leg,
                     'base_currency': base_currency,
                     'latest_converted_fare': converted_preview,
                 },
@@ -104,7 +105,7 @@ def get_flight(itinerary_id):
 
 
 @itineraries_bp.route('/<itinerary_id>', methods=['PATCH'])
-def update_flight(itinerary_id):
+def update_flight(itinerary_id):  # noqa: C901 - notify_per_leg branch; split validation out when it grows
     try:
         entry = db.session.execute(
             select(Itinerary).where(Itinerary.id == itinerary_id)
@@ -139,6 +140,17 @@ def update_flight(itinerary_id):
             else:
                 entry.deadline = None
             logger.info('updated itinerary: id=%s deadline=%s', itinerary_id, entry.deadline)
+
+        if 'notify_per_leg' in data:
+            raw = data['notify_per_leg']
+            token = str(raw).strip().lower()
+            if not isinstance(raw, bool) and token not in ('true', 'false', '1', '0', 'none', ''):
+                logger.info('invalid notify_per_leg: itinerary_id=%s', itinerary_id)
+                return jsonify({'message': 'Invalid notify_per_leg', 'data': None}), 400
+            entry.notify_per_leg = _as_bool(raw)
+            logger.info(
+                'updated itinerary: id=%s notify_per_leg=%s', itinerary_id, entry.notify_per_leg
+            )
 
         db.session.commit()
         return jsonify({'message': 'Entry updated', 'data': entry.id})

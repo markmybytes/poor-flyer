@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
+from collections import defaultdict
 from collections.abc import Mapping
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from enum import StrEnum
 from typing import Any
 
 from src.extensions.database import Flight, Itinerary, db
+from src.services.fx_rates import FXRatesError, convert_amount
 from src.utils.filters import CabinClass, MaxStops, parse_airlines
+
+logger = logging.getLogger(__name__)
 
 
 def _enum_value(enum_type: type[StrEnum], value: Any, label: str) -> str:
@@ -17,6 +22,16 @@ def _enum_value(enum_type: type[StrEnum], value: Any, label: str) -> str:
         return enum_type(str(value).strip().upper()).value
     except ValueError:
         raise ValueError(f'Invalid {label}') from None
+
+
+def _notify_per_leg(value: Any) -> bool:
+    """Coerce the opt-in flag from a JSON boolean or a form-encoded string."""
+    if isinstance(value, bool):
+        return value
+    token = str(value).strip().lower()
+    if token not in ('true', 'false', '1', '0', 'none', ''):
+        raise ValueError('Invalid notify_per_leg')
+    return token not in ('false', '0', 'none', '')
 
 
 def create_itinerary(data: Mapping[str, Any]) -> Itinerary:
@@ -42,6 +57,7 @@ def create_itinerary(data: Mapping[str, Any]) -> Itinerary:
         airlines=list(parse_airlines(data['airlines']))
         if data.get('airlines') is not None
         else None,
+        notify_per_leg=_notify_per_leg(data.get('notify_per_leg', False)),
         created_at=datetime.now(UTC),
     )
 
@@ -60,3 +76,39 @@ def create_itinerary(data: Mapping[str, Any]) -> Itinerary:
         db.session.add(flight)
 
     return itinerary
+
+
+def get_combined_totals(itinerary: Itinerary, currency: str) -> dict[date, float]:
+    """Computes daily combined price minimums across all legs of an itinerary."""
+    date_fares = defaultdict(dict)
+    for flight in itinerary.flights:
+        for s in flight.fare_snapshots:
+            if s.scrape_status == 'success' and s.fare is not None:
+                src_currency = (s.currency or currency).upper()
+                try:
+                    fare_value = convert_amount(s.fare, src_currency, currency)
+                except FXRatesError:
+                    logger.warning('convert itinerary fare snapshot failed: snapshot_id=%s', s.id)
+                    continue
+
+                s_date = (
+                    s.created_at.date()
+                    if isinstance(s.created_at, datetime)
+                    else getattr(s.created_at, 'date', lambda s=s: s.created_at)()
+                )
+                if (
+                    flight.id not in date_fares[s_date]
+                    or fare_value < date_fares[s_date][flight.id]
+                ):
+                    date_fares[s_date][flight.id] = fare_value
+
+    combined_totals = {}
+    num_flights = len(itinerary.flights)
+    if num_flights == 0:
+        return {}
+
+    for d, f_fares in date_fares.items():
+        if len(f_fares) == num_flights:
+            combined_totals[d] = float(sum(f_fares.values()))
+
+    return combined_totals
