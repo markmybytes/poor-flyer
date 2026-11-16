@@ -388,10 +388,10 @@ function submit() {
                 />
 
                 <div>
-                  <span class="label-text block text-sm font-bold">分段價格通知</span>
+                  <span class="label-text block text-sm font-bold">逐航段通知</span>
 
                   <span class="label-text-alt text-base-content/60">
-                    每個航段價格下跌時獨立發送電郵通知
+                    逐航段價格下跌時，獨立發送電郵通知
                   </span>
                 </div>
               </label>

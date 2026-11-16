@@ -137,7 +137,7 @@ describe('Itineraries/Create', () => {
   })
 
   function notifyToggle(wrapper: ReturnType<typeof mount>) {
-    const label = wrapper.findAll('label').find((l) => l.text().includes('分段價格通知'))
+    const label = wrapper.findAll('label').find((l) => l.text().includes('逐航段通知'))
     return label!.find('input[type="checkbox"]')
   }
 

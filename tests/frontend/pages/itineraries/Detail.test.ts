@@ -101,14 +101,14 @@ describe('Itineraries/Detail per-leg notifications', () => {
   it('shows the flag as 已開啟 when enabled', () => {
     const wrapper = mountDetail({ notifyPerLeg: true })
 
-    expect(wrapper.text()).toContain('分段價格通知')
+    expect(wrapper.text()).toContain('逐航段通知')
     expect(wrapper.text()).toContain('已開啟')
   })
 
   it('shows the flag as 未開啟 when disabled', () => {
     const wrapper = mountDetail({ notifyPerLeg: false })
 
-    expect(wrapper.text()).toContain('分段價格通知')
+    expect(wrapper.text()).toContain('逐航段通知')
     expect(wrapper.text()).toContain('未開啟')
     expect(wrapper.text()).not.toContain('已開啟')
   })
@@ -129,7 +129,7 @@ describe('Itineraries/Detail settings modal', () => {
     await wrapper.find('button[title="設定通知與限期"]').trigger('click')
 
     expect(wrapper.text()).toContain('通知與限期設定')
-    expect(wrapper.text()).toContain('分段價格通知')
+    expect(wrapper.text()).toContain('逐航段通知')
     // daisyUI .label is nowrap inline-flex; flex-wrap keeps the toggle row from overflowing the box
     expect(wrapper.find('label').classes()).toContain('flex-wrap')
     expect(fetch).not.toHaveBeenCalled()
@@ -159,7 +159,7 @@ describe('Itineraries/Detail settings modal', () => {
     const wrapper = mountDetail()
     await wrapper.find('button[title="設定通知與限期"]').trigger('click')
 
-    const clearBtn = wrapper.find('button[aria-label="清除購票限期"]')
+    const clearBtn = wrapper.find('button[aria-label="清除限期"]')
     expect(clearBtn.exists()).toBe(true)
     expect(clearBtn.attributes('disabled')).toBeDefined()
     expect(wrapper.findAll('button').some((b) => b.text().trim() === '移除限期')).toBe(false)
@@ -170,7 +170,7 @@ describe('Itineraries/Detail settings modal', () => {
     await wrapper.find('button[title="設定通知與限期"]').trigger('click')
     vi.mocked(fetch).mockClear()
 
-    const clearBtn = wrapper.find('button[aria-label="清除購票限期"]')
+    const clearBtn = wrapper.find('button[aria-label="清除限期"]')
     expect(clearBtn.attributes('disabled')).toBeUndefined()
 
     await clearBtn.trigger('click')
