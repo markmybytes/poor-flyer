@@ -625,8 +625,8 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
 
             <button
               type="button"
-              title="清除購票限期"
-              aria-label="清除購票限期"
+              title="清除限期"
+              aria-label="清除限期"
               class="btn absolute top-1/2 right-1.5 -translate-y-1/2 text-base-content/40 btn-ghost btn-xs hover:text-base-content/60"
               :disabled="!settings.deadline || ui.loading === 'update_settings'"
               @click="settings.deadline = ''"
