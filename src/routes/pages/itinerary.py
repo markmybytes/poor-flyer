@@ -3,7 +3,7 @@ from dataclasses import asdict
 from datetime import date, datetime
 from typing import Any
 
-from flask import Blueprint, g, make_response, redirect, request
+from flask import Blueprint, g, redirect, request, session
 from flask.typing import ResponseReturnValue
 from flask_inertia import render_inertia
 from fli.models.airline import AIRLINE_NAMES
@@ -74,25 +74,6 @@ def _serialize_itinerary(
     }
 
 
-def _detail_props(itinerary_id: str) -> dict | None:
-    """Show props for the Detail page, or None when the itinerary is gone."""
-    base_currency = get_configured_base_currency()
-    itinerary = db.session.execute(
-        select(Itinerary)
-        .options(selectinload(Itinerary.flights).selectinload(Flight.fare_snapshots))
-        .where(Itinerary.id == itinerary_id)
-    ).scalar_one_or_none()
-    if not itinerary:
-        logger.debug('itinerary not found: id=%s', itinerary_id)
-        return None
-    return {
-        'itinerary': _serialize_itinerary(
-            itinerary, base_currency, today=datetime.now(g.tz).date()
-        ),
-        'base_currency': base_currency,
-    }
-
-
 def _airline_options() -> list[dict[str, str]]:
     """IATA code/name pairs, digit-leading enum keys normalized (``_7C`` -> ``7C``)."""
     return sorted(
@@ -109,18 +90,6 @@ def _parse_deadline(raw: Any) -> date | None:
         return datetime.strptime(str(raw), '%Y-%m-%d').date()
     except ValueError:
         raise ValueError('Deadline must be a valid date') from None
-
-
-def _detail_validation_error(itinerary_id: str, errors: dict[str, str]) -> ResponseReturnValue:
-    """Re-render Detail with the full props plus the field errors (Inertia 422)."""
-    props = _detail_props(itinerary_id)
-    if props is None:
-        return redirect('/itineraries/')
-    # shortcut: full props re-render for Inertia 422; may block up to 15s on a
-    # cold FX cache when the network is unreachable (get_rates stale fallback)
-    response = make_response(render_inertia('Itineraries/Detail', props=props | {'errors': errors}))
-    response.status_code = 422
-    return response
 
 
 @itineraries_bp.route('/')
@@ -173,17 +142,8 @@ def create_submit() -> ResponseReturnValue:
     except (KeyError, TypeError, ValueError) as exc:
         db.session.rollback()
         logger.info('invalid itinerary submission: error=%s', exc)
-        response = make_response(
-            render_inertia(
-                'Itineraries/Create',
-                props={
-                    'airlines': _airline_options(),
-                    'errors': {'itinerary': '請檢查輸入內容'},
-                },
-            )
-        )
-        response.status_code = 422
-        return response
+        session['errors'] = {'itinerary': '請檢查輸入內容'}
+        return redirect('/itineraries/create')
 
     logger.info('created itinerary from page form: id=%s', itinerary.id)
     return redirect('/')
@@ -192,10 +152,24 @@ def create_submit() -> ResponseReturnValue:
 @itineraries_bp.route('/<itinerary_id>')
 def show(itinerary_id: str) -> ResponseReturnValue:
     try:
-        props = _detail_props(itinerary_id)
-        if props is None:
+        base_currency = get_configured_base_currency()
+        itinerary = db.session.execute(
+            select(Itinerary)
+            .options(selectinload(Itinerary.flights).selectinload(Flight.fare_snapshots))
+            .where(Itinerary.id == itinerary_id)
+        ).scalar_one_or_none()
+        if not itinerary:
+            logger.debug('itinerary not found: id=%s', itinerary_id)
             return redirect('/itineraries/')
-        return render_inertia('Itineraries/Detail', props=props)
+        return render_inertia(
+            'Itineraries/Detail',
+            props={
+                'itinerary': _serialize_itinerary(
+                    itinerary, base_currency, today=datetime.now(g.tz).date()
+                ),
+                'base_currency': base_currency,
+            },
+        )
     except Exception:
         logger.exception('render itinerary detail failed: id=%s', itinerary_id)
         return redirect('/itineraries/')
@@ -235,7 +209,8 @@ def update_itinerary(itinerary_id: str) -> ResponseReturnValue:
     if errors:
         db.session.rollback()
         logger.info('invalid itinerary update: id=%s fields=%s', itinerary_id, ','.join(errors))
-        return _detail_validation_error(itinerary_id, errors)
+        session['errors'] = errors
+        return redirect(f'/itineraries/{itinerary_id}')
 
     db.session.commit()
     logger.info('updated itinerary from page form: id=%s', itinerary_id)

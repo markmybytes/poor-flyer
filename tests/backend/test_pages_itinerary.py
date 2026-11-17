@@ -258,7 +258,7 @@ def test_itinerary_create_submit_honors_notify_per_leg(client, app):
         assert db.session.query(Itinerary).all()[-1].notify_per_leg is True
 
 
-def test_itinerary_create_submit_invalid_payload_returns_422(client, app):
+def test_itinerary_create_submit_invalid_payload_redirects_with_errors(client, app):
     resp = client.post(
         '/itineraries',
         data=json.dumps(
@@ -272,16 +272,18 @@ def test_itinerary_create_submit_invalid_payload_returns_422(client, app):
         headers=INERTIA_HEADERS,
     )
 
-    assert resp.status_code == 422
-    data = resp.get_json()
-    assert data['component'] == 'Itineraries/Create'
-    assert data['props']['errors']['itinerary'] == '請檢查輸入內容'
-    assert 'airlines' in data['props']
+    assert resp.status_code == 302
+    assert resp.headers['Location'] == '/itineraries/create'
     with app.app_context():
         assert db.session.query(Itinerary).count() == 0
 
+    data = client.get('/itineraries/create', headers=INERTIA_HEADERS).get_json()
+    assert data['component'] == 'Itineraries/Create'
+    assert data['props']['errors']['itinerary'] == '請檢查輸入內容'
+    assert 'airlines' in data['props']
 
-def test_itinerary_create_submit_past_deadline_returns_422(client, app):
+
+def test_itinerary_create_submit_past_deadline_redirects_with_errors(client, app):
     resp = client.post(
         '/itineraries',
         data=json.dumps(
@@ -295,9 +297,13 @@ def test_itinerary_create_submit_past_deadline_returns_422(client, app):
         headers=INERTIA_HEADERS,
     )
 
-    assert resp.status_code == 422
+    assert resp.status_code == 302
+    assert resp.headers['Location'] == '/itineraries/create'
     with app.app_context():
         assert db.session.query(Itinerary).count() == 0
+
+    data = client.get('/itineraries/create', headers=INERTIA_HEADERS).get_json()
+    assert data['props']['errors'] == {'itinerary': '請檢查輸入內容'}
 
 
 def test_itinerary_show_renders_detail_component(client, app):
@@ -419,7 +425,7 @@ def test_itinerary_update_absent_notify_per_leg_is_unchanged(client, app):
         assert db.session.get(Itinerary, iid).notify_per_leg is True
 
 
-def test_itinerary_update_past_deadline_returns_422_with_detail_props(client, app):
+def test_itinerary_update_past_deadline_redirects_with_detail_props(client, app):
     with app.app_context():
         it = _seed_itinerary(flight_date=_future_departure())
         iid = it.id
@@ -431,8 +437,9 @@ def test_itinerary_update_past_deadline_returns_422_with_detail_props(client, ap
         headers=INERTIA_HEADERS,
     )
 
-    assert resp.status_code == 422
-    data = resp.get_json()
+    assert resp.status_code == 303
+    assert resp.headers['Location'].endswith(f'/itineraries/{iid}')
+    data = client.get(f'/itineraries/{iid}', headers=INERTIA_HEADERS).get_json()
     assert data['component'] == 'Itineraries/Detail'
     assert data['props']['errors'] == {'deadline': 'Deadline must not be in the past'}
     assert data['props']['itinerary']['id'] == iid
@@ -441,7 +448,7 @@ def test_itinerary_update_past_deadline_returns_422_with_detail_props(client, ap
         assert db.session.get(Itinerary, iid).deadline is None
 
 
-def test_itinerary_update_deadline_after_departure_returns_422(client, app):
+def test_itinerary_update_deadline_after_departure_redirects_with_errors(client, app):
     departure = _future_departure()
     with app.app_context():
         it = _seed_itinerary(flight_date=departure)
@@ -454,10 +461,9 @@ def test_itinerary_update_deadline_after_departure_returns_422(client, app):
         headers=INERTIA_HEADERS,
     )
 
-    assert resp.status_code == 422
-    assert resp.get_json()['props']['errors'] == {
-        'deadline': 'Deadline must not be after the first departure'
-    }
+    assert resp.status_code == 303
+    data = client.get(f'/itineraries/{iid}', headers=INERTIA_HEADERS).get_json()
+    assert data['props']['errors'] == {'deadline': 'Deadline must not be after the first departure'}
 
 
 @pytest.mark.parametrize('offset', [0, 30])
@@ -479,7 +485,7 @@ def test_itinerary_update_accepts_inclusive_deadline_bounds(client, app, offset)
         assert db.session.get(Itinerary, iid).deadline == date.today() + timedelta(days=offset)
 
 
-def test_itinerary_update_invalid_deadline_format_returns_422(client, app):
+def test_itinerary_update_invalid_deadline_format_redirects_with_errors(client, app):
     with app.app_context():
         it = _seed_itinerary(flight_date=_future_departure())
         iid = it.id
@@ -491,8 +497,9 @@ def test_itinerary_update_invalid_deadline_format_returns_422(client, app):
         headers=INERTIA_HEADERS,
     )
 
-    assert resp.status_code == 422
-    assert resp.get_json()['props']['errors'] == {'deadline': 'Deadline must be a valid date'}
+    assert resp.status_code == 303
+    data = client.get(f'/itineraries/{iid}', headers=INERTIA_HEADERS).get_json()
+    assert data['props']['errors'] == {'deadline': 'Deadline must be a valid date'}
 
 
 @pytest.mark.parametrize(
@@ -524,7 +531,7 @@ def test_itinerary_update_notify_per_leg_tokens(client, app, token, stored):
 
 
 @pytest.mark.parametrize('token', ['maybe', 'none', ''])
-def test_itinerary_update_invalid_notify_per_leg_returns_422(client, app, token):
+def test_itinerary_update_invalid_notify_per_leg_redirects_with_errors(client, app, token):
     with app.app_context():
         it = _seed_itinerary(notify_per_leg=True)
         iid = it.id
@@ -536,10 +543,30 @@ def test_itinerary_update_invalid_notify_per_leg_returns_422(client, app, token)
         headers=INERTIA_HEADERS,
     )
 
-    assert resp.status_code == 422
-    assert resp.get_json()['props']['errors'] == {'notifyPerLeg': 'Invalid notify_per_leg'}
+    assert resp.status_code == 303
+    data = client.get(f'/itineraries/{iid}', headers=INERTIA_HEADERS).get_json()
+    assert data['props']['errors'] == {'notifyPerLeg': 'Invalid notify_per_leg'}
     with app.app_context():
         assert db.session.get(Itinerary, iid).notify_per_leg is True
+
+
+def test_page_errors_are_consumed_on_first_render(client, app):
+    with app.app_context():
+        it = _seed_itinerary(flight_date=_future_departure())
+        iid = it.id
+
+    client.patch(
+        f'/itineraries/{iid}',
+        data=json.dumps({'deadline': '2026-13-45'}),
+        content_type='application/json',
+        headers=INERTIA_HEADERS,
+    )
+
+    first = client.get(f'/itineraries/{iid}', headers=INERTIA_HEADERS).get_json()
+    second = client.get(f'/itineraries/{iid}', headers=INERTIA_HEADERS).get_json()
+
+    assert first['props']['errors'] == {'deadline': 'Deadline must be a valid date'}
+    assert second['props']['errors'] == {}
 
 
 def test_itinerary_update_not_found_redirects(client, app):
@@ -586,7 +613,7 @@ def test_itinerary_create_submit_reads_form_encoded_is_active(client, app, token
         assert db.session.query(Itinerary).one().is_active is stored
 
 
-def test_itinerary_create_submit_invalid_notify_returns_422(client, app):
+def test_itinerary_create_submit_invalid_notify_redirects_with_errors(client, app):
     resp = client.post(
         '/itineraries',
         data=json.dumps(
@@ -600,13 +627,14 @@ def test_itinerary_create_submit_invalid_notify_returns_422(client, app):
         headers=INERTIA_HEADERS,
     )
 
-    assert resp.status_code == 422
-    assert resp.get_json()['props']['errors'] == {'itinerary': '請檢查輸入內容'}
+    assert resp.status_code == 302
+    data = client.get('/itineraries/create', headers=INERTIA_HEADERS).get_json()
+    assert data['props']['errors'] == {'itinerary': '請檢查輸入內容'}
     with app.app_context():
         assert db.session.query(Itinerary).count() == 0
 
 
-def test_itinerary_create_submit_deadline_after_departure_returns_422(client, app):
+def test_itinerary_create_submit_deadline_after_departure_redirects_with_errors(client, app):
     departure = _future_departure()
     resp = client.post(
         '/itineraries',
@@ -623,9 +651,12 @@ def test_itinerary_create_submit_deadline_after_departure_returns_422(client, ap
         headers=INERTIA_HEADERS,
     )
 
-    assert resp.status_code == 422
+    assert resp.status_code == 302
     with app.app_context():
         assert db.session.query(Itinerary).count() == 0
+
+    data = client.get('/itineraries/create', headers=INERTIA_HEADERS).get_json()
+    assert data['props']['errors'] == {'itinerary': '請檢查輸入內容'}
 
 
 @pytest.mark.parametrize('offset', [0, 30])
@@ -650,7 +681,7 @@ def test_itinerary_create_submit_accepts_inclusive_deadline_bounds(client, app, 
         assert db.session.query(Itinerary).one().deadline == date.today() + timedelta(days=offset)
 
 
-def test_itinerary_create_submit_invalid_deadline_format_returns_422(client, app):
+def test_itinerary_create_submit_invalid_deadline_format_redirects_with_errors(client, app):
     resp = client.post(
         '/itineraries',
         data=json.dumps(
@@ -664,6 +695,9 @@ def test_itinerary_create_submit_invalid_deadline_format_returns_422(client, app
         headers=INERTIA_HEADERS,
     )
 
-    assert resp.status_code == 422
+    assert resp.status_code == 302
     with app.app_context():
         assert db.session.query(Itinerary).count() == 0
+
+    data = client.get('/itineraries/create', headers=INERTIA_HEADERS).get_json()
+    assert data['props']['errors'] == {'itinerary': '請檢查輸入內容'}

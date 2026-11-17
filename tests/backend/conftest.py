@@ -11,6 +11,7 @@ INERTIA_HEADERS = {'X-Inertia': 'true', 'X-Inertia-Version': ''}
 @pytest.fixture(scope='session')
 def app():
     os.environ['PF_DATABASE_URL'] = 'sqlite:///:memory:'
+    os.environ['PF_SECRET_KEY'] = 'test-secret-key'
 
     app = create_app()
     app.config.update(

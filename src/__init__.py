@@ -1,14 +1,15 @@
 # src/__init__.py
 import logging
 import os
+import secrets
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from flask import Flask, current_app, g, request
+from flask import Flask, current_app, g, request, session
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from src.cli import dev, run_scheduler
-from src.extensions import init_extensions
+from src.extensions import inertia, init_extensions
 from src.extensions.scheduler import create_cron_trigger
 from src.logging_config import configure_logging
 from src.routes.api import api_bp
@@ -39,6 +40,25 @@ def _inject_vite_url():
     return {'vite_dev_url': vite_dev_url}
 
 
+def _secret_key(instance_path: Path) -> str:
+    """PF_SECRET_KEY, else a generated key persisted write-once in the instance folder."""
+    if key := os.getenv('PF_SECRET_KEY'):
+        return key
+    path = instance_path.joinpath('secret_key')
+    for _ in range(2):
+        try:
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError:
+            if key := path.read_text().strip():
+                return key
+            continue  # concurrent writer created the file but has not written it yet
+        with os.fdopen(fd, 'w') as handle:
+            key = secrets.token_hex(32)
+            handle.write(key)
+        return key
+    raise RuntimeError(f'secret key file is empty: path={path}')
+
+
 def create_app():
     """Application factory to initialize and configure the Flask app."""
     base_dir = Path(__file__).resolve().parent.parent
@@ -53,6 +73,7 @@ def create_app():
     app.config.from_mapping(
         {
             'INERTIA_TEMPLATE': 'base.html',
+            'SECRET_KEY': _secret_key(Path(app.instance_path)),
             'SQLALCHEMY_TRACK_MODIFICATIONS': False,
             'SCHEDULER_API_ENABLED': False,
             'LOG_LEVEL': os.getenv('PF_LOG_LEVEL', 'INFO'),
@@ -98,6 +119,10 @@ def create_app():
 
     init_extensions(app)
     logger.info('extensions initialized')
+
+    # session values are serialised by app.json, which camelizes keys: keep this one
+    # camelCase-stable so the pop below finds what the views stored
+    inertia.share('errors', lambda: session.pop('errors', None) or {})
 
     app.before_request(_resolve_timezone)
 

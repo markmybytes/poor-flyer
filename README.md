@@ -127,6 +127,7 @@ gunicorn --bind 0.0.0.0:8000 --workers 1 --timeout 120 wsgi:app
 | 變數               | 預設                           | 用途                           |
 | ------------------ | ------------------------------ | ------------------------------ |
 | `PF_DATABASE_URL`  | `instance/db.sqlite`（sqlite） | 資料庫連線（SQLAlchemy URL）   |
+| `PF_SECRET_KEY`    | 自動產生 `instance/secret_key` | Session 簽章金鑰（首次啟動寫入） |
 | `PF_SCRAPE_CRON`   | `0 9 * * *`                    | 票價收集排程（crontab）        |
 | `PF_SCRAPE_JITTER` | `1800`                         | 收集票價時刻隨機延後上限（秒） |
 | `PF_LOG_FILE`      | `instance/app.log`             | 日誌檔路徑                     |
