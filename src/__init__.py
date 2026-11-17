@@ -5,7 +5,7 @@ import secrets
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from flask import Flask, current_app, g, request, session
+from flask import Flask, current_app, g, get_flashed_messages, request
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from src.cli import dev, run_scheduler
@@ -120,9 +120,9 @@ def create_app():
     init_extensions(app)
     logger.info('extensions initialized')
 
-    # session values are serialised by app.json, which camelizes keys: keep this one
-    # camelCase-stable so the pop below finds what the views stored
-    inertia.share('errors', lambda: session.pop('errors', None) or {})
+    # flashes are category-keyed: the category is the error field the frontend reads.
+    # dict() collapses a duplicated category to its last message.
+    inertia.share('errors', lambda: dict(get_flashed_messages(with_categories=True)))
 
     app.before_request(_resolve_timezone)
 
