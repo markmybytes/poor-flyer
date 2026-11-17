@@ -33,7 +33,8 @@ vi.mock('chart.js/auto', () => {
 })
 
 vi.mock('@vuepic/vue-datepicker', () => ({
-  VueDatePicker: { template: '<input />' },
+  // stub renders the trigger slot and keeps vnode props readable (Detail.test inspects them)
+  VueDatePicker: { template: '<div><slot name="trigger" /><slot /></div>' },
 }))
 
 vi.mock('@iconify/vue', () => ({

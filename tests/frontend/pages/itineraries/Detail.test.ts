@@ -11,9 +11,7 @@ const itinerary = {
   isActive: true,
   deadline: null,
   createdAt: '2026-01-01T00:00:00Z',
-  flights: [
-    { id: 'f1', sequence: 0, origin: 'HKG', destination: 'NRT', flightDate: '2026-12-01' },
-  ],
+  flights: [{ id: 'f1', sequence: 0, origin: 'HKG', destination: 'NRT', flightDate: '2026-12-01' }],
 }
 
 const globalStubs = {
@@ -79,9 +77,7 @@ describe('Itineraries/Detail filters', () => {
     expect(fetch).not.toHaveBeenCalled()
 
     // confirm button inside the modal triggers the DELETE + visit
-    const confirmBtn = wrapper
-      .findAll('button')
-      .find((b) => b.text().trim() === '刪除')
+    const confirmBtn = wrapper.findAll('button').find((b) => b.text().trim() === '刪除')
     await confirmBtn?.trigger('click')
     await flushPromises()
 
@@ -176,7 +172,10 @@ describe('Itineraries/Detail settings modal', () => {
     await clearBtn.trigger('click')
     expect(fetch).not.toHaveBeenCalled()
 
-    await wrapper.findAll('button').find((b) => b.text().trim() === '儲存')!.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text().trim() === '儲存')!
+      .trigger('click')
     await flushPromises()
 
     expect(fetch).toHaveBeenCalledWith(
@@ -195,9 +194,9 @@ describe('Itineraries/Detail settings modal', () => {
     expect(dp.exists()).toBe(true)
     // VTU's props() reads $props, which stays empty for this package's root; vnode props carry the bindings.
     const dpVNodeProps = dp.vm.$.vnode.props as Record<string, unknown> | null
-    expect(dpVNodeProps?.markers).toEqual([
-      { date: '2026-12-01', type: 'dot', color: '#007af0' },
-    ])
+    expect(dpVNodeProps?.markers).toEqual([{ date: '2026-12-01', type: 'dot', color: '#007af0' }])
+    // presets are computed from the real clock, so only assert they reach the picker
+    expect(Array.isArray(dpVNodeProps?.presetDates)).toBe(true)
   })
 
   it('toggles notify_per_leg via PATCH', async () => {
@@ -246,7 +245,9 @@ describe('Itineraries/Detail archived state', () => {
 
     expect(wrapper.text()).toContain('已封存')
     expect(wrapper.text()).not.toContain('下載最新票價')
-    expect(wrapper.findAll('button').some((b) => ['暫停追蹤', '開始追蹤'].includes(b.text().trim()))).toBe(false)
+    expect(
+      wrapper.findAll('button').some((b) => ['暫停追蹤', '開始追蹤'].includes(b.text().trim())),
+    ).toBe(false)
     expect(wrapper.find('button[title="設定通知與限期"]').exists()).toBe(true)
   })
 
@@ -270,7 +271,10 @@ describe('Itineraries/Detail archived state', () => {
     vi.mocked(fetch).mockClear()
 
     // open the confirm modal from the join button group
-    await wrapper.findAll('button').find((b) => b.text().trim() === '恢復追蹤')!.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text().trim() === '恢復追蹤')!
+      .trigger('click')
     expect(wrapper.text()).toContain('重新封存')
     expect(fetch).not.toHaveBeenCalled()
 

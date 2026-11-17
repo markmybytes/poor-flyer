@@ -153,19 +153,20 @@ def test_patch_itinerary_rejects_filter_edits(client, app, payload):
 
 
 def test_patch_itinerary_deadline_only_still_updates(client, app):
+    deadline = date.today() + timedelta(days=5)
     with app.app_context():
         itinerary, _ = _seed_itinerary()
         iid = itinerary.id
 
     resp = client.patch(
         f'/api/itineraries/{iid}',
-        data=json.dumps({'deadline': '2025-12-31'}),
+        data=json.dumps({'deadline': deadline.isoformat()}),
         content_type='application/json',
     )
 
     assert resp.status_code == 200
     with app.app_context():
-        assert db.session.get(Itinerary, iid).deadline == date(2025, 12, 31)
+        assert db.session.get(Itinerary, iid).deadline == deadline
 
 
 def test_patch_itinerary_absent_filters_are_unchanged(client, app):

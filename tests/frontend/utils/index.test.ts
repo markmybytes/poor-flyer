@@ -1,5 +1,12 @@
 import type { Itinerary } from '@/types'
-import { fmtDate, fmtFare, fmtItineraryName, fmtTime, fmtTz, getCurrencySign } from '@/utils'
+import {
+  fmtDate,
+  fmtFare,
+  fmtItineraryName,
+  fmtTime,
+  fmtTz,
+  getCurrencySign,
+} from '@/utils'
 import { describe, expect, it } from 'vitest'
 
 describe('getCurrencySign', () => {
