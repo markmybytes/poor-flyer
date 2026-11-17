@@ -99,9 +99,12 @@ describe('Logs/Index', () => {
       props: defaultProps,
       global: { stubs: globalStubs },
     })
-    const modal = wrapper.find('dialog').element as HTMLDialogElement
-    modal.close = vi.fn()
+    const dialog = wrapper.find('dialog')
+    const openButton = wrapper.findAll('button').find((b) => b.text().trim() === '清理紀錄')!
     const confirmButton = wrapper.findAll('button').find((b) => b.text().trim() === '確認清除')!
+
+    await openButton.trigger('click')
+    expect(dialog.classes()).toContain('modal-open')
 
     await confirmButton.trigger('click')
 
@@ -118,7 +121,8 @@ describe('Logs/Index', () => {
 
     const options = vi.mocked(router.delete).mock.calls[0][1]
     options.onSuccess?.({} as never)
-    expect(modal.close).toHaveBeenCalled()
+    await wrapper.vm.$nextTick()
+    expect(dialog.classes()).not.toContain('modal-open')
     // success copy comes from the server flash router, not this page
     expect(toast.success).not.toHaveBeenCalled()
 
@@ -139,7 +143,7 @@ describe('Logs/Index', () => {
     vi.mocked(router.delete).mock.calls[0][1].onError?.({} as never)
 
     expect(fetch).not.toHaveBeenCalled()
-    expect(toast.error).toHaveBeenCalledWith('清除失敗，請稍後再試')
+    expect(toast.error).toHaveBeenCalledWith('清除紀錄失敗')
   })
 
   it('shows pagination total', () => {

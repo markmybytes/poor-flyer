@@ -17,8 +17,9 @@ const form = ref({
   isActive: true,
   notifyPerLeg: false,
   flights: [{ origin: '', destination: '', flightDate: '' }],
-  processing: false,
 })
+
+const ui = ref({ processing: false })
 
 const filters = ref<{
   cabinClass: string
@@ -42,7 +43,7 @@ const roundTripDates = computed<string | string[]>({
   },
 })
 
-const getStartDate = (index: number) => {
+function getStartDate(index: number): Date {
   const prevDate = form.value.flights[index - 1]?.flightDate
   return prevDate ? new Date(prevDate) : new Date()
 }
@@ -69,7 +70,7 @@ watch(
 )
 
 function submit() {
-  form.value.processing = true
+  ui.value.processing = true
 
   const payload = {
     trip_type: form.value.tripType,
@@ -96,7 +97,7 @@ function submit() {
     preserveScroll: true,
     onError: (errors) => toast.error(errors.itinerary ?? '新增失敗，請檢查輸入內容'),
     onFinish: () => {
-      form.value.processing = false
+      ui.value.processing = false
     },
   })
 }
@@ -217,7 +218,7 @@ function submit() {
                       class="input-bordered input w-full uppercase transition-colors focus:input-primary"
                       required
                       maxlength="3"
-                      :disabled="form.processing"
+                      :disabled="ui.processing"
                     />
                   </fieldset>
 
@@ -231,7 +232,7 @@ function submit() {
                       class="input-bordered input w-full uppercase transition-colors focus:input-primary"
                       required
                       maxlength="3"
-                      :disabled="form.processing"
+                      :disabled="ui.processing"
                     />
                   </fieldset>
 
@@ -245,7 +246,7 @@ function submit() {
                       v-model="roundTripDates"
                       placeholder="選擇日期"
                       required
-                      :disabled="form.processing"
+                      :disabled="ui.processing"
                       :options="{ range: true }"
                     />
 
@@ -254,7 +255,7 @@ function submit() {
                       v-model="leg.flightDate"
                       placeholder="選擇日期"
                       required
-                      :disabled="form.processing"
+                      :disabled="ui.processing"
                       :options="{ startDate: getStartDate(index) }"
                     />
                   </fieldset>
@@ -293,7 +294,7 @@ function submit() {
                   v-model="form.isActive"
                   type="checkbox"
                   class="toggle toggle-success"
-                  :disabled="form.processing"
+                  :disabled="ui.processing"
                 />
 
                 <div>
@@ -312,7 +313,7 @@ function submit() {
                   v-model="form.notifyPerLeg"
                   type="checkbox"
                   class="toggle toggle-success"
-                  :disabled="form.processing"
+                  :disabled="ui.processing"
                 />
 
                 <div>
@@ -342,10 +343,10 @@ function submit() {
             <button
               type="submit"
               class="btn flex-1 shadow-sm btn-primary"
-              :disabled="form.processing"
+              :disabled="ui.processing"
             >
-              <span v-if="form.processing" class="loading loading-spinner"></span>
-              {{ form.processing ? '處理中...' : '建立' }}
+              <span v-if="ui.processing" class="loading loading-spinner"></span>
+              {{ ui.processing ? '處理中...' : '建立' }}
             </button>
           </div>
         </form>

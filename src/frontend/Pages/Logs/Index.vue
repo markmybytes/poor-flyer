@@ -4,7 +4,7 @@ import { formatLocalDateTime, parsePureCalendarDate } from '@/utils/timezone'
 import { router, usePage } from '@inertiajs/vue3'
 import { VueDatePicker } from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
-import { computed, ref, useTemplateRef, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useToast } from 'vue-toast-notification'
 
 const props = defineProps<{
@@ -21,28 +21,53 @@ const props = defineProps<{
 }>()
 
 const toast = useToast()
-const confirmModal = useTemplateRef<HTMLDialogElement>('confirmModal')
-const clearing = ref(false)
-const expandedRows = ref<number[]>([])
 
 const LOG_LEVELS = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] as const
-const selectedLevels = ref<string[]>(
-  props.filters.levels?.length ? [...props.filters.levels] : [...LOG_LEVELS],
-)
 
-const dateRange = ref<Date[] | null>(
-  props.filters.startDate && props.filters.endDate
-    ? [
-        parsePureCalendarDate(props.filters.startDate)!,
-        parsePureCalendarDate(props.filters.endDate)!,
-      ]
-    : null,
-)
+const filters = ref<{
+  levels: string[]
+  start: Date | null
+  end: Date | null
+  perPage: number
+}>({
+  levels: props.filters.levels?.length ? [...props.filters.levels] : [...LOG_LEVELS],
+  start: parsePureCalendarDate(props.filters.startDate),
+  end: parsePureCalendarDate(props.filters.endDate),
+  perPage: props.pagination.perPage || 50,
+})
 
-const itemsPerPage = ref(props.pagination.perPage || 50)
+const ui = ref({
+  loading: false,
+  expanded: [] as number[],
+  confirmOpen: false,
+})
 
-const isAllLevelsSelected = computed(() =>
-  LOG_LEVELS.every((lvl) => selectedLevels.value.includes(lvl)),
+// the picker works in date pairs; the filter draft keeps two plain dates
+const dateRange = computed<Date[] | null>({
+  get: () =>
+    filters.value.start && filters.value.end ? [filters.value.start, filters.value.end] : null,
+  set: (val) => {
+    filters.value.start = val?.[0] ?? null
+    filters.value.end = val?.[1] ?? null
+  },
+})
+
+// preserveState keeps this page mounted across filter navigations: reseed from what the server applied
+watch(
+  () => [props.filters, props.pagination] as const,
+  ([nextFilters, nextPagination]) => {
+    const levels = nextFilters.levels?.length ? nextFilters.levels : LOG_LEVELS
+    if (levels.join(',') !== filters.value.levels.join(',')) filters.value.levels = [...levels]
+
+    const start = parsePureCalendarDate(nextFilters.startDate)
+    if (start?.getTime() !== filters.value.start?.getTime()) filters.value.start = start
+
+    const end = parsePureCalendarDate(nextFilters.endDate)
+    if (end?.getTime() !== filters.value.end?.getTime()) filters.value.end = end
+
+    filters.value.perPage = nextPagination.perPage || 50
+  },
+  { deep: true },
 )
 
 function levelBadgeClass(level: string): string {
@@ -60,48 +85,42 @@ function formatLocalDate(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
-function toggleRow(i: number) {
-  const idx = expandedRows.value.indexOf(i)
-  if (idx > -1) {
-    expandedRows.value.splice(idx, 1)
-  } else {
-    expandedRows.value.push(i)
-  }
-}
-
-function navigate(page = 1) {
-  expandedRows.value = []
+function navigate(page = 1): void {
+  ui.value.expanded = []
   const data: Record<string, string | number> = {
     page,
-    per_page: itemsPerPage.value,
-    levels: selectedLevels.value.join(','),
+    per_page: filters.value.perPage,
+    levels: filters.value.levels.join(','),
   }
 
-  if (Array.isArray(dateRange.value)) {
-    if (dateRange.value[0]) data.start_date = formatLocalDate(dateRange.value[0])
-    if (dateRange.value[1]) data.end_date = formatLocalDate(dateRange.value[1])
+  if (filters.value.start && filters.value.end) {
+    data.start_date = formatLocalDate(filters.value.start)
+    data.end_date = formatLocalDate(filters.value.end)
   }
 
   router.get('/logs/', data, { preserveState: true, preserveScroll: true, replace: true })
 }
 
-function toggleLevel(level: (typeof LOG_LEVELS)[number] | 'ALL') {
-  if (level === 'ALL') return (selectedLevels.value = [...LOG_LEVELS])
-
-  if (selectedLevels.value.includes(level)) {
-    selectedLevels.value = selectedLevels.value.filter((lvl) => lvl !== level)
-  } else {
-    selectedLevels.value.push(level)
+function toggleLevel(level: (typeof LOG_LEVELS)[number] | 'ALL'): void {
+  if (level === 'ALL') {
+    filters.value.levels = [...LOG_LEVELS]
+    return
   }
 
-  if (!selectedLevels.value.length) {
-    selectedLevels.value = [...LOG_LEVELS]
+  if (filters.value.levels.includes(level)) {
+    filters.value.levels = filters.value.levels.filter((lvl) => lvl !== level)
+  } else {
+    filters.value.levels.push(level)
+  }
+
+  if (!filters.value.levels.length) {
+    filters.value.levels = [...LOG_LEVELS]
   }
 }
 
 let timeoutId: ReturnType<typeof setTimeout>
 watch(
-  [selectedLevels, dateRange],
+  () => [filters.value.levels, filters.value.start, filters.value.end],
   () => {
     clearTimeout(timeoutId)
     timeoutId = setTimeout(() => navigate(1), 500)
@@ -110,13 +129,6 @@ watch(
 )
 
 const totalPages = computed(() => Math.ceil(props.pagination.total / props.pagination.perPage))
-
-const startIndex = computed(() =>
-  props.pagination.total === 0 ? 0 : (props.pagination.page - 1) * props.pagination.perPage + 1,
-)
-const endIndex = computed(() =>
-  Math.min(props.pagination.page * props.pagination.perPage, props.pagination.total),
-)
 
 const pageNumbers = computed((): (number | '...')[] => {
   const { page } = props.pagination
@@ -138,17 +150,18 @@ const pageNumbers = computed((): (number | '...')[] => {
 })
 
 function clearLogs(): void {
-  clearing.value = true
+  ui.value.loading = true
   router.delete('/logs', {
     onSuccess: () => {
-      confirmModal.value?.close()
+      ui.value.confirmOpen = false
     },
     onError: () => {
       const errors = usePage().props.errors ?? {}
-      toast.error(errors.logs ? '清除失敗，請稍後再試' : '清除失敗')
+      // the endpoint flashes zh-Hant server copy; the fallback covers an empty bag
+      toast.error(errors.logs ?? '清除失敗')
     },
     onFinish: () => {
-      clearing.value = false
+      ui.value.loading = false
     },
   })
 }
@@ -170,7 +183,11 @@ function clearLogs(): void {
           <div class="join flex flex-wrap gap-0">
             <button
               class="btn join-item btn-xs"
-              :class="isAllLevelsSelected ? 'btn-primary' : 'border border-base-300 btn-ghost'"
+              :class="
+                LOG_LEVELS.every((lvl) => filters.levels.includes(lvl))
+                  ? 'btn-primary'
+                  : 'border border-base-300 btn-ghost'
+              "
               @click="toggleLevel('ALL')"
             >
               ALL
@@ -181,7 +198,7 @@ function clearLogs(): void {
               :key="lvl"
               class="btn join-item btn-xs"
               :class="
-                selectedLevels.includes(lvl) ? 'btn-primary' : 'border border-base-300 btn-ghost'
+                filters.levels.includes(lvl) ? 'btn-primary' : 'border border-base-300 btn-ghost'
               "
               @click="toggleLevel(lvl)"
             >
@@ -205,7 +222,7 @@ function clearLogs(): void {
         </div>
 
         <div class="flex-none">
-          <button class="btn btn-outline btn-sm btn-error" @click="confirmModal?.showModal()">
+          <button class="btn btn-outline btn-sm btn-error" @click="ui.confirmOpen = true">
             清理紀錄
           </button>
         </div>
@@ -213,7 +230,7 @@ function clearLogs(): void {
     </div>
 
     <div class="tracker-panel overflow-hidden rounded-lg border border-base-200 shadow-sm">
-      <div v-if="logs.length === 0" class="py-16 text-center text-base-content/50">
+      <div v-if="props.logs.length === 0" class="py-16 text-center text-base-content/50">
         <div class="mb-2 text-4xl">📋</div>
 
         <div class="font-medium">無符合篩選條件的紀錄</div>
@@ -236,10 +253,19 @@ function clearLogs(): void {
           </thead>
 
           <tbody>
-            <template v-for="(entry, i) in logs" :key="i">
+            <template v-for="(entry, i) in props.logs" :key="i">
               <tr
                 class="cursor-pointer transition-colors hover:bg-base-200/40"
-                @click="toggleRow(i)"
+                @click="
+                  () => {
+                    const idx = ui.expanded.indexOf(i)
+                    if (idx > -1) {
+                      ui.expanded.splice(idx, 1)
+                    } else {
+                      ui.expanded.push(i)
+                    }
+                  }
+                "
               >
                 <td
                   class="hidden font-mono text-xs whitespace-nowrap text-base-content/60 md:table-cell"
@@ -275,7 +301,7 @@ function clearLogs(): void {
                     xmlns="http://www.w3.org/2000/svg"
                     class="inline-block h-4 w-4 opacity-50 transition-transform duration-200"
                     :class="[
-                      expandedRows.includes(i) ? 'rotate-180' : '',
+                      ui.expanded.includes(i) ? 'rotate-180' : '',
                       !entry.traceback ? 'md:hidden' : '',
                     ]"
                     viewBox="0 0 20 20"
@@ -290,7 +316,7 @@ function clearLogs(): void {
                 </td>
               </tr>
 
-              <tr v-if="expandedRows.includes(i)" class="bg-base-200/20">
+              <tr v-if="ui.expanded.includes(i)" class="bg-base-200/20">
                 <td colspan="5" class="p-0">
                   <div class="border-b border-base-200/50 px-4 py-3">
                     <div class="mb-3 flex flex-col gap-1 md:hidden">
@@ -330,10 +356,20 @@ function clearLogs(): void {
 
     <div class="mt-6 flex flex-col items-center justify-between gap-4 sm:flex-row">
       <div class="flex items-center gap-3 text-sm text-base-content/70">
-        <span>顯示第 {{ startIndex }} 至 {{ endIndex }} 條，共 {{ pagination.total }} 條紀錄</span>
+        <span
+          >顯示第
+          {{
+            props.pagination.total === 0
+              ? 0
+              : (props.pagination.page - 1) * props.pagination.perPage + 1
+          }}
+          至
+          {{ Math.min(props.pagination.page * props.pagination.perPage, props.pagination.total) }}
+          條，共 {{ props.pagination.total }} 條紀錄</span
+        >
 
         <select
-          v-model="itemsPerPage"
+          v-model="filters.perPage"
           class="select-bordered select w-32 bg-base-100 select-sm"
           @change="navigate(1)"
         >
@@ -350,8 +386,8 @@ function clearLogs(): void {
       <div v-if="totalPages > 1" class="join">
         <button
           class="btn join-item min-w-9 p-0 btn-sm"
-          :disabled="pagination.page <= 1"
-          @click="navigate(pagination.page - 1)"
+          :disabled="props.pagination.page <= 1"
+          @click="navigate(props.pagination.page - 1)"
         >
           «
         </button>
@@ -364,7 +400,7 @@ function clearLogs(): void {
           <button
             v-else
             class="btn join-item min-w-9 p-0 btn-sm"
-            :class="p === pagination.page ? 'btn-active' : ''"
+            :class="p === props.pagination.page ? 'btn-active' : ''"
             @click="navigate(p as number)"
           >
             {{ p }}
@@ -373,15 +409,15 @@ function clearLogs(): void {
 
         <button
           class="btn join-item min-w-9 p-0 btn-sm"
-          :disabled="pagination.page >= totalPages"
-          @click="navigate(pagination.page + 1)"
+          :disabled="props.pagination.page >= totalPages"
+          @click="navigate(props.pagination.page + 1)"
         >
           »
         </button>
       </div>
     </div>
 
-    <dialog ref="confirmModal" class="modal">
+    <dialog class="modal" :class="{ 'modal-open': ui.confirmOpen }">
       <div class="modal-box">
         <h3 class="text-lg font-bold">確認清除紀錄</h3>
 
@@ -390,16 +426,16 @@ function clearLogs(): void {
         </p>
 
         <div class="modal-action">
-          <button class="btn btn-ghost" @click="confirmModal?.close()">取消</button>
+          <button class="btn btn-ghost" @click="ui.confirmOpen = false">取消</button>
 
-          <button class="btn btn-error" :disabled="clearing" @click="clearLogs">
-            <span v-if="clearing" class="loading loading-sm loading-spinner"></span>
+          <button class="btn btn-error" :disabled="ui.loading" @click="clearLogs">
+            <span v-if="ui.loading" class="loading loading-sm loading-spinner"></span>
             確認清除
           </button>
         </div>
       </div>
 
-      <form method="dialog" class="modal-backdrop"><button>close</button></form>
+      <div class="modal-backdrop" @click="ui.confirmOpen = false"></div>
     </dialog>
   </AppLayout>
 </template>

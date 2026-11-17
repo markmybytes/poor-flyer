@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { Itinerary } from '@/types'
-import { fmtDate, fmtFare, fmtItineraryName } from '@/utils'
+import { fmtDate, fmtFare, fmtFlightRange, fmtItineraryName } from '@/utils'
 import { formatLocalDate } from '@/utils/timezone'
 import { Link } from '@inertiajs/vue3'
 
-defineProps<{
+const props = defineProps<{
   itinerary: Itinerary
   baseCurrency: string
   archived?: boolean
@@ -17,67 +17,65 @@ const emit = defineEmits<{ restore: [itinerary: Itinerary] }>()
   <div
     class="tracker-panel group relative transition-colors active:bg-base-200/60 sm:card sm:rounded-lg sm:border sm:active:bg-transparent"
     :class="
-      archived
+      props.archived
         ? 'bg-base-200/40 sm:border-base-200'
         : [
             'bg-base-100 sm:transition-all sm:duration-300 sm:hover:-translate-y-1 sm:hover:shadow-xl',
-            itinerary.rule37Analysis?.phase === 'BUY_SIGNAL'
+            props.itinerary.rule37Analysis?.phase === 'BUY_SIGNAL'
               ? 'bg-success/[0.04] sm:border-success/40 sm:bg-base-100 sm:hover:border-success/70'
               : 'sm:border-base-200',
           ]
     "
   >
     <Link
-      :href="`/itineraries/${itinerary.id}`"
+      :href="`/itineraries/${props.itinerary.id}`"
       class="absolute inset-0 z-10"
-      :aria-label="`查看 ${fmtItineraryName(itinerary)} 詳情`"
+      :aria-label="`查看 ${fmtItineraryName(props.itinerary)} 詳情`"
     ></Link>
 
     <!-- Mobile -->
     <div class="flex items-center justify-between gap-3 px-4 py-3.5 sm:hidden">
-      <div class="min-w-0 flex-1 space-y-1" :class="archived ? 'opacity-70' : ''">
+      <div class="min-w-0 flex-1 space-y-1" :class="props.archived ? 'opacity-70' : ''">
         <div
           class="truncate text-[15px] font-extrabold tracking-tight"
-          :class="archived ? 'text-base-content/80' : 'text-base-content'"
+          :class="props.archived ? 'text-base-content/80' : 'text-base-content'"
         >
-          {{ fmtItineraryName(itinerary) }}
+          {{ fmtItineraryName(props.itinerary) }}
         </div>
 
         <div class="flex items-center gap-1.5 text-xs">
           <span class="shrink-0 text-base-content/55">
-            {{
-              itinerary.flights.length == 1
-                ? fmtDate(itinerary.flights.at(0).flightDate)
-                : `${fmtDate(itinerary.flights.at(0).flightDate)} - ${fmtDate(itinerary.flights.at(-1).flightDate)}`
-            }}
+            {{ fmtFlightRange(props.itinerary.flights) }}
           </span>
 
-          <template v-if="archived">
+          <template v-if="props.archived">
             <span class="text-base-content/30">·</span>
 
             <span class="truncate text-base-content/55">已封存</span>
           </template>
 
-          <template v-else-if="!itinerary.isActive">
+          <template v-else-if="!props.itinerary.isActive">
             <span class="text-base-content/30">·</span>
 
             <span class="truncate font-medium text-warning">已暫停</span>
           </template>
 
           <template
-            v-else-if="itinerary.rule37Analysis && itinerary.statistics?.latestVal !== null"
+            v-else-if="
+              props.itinerary.rule37Analysis && props.itinerary.statistics?.latestVal !== null
+            "
           >
             <span class="text-base-content/30">·</span>
 
             <span
-              v-if="itinerary.rule37Analysis.phase === 'BUY_SIGNAL'"
+              v-if="props.itinerary.rule37Analysis.phase === 'BUY_SIGNAL'"
               class="truncate font-semibold text-success"
             >
               入手訊號
             </span>
 
             <span
-              v-else-if="itinerary.rule37Analysis.phase === 'OBSERVING'"
+              v-else-if="props.itinerary.rule37Analysis.phase === 'OBSERVING'"
               class="truncate text-base-content/65"
             >
               數據觀察期
@@ -86,7 +84,9 @@ const emit = defineEmits<{ restore: [itinerary: Itinerary] }>()
             <span v-else class="truncate font-medium text-info">決策期</span>
           </template>
 
-          <template v-else-if="itinerary.deadline && itinerary.statistics?.latestVal == null">
+          <template
+            v-else-if="props.itinerary.deadline && props.itinerary.statistics?.latestVal == null"
+          >
             <span class="text-base-content/30">·</span>
 
             <span class="truncate text-base-content/55">收集數據中</span>
@@ -98,16 +98,16 @@ const emit = defineEmits<{ restore: [itinerary: Itinerary] }>()
         <span
           class="text-base font-black tabular-nums"
           :class="
-            itinerary.statistics?.latestVal == null
+            props.itinerary.statistics?.latestVal == null
               ? 'text-base-content/30'
-              : archived || !itinerary.isActive
+              : props.archived || !props.itinerary.isActive
                 ? 'text-base-content/65'
-                : itinerary.rule37Analysis?.phase === 'BUY_SIGNAL'
+                : props.itinerary.rule37Analysis?.phase === 'BUY_SIGNAL'
                   ? 'text-success'
                   : 'text-primary'
           "
         >
-          {{ fmtFare(itinerary.statistics?.latestVal ?? null, baseCurrency) }}
+          {{ fmtFare(props.itinerary.statistics?.latestVal ?? null, props.baseCurrency) }}
         </span>
 
         <svg
@@ -128,117 +128,116 @@ const emit = defineEmits<{ restore: [itinerary: Itinerary] }>()
 
     <!-- Tablet & Desktop -->
     <div class="card-body hidden gap-4 p-4 sm:flex md:gap-5 md:p-5 lg:p-6">
-      <div class="flex flex-col gap-2" :class="archived ? 'opacity-70' : ''">
+      <div class="flex flex-col gap-2" :class="props.archived ? 'opacity-70' : ''">
         <div class="flex justify-between gap-2">
           <span
             class="text-lg font-black tracking-tight md:text-xl"
-            :class="archived ? 'text-base-content/80' : 'text-base-content'"
+            :class="props.archived ? 'text-base-content/80' : 'text-base-content'"
           >
-            {{ fmtItineraryName(itinerary) }}
+            {{ fmtItineraryName(props.itinerary) }}
           </span>
 
-          <span v-if="archived" class="badge shrink-0 badge-soft badge-neutral">已封存</span>
+          <span v-if="props.archived" class="badge shrink-0 badge-soft badge-neutral">已封存</span>
 
-          <span v-else-if="!itinerary.isActive" class="badge shrink-0 badge-soft badge-warning">
+          <span
+            v-else-if="!props.itinerary.isActive"
+            class="badge shrink-0 badge-soft badge-warning"
+          >
             已暫停
           </span>
         </div>
 
-        <p class="text-sm font-medium" :class="archived ? 'text-base-content/55' : ''">
-          日期：{{
-            itinerary.flights.length == 1
-              ? fmtDate(itinerary.flights.at(0).flightDate)
-              : `${fmtDate(itinerary.flights.at(0).flightDate)} - ${fmtDate(itinerary.flights.at(-1).flightDate)}`
-          }}
+        <p class="text-sm font-medium" :class="props.archived ? 'text-base-content/55' : ''">
+          日期：{{ fmtFlightRange(props.itinerary.flights) }}
         </p>
       </div>
 
       <div
         class="stats stats-vertical rounded-lg border border-base-200 sm:max-xl:grid-cols-2 xl:stats-horizontal"
-        :class="archived ? 'bg-base-100/60' : 'bg-base-200/50'"
+        :class="props.archived ? 'bg-base-100/60' : 'bg-base-200/50'"
       >
         <div
           class="stat px-3.5 py-3 sm:max-xl:col-span-2 md:px-4 md:py-3.5 lg:px-5 lg:py-4 xl:px-4"
-          :class="archived ? '' : 'transition-colors group-hover:bg-base-200/80'"
+          :class="props.archived ? '' : 'transition-colors group-hover:bg-base-200/80'"
         >
           <div
             class="stat-title"
-            :class="archived ? 'text-base-content/50' : 'text-base-content/55'"
+            :class="props.archived ? 'text-base-content/50' : 'text-base-content/55'"
           >
             最新總計
           </div>
 
           <div
             class="stat-value text-2xl tabular-nums md:text-3xl xl:text-2xl"
-            :class="archived ? 'text-base-content/70' : 'text-primary'"
+            :class="props.archived ? 'text-base-content/70' : 'text-primary'"
           >
-            {{ fmtFare(itinerary.statistics?.latestVal ?? null, baseCurrency) }}
+            {{ fmtFare(props.itinerary.statistics?.latestVal ?? null, props.baseCurrency) }}
           </div>
         </div>
 
         <div
           class="stat px-3 py-3 md:px-4 md:py-3.5 lg:px-5 lg:py-4 xl:px-3.5"
-          :class="archived ? '' : 'transition-colors group-hover:bg-base-200/80'"
+          :class="props.archived ? '' : 'transition-colors group-hover:bg-base-200/80'"
         >
           <div
             class="stat-title"
-            :class="archived ? 'text-base-content/50' : 'text-base-content/55'"
+            :class="props.archived ? 'text-base-content/50' : 'text-base-content/55'"
           >
             歷史最低
           </div>
 
           <div
             class="stat-value text-lg tabular-nums md:text-xl lg:text-2xl xl:text-xl"
-            :class="archived ? 'text-base-content/60' : 'text-success'"
+            :class="props.archived ? 'text-base-content/60' : 'text-success'"
           >
-            {{ fmtFare(itinerary.statistics?.allTimeLow ?? null, baseCurrency) }}
+            {{ fmtFare(props.itinerary.statistics?.allTimeLow ?? null, props.baseCurrency) }}
           </div>
         </div>
 
         <div
           class="stat px-3 py-3 sm:max-xl:border-l sm:max-xl:border-base-content/10 md:px-4 md:py-3.5 lg:px-5 lg:py-4 xl:px-3.5"
-          :class="archived ? '' : 'transition-colors group-hover:bg-base-200/80'"
+          :class="props.archived ? '' : 'transition-colors group-hover:bg-base-200/80'"
         >
           <div
             class="stat-title"
-            :class="archived ? 'text-base-content/50' : 'text-base-content/55'"
+            :class="props.archived ? 'text-base-content/50' : 'text-base-content/55'"
           >
             歷史最高
           </div>
 
           <div
             class="stat-value text-lg tabular-nums md:text-xl lg:text-2xl xl:text-xl"
-            :class="archived ? 'text-base-content/60' : 'text-error'"
+            :class="props.archived ? 'text-base-content/60' : 'text-error'"
           >
-            {{ fmtFare(itinerary.statistics?.allTimeHigh ?? null, baseCurrency) }}
+            {{ fmtFare(props.itinerary.statistics?.allTimeHigh ?? null, props.baseCurrency) }}
           </div>
         </div>
       </div>
 
-      <div v-if="!archived" class="my-auto">
+      <div v-if="!props.archived" class="my-auto">
         <div
-          v-if="itinerary.rule37Analysis && itinerary.statistics?.latestVal !== null"
+          v-if="props.itinerary.rule37Analysis && props.itinerary.statistics?.latestVal !== null"
           class="rounded-lg border px-3.5 py-3.5 transition-colors md:px-4 md:py-4"
           :class="{
             'border-success/20 bg-success/10 group-hover:bg-success/15':
-              itinerary.rule37Analysis.phase === 'BUY_SIGNAL',
+              props.itinerary.rule37Analysis.phase === 'BUY_SIGNAL',
             'border-info/20 bg-info/10 group-hover:bg-info/15':
-              itinerary.rule37Analysis.phase === 'WAITING',
+              props.itinerary.rule37Analysis.phase === 'WAITING',
             'border-neutral/10 bg-neutral/5 group-hover:bg-neutral/10':
-              itinerary.rule37Analysis.phase === 'OBSERVING',
+              props.itinerary.rule37Analysis.phase === 'OBSERVING',
           }"
         >
           <div class="space-y-3">
             <p class="text-xs font-bold tracking-widest uppercase opacity-60">購買時機分析</p>
 
             <div class="flex items-center gap-2">
-              <template v-if="itinerary.rule37Analysis.phase === 'BUY_SIGNAL'">
+              <template v-if="props.itinerary.rule37Analysis.phase === 'BUY_SIGNAL'">
                 <span class="status status-lg animate-pulse status-success"></span>
 
                 <span class="text-sm font-bold text-success">入手訊號（最佳購買時機）</span>
               </template>
 
-              <template v-else-if="itinerary.rule37Analysis.phase === 'OBSERVING'">
+              <template v-else-if="props.itinerary.rule37Analysis.phase === 'OBSERVING'">
                 <span class="status status-lg status-neutral"></span>
 
                 <span class="text-sm font-bold text-neutral">數據觀察期</span>
@@ -249,7 +248,12 @@ const emit = defineEmits<{ restore: [itinerary: Itinerary] }>()
 
                 <span class="text-sm font-bold text-info">
                   決策期（門檻:
-                  {{ fmtFare(itinerary.rule37Analysis.historyBestVal ?? null, baseCurrency) }}）
+                  {{
+                    fmtFare(
+                      props.itinerary.rule37Analysis.historyBestVal ?? null,
+                      props.baseCurrency,
+                    )
+                  }}）
                 </span>
               </template>
             </div>
@@ -257,13 +261,13 @@ const emit = defineEmits<{ restore: [itinerary: Itinerary] }>()
             <div class="text-xs text-base-content/60">
               <span class="font-medium">購票限期：</span>
 
-              <span>{{ fmtDate(itinerary.deadline) }}</span>
+              <span>{{ fmtDate(props.itinerary.deadline) }}</span>
             </div>
           </div>
         </div>
 
         <div
-          v-else-if="itinerary.deadline && itinerary.statistics?.latestVal == null"
+          v-else-if="props.itinerary.deadline && props.itinerary.statistics?.latestVal == null"
           class="bg-base-50/50 group-hover:border-base-400 rounded-lg border border-dashed border-base-300 px-3.5 py-4 text-center transition-all group-hover:bg-base-200/20 md:px-4 md:py-5"
         >
           <div class="flex flex-col items-center justify-center space-y-2">
@@ -276,7 +280,7 @@ const emit = defineEmits<{ restore: [itinerary: Itinerary] }>()
             <div class="flex items-center justify-center gap-1 text-xs text-base-content/60">
               <span class="font-medium opacity-70">購票限期：</span>
 
-              <span>{{ fmtDate(itinerary.deadline) }}</span>
+              <span>{{ fmtDate(props.itinerary.deadline) }}</span>
             </div>
           </div>
         </div>
@@ -293,12 +297,12 @@ const emit = defineEmits<{ restore: [itinerary: Itinerary] }>()
 
       <div v-else class="flex items-center justify-between border-t border-base-300/60 pt-4">
         <span class="text-xs font-medium text-base-content/50">
-          封存於 {{ formatLocalDate(itinerary.archivedAt) }}
+          封存於 {{ formatLocalDate(props.itinerary.archivedAt) }}
         </span>
 
         <button
           class="btn relative z-20 btn-ghost btn-sm"
-          @click.stop.prevent="emit('restore', itinerary)"
+          @click.stop.prevent="emit('restore', props.itinerary)"
         >
           恢復追蹤
         </button>

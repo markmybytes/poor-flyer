@@ -9,7 +9,6 @@ const props = defineProps<{
 
 const model = defineModel<string>({ required: true })
 
-// the viewer's local calendar day (en-CA renders YYYY-MM-DD) as the picker floor
 const minDate = new Date().toLocaleDateString('en-CA')
 
 // a departed trip gets no upper bound, so max never undercuts min
@@ -25,20 +24,20 @@ const maxDate = computed(() =>
       minDate,
       maxDate,
       startDate: maxDate,
-      markers: trip?.start
+      markers: props.trip?.start
         ? [
-            { date: trip.start, type: 'dot' as const, color: '#007af0' },
-            ...(trip.end && trip.end !== trip.start
-              ? [{ date: trip.end, type: 'dot' as const, color: '#10b981' }]
+            { date: props.trip.start, type: 'dot' as const, color: '#007af0' },
+            ...(props.trip.end && props.trip.end !== props.trip.start
+              ? [{ date: props.trip.end, type: 'dot' as const, color: '#10b981' }]
               : []),
           ]
         : undefined,
-      presetDates: !trip?.start
+      presetDates: !props.trip?.start
         ? []
         : [7, 14, 30, 60, 90]
             .map((days) => ({
               label: `-${days}天`,
-              value: subDays(parseISO(trip.start!), days),
+              value: subDays(parseISO(props.trip.start!), days),
             }))
             .filter((preset) => {
               const max = maxDate ? parseISO(maxDate).getTime() : null

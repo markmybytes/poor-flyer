@@ -95,6 +95,42 @@ describe('Settings/Index', () => {
     expect(wrapper.text()).toContain('API unavailable')
   })
 
+  it('refreshes fx rates through the API, then reloads the page props', async () => {
+    const wrapper = mount(SettingsIndexPage, {
+      props: defaultProps,
+      global: { stubs: globalStubs },
+    })
+    const refreshBtn = wrapper.findAll('button').find((b) => b.text().includes('更新匯率'))!
+
+    await refreshBtn.trigger('click')
+    await flushPromises()
+
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/settings/fx-rates/refresh',
+      expect.objectContaining({ method: 'POST' }),
+    )
+    expect(router.reload).toHaveBeenCalled()
+    // the reloaded props are the feedback: same shape as the Detail scrape, no local success toast
+    const { useToast } = await import('vue-toast-notification')
+    expect(vi.mocked(useToast)().success).not.toHaveBeenCalled()
+  })
+
+  it('toasts and skips the reload when the refresh request fails', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: false } as Response)
+    const wrapper = mount(SettingsIndexPage, {
+      props: defaultProps,
+      global: { stubs: globalStubs },
+    })
+    const refreshBtn = wrapper.findAll('button').find((b) => b.text().includes('更新匯率'))!
+
+    await refreshBtn.trigger('click')
+    await flushPromises()
+
+    expect(router.reload).not.toHaveBeenCalled()
+    const { useToast } = await import('vue-toast-notification')
+    expect(vi.mocked(useToast)().error).toHaveBeenCalledWith('更新匯率失敗，請稍後再試')
+  })
+
   it('posts to /settings through the Inertia router on save', async () => {
     const wrapper = mount(SettingsIndexPage, {
       props: defaultProps,
@@ -145,5 +181,4 @@ describe('Settings/Index', () => {
       expect(fetch).toHaveBeenCalled()
     }
   })
-
 })

@@ -11,14 +11,12 @@ const props = defineProps<{ itineraries: Itinerary[]; baseCurrency: string }>()
 
 const toast = useToast()
 
-const archivedView = ref(
-  typeof window !== 'undefined' &&
-    new URLSearchParams(window.location.search).get('archived') === '1',
-)
-
-const ui = ref<{ pendingId: string | null; restoring: boolean }>({
+const ui = ref<{ pendingId: string | null; restoring: boolean; archivedView: boolean }>({
   pendingId: null,
   restoring: false,
+  archivedView:
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('archived') === '1',
 })
 
 const pendingItinerary = computed(() =>
@@ -38,9 +36,9 @@ const summary = computed(() => {
 })
 
 function switchView(archived: boolean) {
-  if (archived === archivedView.value) return
+  if (archived === ui.value.archivedView) return
 
-  archivedView.value = archived
+  ui.value.archivedView = archived
   // Fresh navigation — Inertia resets scroll to top for each view's own layout.
   router.get('/itineraries/', archived ? { archived: '1' } : {}, {
     replace: true,
@@ -87,16 +85,16 @@ function runRestore() {
       class="tracker-panel stats mb-8 w-full stats-horizontal gap-0 rounded-lg border border-base-200 shadow-sm"
     >
       <div class="stat px-4 py-3 sm:px-6 sm:py-4">
-        <div class="stat-title text-xs sm:text-sm">{{ archivedView ? '已封存' : '旅程' }}</div>
+        <div class="stat-title text-xs sm:text-sm">{{ ui.archivedView ? '已封存' : '旅程' }}</div>
 
         <div class="stat-value text-xl text-primary sm:text-3xl">{{ summary.total }}</div>
 
         <div class="stat-desc hidden sm:block">
-          {{ archivedView ? '已完結的旅程紀錄' : '已儲存的追蹤項目' }}
+          {{ ui.archivedView ? '已完結的旅程紀錄' : '已儲存的追蹤項目' }}
         </div>
       </div>
 
-      <template v-if="!archivedView">
+      <template v-if="!ui.archivedView">
         <div class="stat px-4 py-3 sm:px-6 sm:py-4">
           <div class="stat-title text-xs sm:text-sm">自動追蹤中</div>
 
@@ -119,7 +117,7 @@ function runRestore() {
       <div class="join gap-0 shadow-sm">
         <button
           class="btn join-item btn-sm"
-          :class="archivedView ? 'border border-base-300 btn-ghost' : 'btn-primary'"
+          :class="ui.archivedView ? 'border border-base-300 btn-ghost' : 'btn-primary'"
           @click="switchView(false)"
         >
           追蹤中
@@ -127,26 +125,28 @@ function runRestore() {
 
         <button
           class="btn join-item btn-sm"
-          :class="archivedView ? 'btn-primary' : 'border border-base-300 btn-ghost'"
+          :class="ui.archivedView ? 'btn-primary' : 'border border-base-300 btn-ghost'"
           @click="switchView(true)"
         >
           已封存
         </button>
       </div>
 
-      <Link href="/itineraries/create" class="btn shadow-sm btn-primary">新增監察項目</Link>
+      <Link href="/props.itineraries/create" class="btn shadow-sm btn-primary">新增監察項目</Link>
     </div>
 
     <div
-      v-if="itineraries?.length"
+      v-if="props.itineraries?.length"
       class="divide-y divide-base-200 overflow-hidden rounded-lg border border-base-200 bg-base-100 shadow-sm sm:grid sm:grid-cols-2 sm:gap-4 sm:divide-y-0 sm:overflow-visible sm:rounded-none sm:border-0 sm:bg-transparent sm:shadow-none md:gap-5 lg:gap-6"
     >
       <ItineraryCard
-        v-for="itinerary in itineraries.toSorted((a, b) => a.createdAt.localeCompare(b.createdAt))"
+        v-for="itinerary in props.itineraries.toSorted((a, b) =>
+          a.createdAt.localeCompare(b.createdAt),
+        )"
         :key="itinerary.id"
         :itinerary="itinerary"
-        :base-currency="baseCurrency"
-        :archived="archivedView"
+        :base-currency="props.baseCurrency"
+        :archived="ui.archivedView"
         @restore="confirmRestore"
       />
     </div>
@@ -160,27 +160,27 @@ function runRestore() {
           <div
             class="flex h-24 w-24 items-center justify-center rounded-full text-5xl"
             :class="
-              archivedView ? 'bg-base-200 text-base-content/50' : 'bg-primary/10 text-primary'
+              ui.archivedView ? 'bg-base-200 text-base-content/50' : 'bg-primary/10 text-primary'
             "
           >
-            {{ archivedView ? '🗄️' : '✈️' }}
+            {{ ui.archivedView ? '🗄️' : '✈️' }}
           </div>
         </div>
 
         <h3 class="mb-2 text-2xl font-bold text-base-content">
-          {{ archivedView ? '沒有已封存的旅程' : '未有追蹤任何旅程' }}
+          {{ ui.archivedView ? '沒有已封存的旅程' : '未有追蹤任何旅程' }}
         </h3>
 
         <p class="mb-8 max-w-xl text-sm leading-relaxed text-base-content/65">
           {{
-            archivedView
+            ui.archivedView
               ? '已完結的旅程會被封存於此，僅保留紀錄供回顧。'
               : '新增你想關注的，系統將全天候自動收集機票價格，助你分析最佳的購買時機。'
           }}
         </p>
 
-        <Link href="/itineraries/create" class="btn shadow-sm btn-lg btn-primary">
-          {{ archivedView ? '建立新的追蹤' : '建立你的第一個追蹤' }}
+        <Link href="/props.itineraries/create" class="btn shadow-sm btn-lg btn-primary">
+          {{ ui.archivedView ? '建立新的追蹤' : '建立你的第一個追蹤' }}
         </Link>
       </div>
     </div>

@@ -128,7 +128,7 @@ onUnmounted(() => chart?.destroy())
 </script>
 
 <template>
-  <template v-if="itinerary.flights.length">
+  <template v-if="props.itinerary.flights.length">
     <div class="relative h-100 rounded-3xl bg-base-100 p-4 max-sm:h-80 md:p-6">
       <canvas ref="chartCanvas"></canvas>
     </div>

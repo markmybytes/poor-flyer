@@ -120,7 +120,7 @@ describe('Itineraries/Detail per-leg notifications', () => {
     expect(wrapper.text()).not.toContain('已開啟')
   })
 
-  it('syncs the applied chips when the visit refreshes the props', async () => {
+  it('syncs the chips when the visit refreshes the props', async () => {
     const wrapper = mountDetail({ notifyPerLeg: false, deadline: null })
     expect(wrapper.text()).toContain('未開啟')
     expect(wrapper.text()).toContain('未啟用數據分析')

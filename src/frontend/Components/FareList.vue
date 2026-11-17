@@ -143,7 +143,7 @@ const dailySnapshots = computed(() => {
         </button>
 
         <div
-          v-if="rule37Analysis?.phase && group.date === rule37Analysis.cutoffDate"
+          v-if="props.rule37Analysis?.phase && group.date === props.rule37Analysis.cutoffDate"
           class="border-y border-warning/20 bg-warning/15 px-5 py-1.5 text-center"
         >
           <p class="text-[11px] font-bold tracking-widest text-warning-content">

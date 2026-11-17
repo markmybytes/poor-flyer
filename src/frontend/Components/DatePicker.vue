@@ -42,7 +42,7 @@ const model = defineModel<string | string[]>({ required: true })
           :value="
             !Array.isArray(model) ? model : model.length === 2 ? `${model[0]} 至 ${model[1]}` : ''
           "
-          :placeholder="placeholder"
+          :placeholder="props.placeholder"
           class="input-bordered input w-full cursor-pointer transition-colors focus:input-primary"
           readonly
           v-bind="$attrs"
@@ -51,10 +51,10 @@ const model = defineModel<string | string[]>({ required: true })
     </VueDatePicker>
 
     <button
-      v-if="clearable"
+      v-if="props.clearable"
       type="button"
-      :title="clearLabel"
-      :aria-label="clearLabel"
+      :title="props.clearLabel"
+      :aria-label="props.clearLabel"
       class="btn absolute top-1/2 right-1.5 -translate-y-1/2 text-base-content/40 btn-ghost btn-xs hover:text-base-content/60"
       :disabled="Array.isArray(model) ? model.length === 0 : !model || Boolean($attrs.disabled)"
       @click="model = Array.isArray(model) ? [] : ''"

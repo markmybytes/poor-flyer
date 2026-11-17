@@ -45,6 +45,13 @@ export function fmtDate(iso: string | null) {
   return iso ? iso.replace(/-/g, '/') : '—'
 }
 
+export function fmtFlightRange(flights: { flightDate: string }[]): string {
+  if (flights.length === 1) {
+    return fmtDate(flights[0].flightDate)
+  }
+  return `${fmtDate(flights.at(0)?.flightDate ?? null)} - ${fmtDate(flights.at(-1)?.flightDate ?? null)}`
+}
+
 export function fmtTime(iso: string | null) {
   if (!iso) {
     return '—'
