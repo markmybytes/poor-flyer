@@ -5,8 +5,8 @@ import AppLayout from '@/Layouts/AppLayout.vue'
 import { CABIN_CLASS_OPTIONS, MAX_STOPS_OPTIONS } from '@/options'
 import type { Itinerary } from '@/types'
 import { fmtDate, fmtFare, fmtItineraryName } from '@/utils'
-import { router } from '@inertiajs/vue3'
-import { computed, ref } from 'vue'
+import { router, usePage } from '@inertiajs/vue3'
+import { computed, ref, watch } from 'vue'
 import { useToast } from 'vue-toast-notification'
 
 import DeadlineDatePicker from '@/Components/DeadlineDatePicker.vue'
@@ -20,6 +20,13 @@ const applied = ref({
   deadline: props.itinerary.deadline,
   notifyPerLeg: props.itinerary.notifyPerLeg ?? false,
 })
+
+watch(
+  () => [props.itinerary.deadline, props.itinerary.notifyPerLeg] as const,
+  ([deadline, notifyPerLeg]) => {
+    applied.value = { deadline, notifyPerLeg: notifyPerLeg ?? false }
+  },
+)
 
 const settings = ref({
   deadline: '',
@@ -65,92 +72,93 @@ function openSettingsModal(): void {
 function submitSettings(): void {
   ui.value.loading = 'update_settings'
   settings.value.error = ''
-  const targetDeadline = settings.value.deadline || null
+
+  router.patch(
+    `/itineraries/${props.itinerary.id}`,
+    { deadline: settings.value.deadline, notify_per_leg: settings.value.notifyPerLeg },
+    {
+      onSuccess: () => {
+        // Server flash is English ('Entry updated'); app copy is zh-Hant, so hardcode the fallback.
+        toast.success('已更新設定')
+        ui.value.settingsModal = false
+      },
+      onError: () => {
+        const errors = usePage().props.errors ?? {}
+        settings.value.error = errors.deadline
+          ? '購票限期無效，請重新選擇'
+          : errors.notifyPerLeg
+            ? '通知設定無效'
+            : '更新失敗，請稍後再試'
+      },
+      onFinish: () => {
+        ui.value.loading = null
+      },
+    },
+  )
+}
+
+type Action = 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive'
+
+const ACTION_LABELS: Record<Action, string> = {
+  toggle: '操作',
+  scrape: '更新票價',
+  delete: '刪除',
+  restore: '恢復追蹤',
+  archive: '封存',
+}
+
+function runAction(action: Action): void {
+  if (action !== 'toggle' && action !== 'scrape') {
+    ui.value[`${action}Modal`] = false
+  }
+  ui.value.loading = action
+
+  if (action === 'delete') {
+    router.delete(`/itineraries/${props.itinerary.id}`, {
+      onError: () => toast.error(`${ACTION_LABELS.delete}失敗，請稍後再試`),
+      onFinish: () => {
+        ui.value.loading = null
+      },
+    })
+    return
+  }
+
+  if (action === 'scrape') {
+    fetch(`/api/itineraries/${props.itinerary.id}/scrape`, { method: 'POST' })
+      .then((res) => {
+        if (!res.ok) throw new Error()
+        return router.reload()
+      })
+      .catch(() => toast.error(`${ACTION_LABELS.scrape}失敗，請稍後再試`))
+      .finally(() => {
+        ui.value.loading = null
+      })
+    return
+  }
 
   fetch(`/api/itineraries/${props.itinerary.id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ deadline: targetDeadline, notify_per_leg: settings.value.notifyPerLeg }),
+    body: JSON.stringify(
+      action === 'toggle'
+        ? { is_active: !props.itinerary.isActive }
+        : { archived: action === 'archive' },
+    ),
   })
     .then((res) => {
       if (!res.ok) {
         throw new Error()
       }
 
-      applied.value = { deadline: targetDeadline, notifyPerLeg: settings.value.notifyPerLeg }
-      // Server flash is English ('Entry updated'); app copy is zh-Hant, so hardcode the fallback.
-      toast.success('已更新設定')
-      ui.value.settingsModal = false
+      if (action === 'restore') {
+        toast.success('已恢復追蹤')
+      }
+      if (action === 'archive') {
+        toast.success('已封存')
+      }
       router.reload()
     })
-    .catch(() => {
-      settings.value.error = '更新失敗，請稍後再試'
-    })
-    .finally(() => {
-      ui.value.loading = null
-    })
-}
-
-function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive'): void {
-  if (action !== 'toggle' && action !== 'scrape') {
-    ui.value[`${action}Modal`] = false
-  }
-  ui.value.loading = action
-
-  const opts: RequestInit = {
-    method:
-      action === 'toggle' || action === 'restore' || action === 'archive'
-        ? 'PATCH'
-        : action === 'scrape'
-          ? 'POST'
-          : 'DELETE',
-  }
-  if (action === 'toggle') {
-    opts.headers = { 'Content-Type': 'application/json' }
-    opts.body = JSON.stringify({ is_active: !props.itinerary.isActive })
-  }
-  if (action === 'restore') {
-    opts.headers = { 'Content-Type': 'application/json' }
-    opts.body = JSON.stringify({ archived: false })
-  }
-  if (action === 'archive') {
-    opts.headers = { 'Content-Type': 'application/json' }
-    opts.body = JSON.stringify({ archived: true })
-  }
-
-  fetch(`/api/itineraries/${props.itinerary.id}${action === 'scrape' ? '/scrape' : ''}`, opts)
-    .then((res) => {
-      if (!res.ok) {
-        throw new Error()
-      }
-
-      if (action === 'delete') {
-        router.visit('/itineraries/')
-      } else {
-        if (action === 'restore') {
-          toast.success('已恢復追蹤')
-        }
-        if (action === 'archive') {
-          toast.success('已封存')
-        }
-        router.reload()
-      }
-    })
-    .catch(() => {
-      toast.error(
-        `${
-          action === 'scrape'
-            ? '更新票價'
-            : action === 'delete'
-              ? '刪除'
-              : action === 'restore'
-                ? '恢復追蹤'
-                : action === 'archive'
-                  ? '封存'
-                  : '操作'
-        }失敗，請稍後再試`,
-      )
-    })
+    .catch(() => toast.error(`${ACTION_LABELS[action]}失敗，請稍後再試`))
     .finally(() => {
       ui.value.loading = null
     })

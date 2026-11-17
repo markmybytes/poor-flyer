@@ -144,29 +144,12 @@ def test_patch_itinerary_rejects_filter_edits(client, app, payload):
     )
 
     assert resp.status_code == 400
-    assert resp.get_json()['message'] == '搜尋條件於建立後不可修改'
+    assert resp.get_json()['message'].startswith('Unsupported field: ')
     with app.app_context():
         unchanged = db.session.get(Itinerary, iid)
         assert unchanged.cabin_class == 'BUSINESS'
         assert unchanged.max_stops == 'NON_STOP'
         assert unchanged.airlines == ['CX']
-
-
-def test_patch_itinerary_deadline_only_still_updates(client, app):
-    deadline = date.today() + timedelta(days=5)
-    with app.app_context():
-        itinerary, _ = _seed_itinerary()
-        iid = itinerary.id
-
-    resp = client.patch(
-        f'/api/itineraries/{iid}',
-        data=json.dumps({'deadline': deadline.isoformat()}),
-        content_type='application/json',
-    )
-
-    assert resp.status_code == 200
-    with app.app_context():
-        assert db.session.get(Itinerary, iid).deadline == deadline
 
 
 def test_patch_itinerary_absent_filters_are_unchanged(client, app):
@@ -194,7 +177,7 @@ def test_patch_itinerary_absent_filters_are_unchanged(client, app):
 
 def test_create_itinerary_accepts_search_filters(client, app):
     resp = client.post(
-        '/api/itineraries',
+        '/itineraries',
         data=json.dumps(
             {
                 'trip_type': 'SINGLE',
@@ -207,9 +190,9 @@ def test_create_itinerary_accepts_search_filters(client, app):
         content_type='application/json',
     )
 
-    assert resp.status_code == 200
+    assert resp.status_code == 302
     with app.app_context():
-        created = db.session.get(Itinerary, resp.get_json()['data'])
+        created = db.session.query(Itinerary).one()
         assert created.cabin_class == 'PREMIUM_ECONOMY'
         assert created.max_stops == 'NON_STOP'
         assert created.airlines == ['UO']

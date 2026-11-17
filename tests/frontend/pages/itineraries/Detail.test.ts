@@ -1,6 +1,7 @@
 import DetailPage from '@/Pages/Itineraries/Detail.vue'
 import { flushPromises, mount } from '@vue/test-utils'
-import { router } from '@inertiajs/vue3'
+import { router, usePage } from '@inertiajs/vue3'
+import { nextTick } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useToast } from 'vue-toast-notification'
 import { VueDatePicker } from '@vuepic/vue-datepicker'
@@ -28,6 +29,14 @@ function mountDetail(overrides: Record<string, unknown> = {}) {
     },
     global: { stubs: globalStubs },
   })
+}
+
+function button(wrapper: ReturnType<typeof mountDetail>, label: string) {
+  return wrapper.findAll('button').find((b) => b.text().trim() === label)!
+}
+
+function mockPageErrors(errors: Record<string, string>): void {
+  vi.mocked(usePage).mockReturnValue({ props: { errors } } as never)
 }
 
 describe('Itineraries/Detail filters', () => {
@@ -70,22 +79,24 @@ describe('Itineraries/Detail filters', () => {
 
   it('asks for confirmation in a modal before deleting', async () => {
     const wrapper = mountDetail({ isActive: true })
-    // trash button only opens the modal — no fetch yet
-    vi.mocked(fetch).mockClear()
+    vi.mocked(router.delete).mockClear()
+    vi.mocked(router.visit).mockClear()
+
+    // trash button only opens the modal — no request yet
     await wrapper.find('button[title="刪除此追蹤"]').trigger('click')
     expect(wrapper.text()).toContain('此操作無法復原')
-    expect(fetch).not.toHaveBeenCalled()
+    expect(router.delete).not.toHaveBeenCalled()
 
-    // confirm button inside the modal triggers the DELETE + visit
-    const confirmBtn = wrapper.findAll('button').find((b) => b.text().trim() === '刪除')
-    await confirmBtn?.trigger('click')
-    await flushPromises()
+    // confirm button inside the modal deletes through the page route
+    await button(wrapper, '刪除').trigger('click')
 
-    expect(fetch).toHaveBeenCalledWith(
-      '/api/itineraries/it-1',
-      expect.objectContaining({ method: 'DELETE' }),
+    expect(router.delete).toHaveBeenCalledWith(
+      '/itineraries/it-1',
+      expect.objectContaining({ onError: expect.any(Function) }),
     )
-    expect(vi.mocked(router.visit)).toHaveBeenCalled()
+
+    // deletion goes through Inertia, never the JSON API
+    expect(fetch).not.toHaveBeenCalled()
   })
 })
 
@@ -108,6 +119,17 @@ describe('Itineraries/Detail per-leg notifications', () => {
     expect(wrapper.text()).toContain('未開啟')
     expect(wrapper.text()).not.toContain('已開啟')
   })
+
+  it('syncs the applied chips when the visit refreshes the props', async () => {
+    const wrapper = mountDetail({ notifyPerLeg: false, deadline: null })
+    expect(wrapper.text()).toContain('未開啟')
+    expect(wrapper.text()).toContain('未啟用數據分析')
+
+    await wrapper.setProps({ itinerary: { ...itinerary, notifyPerLeg: true, deadline: '2026-06-01' } })
+
+    expect(wrapper.text()).toContain('已開啟')
+    expect(wrapper.text()).toContain('收集數據中')
+  })
 })
 
 describe('Itineraries/Detail settings modal', () => {
@@ -116,6 +138,9 @@ describe('Itineraries/Detail settings modal', () => {
       ok: true,
       json: async () => ({ message: null, data: null }),
     } as Response)
+    vi.mocked(router.patch).mockClear()
+    vi.mocked(router.reload).mockClear()
+    mockPageErrors({})
   })
 
   it('opens the settings modal from the gear button without fetching', async () => {
@@ -131,24 +156,27 @@ describe('Itineraries/Detail settings modal', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 
-  it('saves the deadline via PATCH and keeps the chip in sync', async () => {
+  it('saves the deadline through the page route and closes the modal on success', async () => {
+    const toast = useToast() as unknown as { success: ReturnType<typeof vi.fn> }
     const wrapper = mountDetail({ deadline: '2026-06-01' })
+
     await wrapper.find('button[title="設定通知與限期"]').trigger('click')
+    await button(wrapper, '儲存').trigger('click')
 
-    const saveBtn = wrapper.findAll('button').find((b) => b.text().trim() === '儲存')
-    await saveBtn!.trigger('click')
-    await flushPromises()
-
-    expect(fetch).toHaveBeenCalledWith(
-      '/api/itineraries/it-1',
-      expect.objectContaining({
-        method: 'PATCH',
-        body: JSON.stringify({ deadline: '2026-06-01', notify_per_leg: false }),
-      }),
+    expect(router.patch).toHaveBeenCalledWith(
+      '/itineraries/it-1',
+      { deadline: '2026-06-01', notify_per_leg: false },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
     )
-    expect(wrapper.text()).toContain('購票限期')
-    expect(wrapper.text()).toContain('天後')
+
+    const options = vi.mocked(router.patch).mock.calls[0][2] as { onSuccess: () => void }
+    options.onSuccess()
+    await nextTick()
+
+    expect(toast.success).toHaveBeenCalledWith('已更新設定')
     expect(wrapper.findAll('dialog.modal-open')).toHaveLength(0)
+    // the redirect-back visit reloads the props; the component must not reload itself
+    expect(router.reload).not.toHaveBeenCalled()
   })
 
   it('keeps the in-field clear affordance disabled without a deadline and drops the footer button', async () => {
@@ -164,28 +192,21 @@ describe('Itineraries/Detail settings modal', () => {
   it('clears the draft in-field without PATCH; PATCH fires only on 儲存', async () => {
     const wrapper = mountDetail({ deadline: '2026-06-01' })
     await wrapper.find('button[title="設定通知與限期"]').trigger('click')
-    vi.mocked(fetch).mockClear()
 
     const clearBtn = wrapper.find('button[aria-label="清除限期"]')
     expect(clearBtn.attributes('disabled')).toBeUndefined()
 
     await clearBtn.trigger('click')
-    expect(fetch).not.toHaveBeenCalled()
+    expect(router.patch).not.toHaveBeenCalled()
 
-    await wrapper
-      .findAll('button')
-      .find((b) => b.text().trim() === '儲存')!
-      .trigger('click')
-    await flushPromises()
+    await button(wrapper, '儲存').trigger('click')
 
-    expect(fetch).toHaveBeenCalledWith(
-      '/api/itineraries/it-1',
-      expect.objectContaining({
-        method: 'PATCH',
-        body: JSON.stringify({ deadline: null, notify_per_leg: false }),
-      }),
+    // an emptied deadline is sent as '' — the page route clears it
+    expect(router.patch).toHaveBeenCalledWith(
+      '/itineraries/it-1',
+      { deadline: '', notify_per_leg: false },
+      expect.objectContaining({ onFinish: expect.any(Function) }),
     )
-    expect(wrapper.findAll('dialog.modal-open')).toHaveLength(0)
   })
 
   it('marks the departure date with a blue dot marker', async () => {
@@ -199,39 +220,93 @@ describe('Itineraries/Detail settings modal', () => {
     expect(Array.isArray(dpVNodeProps?.presetDates)).toBe(true)
   })
 
-  it('toggles notify_per_leg via PATCH', async () => {
+  it('toggles notify_per_leg through the page route', async () => {
     const wrapper = mountDetail({ notifyPerLeg: false })
     await wrapper.find('button[title="設定通知與限期"]').trigger('click')
 
     await wrapper.find('input[type="checkbox"]').setValue(true)
-    const saveBtn = wrapper.findAll('button').find((b) => b.text().trim() === '儲存')
-    await saveBtn!.trigger('click')
+    await button(wrapper, '儲存').trigger('click')
+
+    expect(router.patch).toHaveBeenCalledWith(
+      '/itineraries/it-1',
+      { deadline: '', notify_per_leg: true },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    )
+  })
+
+  it.each([
+    [{ deadline: 'The deadline must be a future date.' }, '購票限期無效，請重新選擇'],
+    [{ notifyPerLeg: 'The notification setting is invalid.' }, '通知設定無效'],
+    [{}, '更新失敗，請稍後再試'],
+  ])('maps the server error %o to inline copy', async (errors, copy) => {
+    mockPageErrors(errors as Record<string, string>)
+    const wrapper = mountDetail()
+    await wrapper.find('button[title="設定通知與限期"]').trigger('click')
+    await button(wrapper, '儲存').trigger('click')
+
+    const options = vi.mocked(router.patch).mock.calls.at(-1)![2] as {
+      onError: () => void
+      onFinish: () => void
+    }
+    options.onError()
+    await nextTick()
+
+    expect(wrapper.text()).toContain(copy)
+    expect(wrapper.find('dialog.modal.modal-open').exists()).toBe(true)
+
+    options.onFinish()
+    await nextTick()
+    expect(wrapper.text()).toContain(copy)
+  })
+})
+
+describe('Itineraries/Detail api actions', () => {
+  beforeEach(() => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({}) } as Response)
+  })
+
+  it('pauses tracking through the API PATCH and reloads', async () => {
+    const wrapper = mountDetail({ isActive: true })
+    vi.mocked(fetch).mockClear()
+    vi.mocked(router.reload).mockClear()
+
+    await button(wrapper, '暫停追蹤').trigger('click')
     await flushPromises()
 
     expect(fetch).toHaveBeenCalledWith(
       '/api/itineraries/it-1',
-      expect.objectContaining({
-        method: 'PATCH',
-        body: JSON.stringify({ deadline: null, notify_per_leg: true }),
-      }),
+      expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ is_active: false }) }),
     )
-    expect(wrapper.text()).toContain('已開啟')
+    expect(vi.mocked(router.reload)).toHaveBeenCalled()
   })
 
-  it('shows an inline error and keeps the modal open on failure', async () => {
-    vi.mocked(fetch).mockResolvedValue({
-      ok: false,
-      json: async () => ({ message: 'Entry not found', data: null }),
-    } as Response)
+  it('posts a scrape request to the API without visiting the page route', async () => {
     const wrapper = mountDetail()
-    await wrapper.find('button[title="設定通知與限期"]').trigger('click')
+    vi.mocked(fetch).mockClear()
+    vi.mocked(router.visit).mockClear()
 
-    const saveBtn = wrapper.findAll('button').find((b) => b.text().trim() === '儲存')
-    await saveBtn!.trigger('click')
+    await button(wrapper, '下載最新票價').trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('更新失敗')
-    expect(wrapper.find('dialog.modal.modal-open').exists()).toBe(true)
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/itineraries/it-1/scrape',
+      expect.objectContaining({ method: 'POST' }),
+    )
+    expect(vi.mocked(router.visit)).not.toHaveBeenCalled()
+    expect(vi.mocked(router.reload)).toHaveBeenCalled()
+  })
+
+  it('shows the failure toast when the scrape request fails', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: false } as Response)
+    vi.mocked(router.reload).mockClear()
+    const toast = useToast() as unknown as { error: ReturnType<typeof vi.fn> }
+    const wrapper = mountDetail()
+
+    await button(wrapper, '下載最新票價').trigger('click')
+    await flushPromises()
+
+    expect(vi.mocked(router.reload)).not.toHaveBeenCalled()
+    expect(toast.error).toHaveBeenCalledWith('更新票價失敗，請稍後再試')
   })
 })
 

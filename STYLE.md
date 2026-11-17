@@ -244,5 +244,5 @@ interface ApiResponse<T = unknown> {
 
 ### Frontend
 
-- The JSON provider emits every key, nested included, in `camelCase`: `latest_converted_fare` arrives as `latestConvertedFare`.
+- The JSON provider emits every key, nested included, in `camelCase`: `flight_date` arrives as `flightDate`.
 - Branch on status (`.then` for 2xx, `.catch` for the rest) and toast `response.data.message`.

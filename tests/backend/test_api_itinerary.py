@@ -1,17 +1,10 @@
 import json
 import uuid
 from datetime import UTC, date, datetime, timedelta
-from unittest.mock import patch
 
 import pytest
 
-from src.extensions.database import FareSnapshot, Flight, Itinerary, db
-
-_MOCK_RATES = {
-    'base': 'HKD',
-    'rates': {'HKD': 1.0, 'USD': 0.1282, 'JPY': 19.23},
-    'last_updated': '2024-06-15T00:00:00Z',
-}
+from src.extensions.database import Itinerary, db
 
 
 def _make_itinerary(trip_type='SINGLE', deadline=None):
@@ -26,197 +19,7 @@ def _make_itinerary(trip_type='SINGLE', deadline=None):
     return it
 
 
-def _make_flight(itinerary_id, origin='HKG', destination='NRT', sequence=0, flight_date=None):
-    f = Flight(
-        itinerary_id=itinerary_id,
-        sequence=sequence,
-        origin=origin,
-        destination=destination,
-        flight_date=flight_date or date.today() + timedelta(days=30),
-    )
-    db.session.add(f)
-    db.session.flush()
-    return f
-
-
-def _make_snapshot(flight_id, fare=1200.0, status='success', currency='HKD'):
-    s = FareSnapshot(
-        flight_id=flight_id,
-        fare=fare,
-        currency=currency,
-        scrape_status=status,
-        created_at=datetime.now(UTC),
-    )
-    db.session.add(s)
-    db.session.flush()
-    return s
-
-
-def test_create_itinerary_single_flight(client, app):
-    with app.app_context():
-        with patch('src.routes.api.itinerary.get_configured_base_currency', return_value='HKD'):
-            resp = client.post(
-                '/api/itineraries',
-                data=json.dumps(
-                    {
-                        'trip_type': 'SINGLE',
-                        'flights': [
-                            {'origin': 'HKG', 'destination': 'NRT', 'flight_date': '2025-12-01'}
-                        ],
-                    }
-                ),
-                content_type='application/json',
-            )
-    assert resp.status_code == 200
-    data = resp.get_json()
-    assert data['message'] == 'Entry created'
-    assert isinstance(data['data'], str)
-
-
-def test_create_itinerary_with_deadline(client, app):
-    first_departure = date.today() + timedelta(days=30)
-    with app.app_context():
-        resp = client.post(
-            '/api/itineraries',
-            data=json.dumps(
-                {
-                    'trip_type': 'SINGLE',
-                    'deadline': (first_departure - timedelta(days=10)).isoformat(),
-                    'flights': [
-                        {
-                            'origin': 'HKG',
-                            'destination': 'LHR',
-                            'flight_date': first_departure.isoformat(),
-                        }
-                    ],
-                }
-            ),
-            content_type='application/json',
-        )
-    assert resp.status_code == 200
-    assert resp.get_json()['message'] == 'Entry created'
-
-
-@pytest.mark.parametrize(
-    ('deadline_offset', 'message'),
-    [
-        (-1, 'Deadline must not be in the past'),
-        (31, 'Deadline must not be after the first departure'),
-    ],
-)
-def test_create_itinerary_rejects_out_of_range_deadline(client, app, deadline_offset, message):
-    payload = {
-        'trip_type': 'SINGLE',
-        'deadline': (date.today() + timedelta(days=deadline_offset)).isoformat(),
-        'flights': [
-            {
-                'origin': 'HKG',
-                'destination': 'NRT',
-                'flight_date': (date.today() + timedelta(days=30)).isoformat(),
-            }
-        ],
-    }
-    resp = client.post(
-        '/api/itineraries', data=json.dumps(payload), content_type='application/json'
-    )
-    assert resp.status_code == 400
-    body = resp.get_json()
-    assert body['message'] == message
-    assert body['data'] is None
-    with app.app_context():
-        assert db.session.query(Itinerary).count() == 0
-
-
-@pytest.mark.parametrize('deadline_offset', [0, 30])
-def test_create_itinerary_accepts_inclusive_deadline_bounds(client, app, deadline_offset):
-    payload = {
-        'trip_type': 'SINGLE',
-        'deadline': (date.today() + timedelta(days=deadline_offset)).isoformat(),
-        'flights': [
-            {
-                'origin': 'HKG',
-                'destination': 'NRT',
-                'flight_date': (date.today() + timedelta(days=30)).isoformat(),
-            }
-        ],
-    }
-    resp = client.post(
-        '/api/itineraries', data=json.dumps(payload), content_type='application/json'
-    )
-    assert resp.status_code == 200
-    with app.app_context():
-        entry = db.session.get(Itinerary, resp.get_json()['data'])
-        assert entry.deadline == date.today() + timedelta(days=deadline_offset)
-
-
-def test_create_itinerary_invalid_date_returns_400(client, app):
-    with app.app_context():
-        resp = client.post(
-            '/api/itineraries',
-            data=json.dumps(
-                {
-                    'trip_type': 'SINGLE',
-                    'flights': [
-                        {'origin': 'HKG', 'destination': 'NRT', 'flight_date': 'not-a-date'}
-                    ],
-                }
-            ),
-            content_type='application/json',
-        )
-    assert resp.status_code == 400
-    body = resp.get_json()
-    assert body['message']
-    assert body['data'] is None
-
-
-def test_get_itinerary_not_found(client, app):
-    with app.app_context():
-        with patch('src.routes.api.itinerary.get_configured_base_currency', return_value='HKD'):
-            resp = client.get(f'/api/itineraries/{uuid.uuid4()}')
-    assert resp.status_code == 404
-    body = resp.get_json()
-    assert body['message'] == 'Entry not found'
-    assert body['data'] is None
-
-
-def test_get_itinerary_success_no_fare(client, app):
-    with app.app_context():
-        it = _make_itinerary()
-        _make_flight(it.id)
-        db.session.commit()
-        iid = it.id
-
-        with patch('src.routes.api.itinerary.get_configured_base_currency', return_value='HKD'):
-            with patch('src.routes.api.itinerary.convert_amount', side_effect=Exception('skip')):
-                resp = client.get(f'/api/itineraries/{iid}')
-
-    assert resp.status_code == 200
-    data = resp.get_json()
-    assert set(data) == {'message', 'data'}
-    assert data['message'] is None
-    assert data['data']['id'] == iid
-    assert data['data']['notifyPerLeg'] is False
-    assert data['data']['latestConvertedFare'] is None
-
-
-def test_get_itinerary_with_fare_conversion(client, app):
-    with app.app_context():
-        it = _make_itinerary()
-        fl = _make_flight(it.id)
-        _make_snapshot(fl.id, fare=1200.0, currency='HKD')
-        db.session.commit()
-        iid = it.id
-
-        with patch('src.routes.api.itinerary.get_configured_base_currency', return_value='HKD'):
-            with patch('src.routes.api.itinerary.convert_amount', return_value=1200.0):
-                resp = client.get(f'/api/itineraries/{iid}')
-
-    assert resp.status_code == 200
-    data = resp.get_json()
-    assert data['data']['latestConvertedFare']['amount'] == 1200.0
-
-
-def test_patch_itinerary_deadline(client, app):
+def test_patch_itinerary_is_active(client, app):
     with app.app_context():
         it = _make_itinerary()
         db.session.commit()
@@ -224,40 +27,13 @@ def test_patch_itinerary_deadline(client, app):
 
     resp = client.patch(
         f'/api/itineraries/{iid}',
-        data=json.dumps({'deadline': (date.today() + timedelta(days=30)).isoformat()}),
+        data=json.dumps({'is_active': False}),
         content_type='application/json',
     )
     assert resp.status_code == 200
-    body = resp.get_json()
-    assert body['message'] == 'Entry updated'
-    assert body['data'] == iid
-
-
-@pytest.mark.parametrize(
-    ('deadline_offset', 'message'),
-    [
-        (-1, 'Deadline must not be in the past'),
-        (31, 'Deadline must not be after the first departure'),
-    ],
-)
-def test_patch_itinerary_rejects_out_of_range_deadline(client, app, deadline_offset, message):
+    assert resp.get_json() == {'message': 'Entry updated', 'data': iid}
     with app.app_context():
-        it = _make_itinerary()
-        _make_flight(it.id, flight_date=date.today() + timedelta(days=30))
-        db.session.commit()
-        iid = it.id
-
-    resp = client.patch(
-        f'/api/itineraries/{iid}',
-        data=json.dumps({'deadline': (date.today() + timedelta(days=deadline_offset)).isoformat()}),
-        content_type='application/json',
-    )
-    assert resp.status_code == 400
-    body = resp.get_json()
-    assert body['message'] == message
-    assert body['data'] is None
-    with app.app_context():
-        assert db.session.get(Itinerary, iid).deadline is None
+        assert db.session.get(Itinerary, iid).is_active is False
 
 
 def test_patch_itinerary_not_found(client, app):
@@ -339,133 +115,82 @@ def test_patch_itinerary_archive_twice_keeps_first_archived_at(client, app):
         assert db.session.get(Itinerary, iid).archived_at.year == 2020
 
 
-def test_delete_itinerary(client, app):
+def test_patch_itinerary_invalid_is_active_token_returns_400(client, app):
     with app.app_context():
         it = _make_itinerary()
         db.session.commit()
         iid = it.id
 
-    resp = client.delete(f'/api/itineraries/{iid}')
-    assert resp.status_code == 200
+    resp = client.patch(
+        f'/api/itineraries/{iid}',
+        data=json.dumps({'is_active': 'maybe'}),
+        content_type='application/json',
+    )
+    assert resp.status_code == 400
     body = resp.get_json()
-    assert body['message'] == 'Entry deleted'
+    assert body['message'] == 'Invalid is_active'
     assert body['data'] is None
-
-
-def test_delete_itinerary_not_found(client, app):
     with app.app_context():
-        resp = client.delete(f'/api/itineraries/{uuid.uuid4()}')
-    assert resp.status_code == 404
+        assert db.session.get(Itinerary, iid).is_active is True
 
 
-def test_create_itinerary_origins_uppercased(client, app):
-    with app.app_context():
-        resp = client.post(
-            '/api/itineraries',
-            data=json.dumps(
-                {
-                    'trip_type': 'SINGLE',
-                    'flights': [
-                        {'origin': 'hkg', 'destination': 'nrt', 'flight_date': '2025-12-01'}
-                    ],
-                }
-            ),
-            content_type='application/json',
-        )
-    assert resp.status_code == 200
-    with app.app_context():
-        it_id = resp.get_json()['data']
-        flight = db.session.query(Flight).filter_by(itinerary_id=it_id).first()
-        assert flight.origin == 'HKG'
-        assert flight.destination == 'NRT'
-
-
-def test_create_itinerary_notify_per_leg_defaults_to_false(client, app):
-    resp = client.post(
-        '/api/itineraries',
-        data=json.dumps(
-            {
-                'trip_type': 'SINGLE',
-                'flights': [{'origin': 'HKG', 'destination': 'NRT', 'flight_date': '2025-12-01'}],
-            }
-        ),
-        content_type='application/json',
-    )
-    assert resp.status_code == 200
-    with app.app_context():
-        assert db.session.get(Itinerary, resp.get_json()['data']).notify_per_leg is False
-
-
-def test_create_itinerary_honors_notify_per_leg(client, app):
-    resp = client.post(
-        '/api/itineraries',
-        data=json.dumps(
-            {
-                'trip_type': 'SINGLE',
-                'notify_per_leg': True,
-                'flights': [{'origin': 'HKG', 'destination': 'NRT', 'flight_date': '2025-12-01'}],
-            }
-        ),
-        content_type='application/json',
-    )
-    assert resp.status_code == 200
-    with app.app_context():
-        assert db.session.get(Itinerary, resp.get_json()['data']).notify_per_leg is True
-
-
-def test_create_itinerary_invalid_notify_per_leg_returns_400(client, app):
-    resp = client.post(
-        '/api/itineraries',
-        data=json.dumps(
-            {
-                'trip_type': 'SINGLE',
-                'notify_per_leg': 'maybe',
-                'flights': [{'origin': 'HKG', 'destination': 'NRT', 'flight_date': '2025-12-01'}],
-            }
-        ),
-        content_type='application/json',
-    )
-    assert resp.status_code == 400
-    assert resp.get_json()['data'] is None
-    with app.app_context():
-        assert db.session.query(Itinerary).count() == 0
-
-
-def test_patch_itinerary_notify_per_leg(client, app):
+@pytest.mark.parametrize(
+    'payload',
+    [
+        {'deadline': '2030-01-01'},
+        {'notify_per_leg': True},
+        {'cabin_class': 'FIRST'},
+        {'max_stops': 'ONE_STOP'},
+        {'airlines': ['JL']},
+        {'unexpected': 'value'},
+        {'is_active': False, 'deadline': '2030-01-01'},
+    ],
+)
+def test_patch_itinerary_rejects_non_toggle_fields(client, app, payload):
     with app.app_context():
         it = _make_itinerary()
+        it.cabin_class = 'BUSINESS'
+        it.max_stops = 'NON_STOP'
+        it.airlines = ['CX']
+        it.notify_per_leg = True
         db.session.commit()
         iid = it.id
 
     resp = client.patch(
         f'/api/itineraries/{iid}',
-        data=json.dumps({'notify_per_leg': True}),
+        data=json.dumps(payload),
         content_type='application/json',
     )
-    assert resp.status_code == 200
-    with app.app_context():
-        assert db.session.get(Itinerary, iid).notify_per_leg is True
 
-    resp = client.patch(
-        f'/api/itineraries/{iid}',
-        data={'notify_per_leg': 'false'},
-    )
-    assert resp.status_code == 200
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body['message'].startswith('Unsupported field: ')
+    assert body['data'] is None
     with app.app_context():
-        assert db.session.get(Itinerary, iid).notify_per_leg is False
+        unchanged = db.session.get(Itinerary, iid)
+        assert unchanged.is_active is True
+        assert unchanged.deadline is None
+        assert unchanged.notify_per_leg is True
+        assert unchanged.cabin_class == 'BUSINESS'
+        assert unchanged.max_stops == 'NON_STOP'
+        assert unchanged.airlines == ['CX']
 
 
-def test_patch_itinerary_invalid_notify_per_leg_returns_400(client, app):
+def test_patch_itinerary_archive_keeps_existing_deadline(client, app):
+    deadline = date.today() + timedelta(days=30)
     with app.app_context():
-        it = _make_itinerary()
+        it = _make_itinerary(deadline=deadline)
         db.session.commit()
         iid = it.id
 
     resp = client.patch(
         f'/api/itineraries/{iid}',
-        data=json.dumps({'notify_per_leg': 'maybe'}),
+        data=json.dumps({'archived': True}),
         content_type='application/json',
     )
-    assert resp.status_code == 400
-    assert resp.get_json()['message'] == 'Invalid notify_per_leg'
-    assert resp.get_json()['data'] is None
+
+    assert resp.status_code == 200
+    with app.app_context():
+        entry = db.session.get(Itinerary, iid)
+        assert entry.archived_at is not None
+        assert entry.deadline == deadline
