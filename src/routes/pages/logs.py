@@ -67,10 +67,10 @@ def index() -> ResponseReturnValue:
 def clear() -> ResponseReturnValue:
     try:
         log_svc.clear_logs()
+
+        flash('已刪除所有紀錄', 'success')
+        return redirect('/logs/')
     except OSError:
         logger.exception('clear application logs from page failed')
         session['errors'] = {'logs': '清除紀錄失敗'}
         return redirect('/logs/')
-
-    flash('已刪除所有紀錄', 'success')
-    return redirect('/logs/')

@@ -109,9 +109,7 @@ describe('Itineraries/Index', () => {
     expect(overlay.exists()).toBe(true)
     expect(overlay.attributes('href')).toBe('/itineraries/it1')
 
-    const restoreBtn = card
-      .findAll('button')
-      .find((b) => b.text().trim() === '恢復追蹤')!
+    const restoreBtn = card.findAll('button').find((b) => b.text().trim() === '恢復追蹤')!
     expect(restoreBtn.exists()).toBe(true)
     expect(overlay.element.contains(restoreBtn.element)).toBe(false)
   })
@@ -137,7 +135,10 @@ describe('Itineraries/Index', () => {
 
   it('switches to the archived view via router.get', async () => {
     const wrapper = mountIndex()
-    await wrapper.findAll('button').find((b) => b.text() === '已封存')!.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text() === '已封存')!
+      .trigger('click')
 
     expect(router.get).toHaveBeenCalledWith(
       '/itineraries/',
@@ -164,41 +165,62 @@ describe('Itineraries/Index', () => {
 
   it('asks for confirmation with re-archive notice before restoring', async () => {
     const wrapper = mountArchivedView()
-    await wrapper.findAll('button').find((b) => b.text().trim() === '恢復追蹤')!.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text().trim() === '恢復追蹤')!
+      .trigger('click')
 
     expect(wrapper.text()).toContain('恢復追蹤？')
     expect(wrapper.text()).toContain('重新封存')
   })
 
-  it('restores via PATCH and reloads', async () => {
+  it('restores through the page route and keeps the archived list', async () => {
+    const toast = useToast() as unknown as { success: ReturnType<typeof vi.fn> }
     const wrapper = mountArchivedView()
-    await wrapper.findAll('button').find((b) => b.text().trim() === '恢復追蹤')!.trigger('click')
-
-    const confirmBtn = wrapper.findAll('button').find((b) => b.text().trim() === '恢復追蹤' && b.attributes('type') === 'button')
-    await confirmBtn!.trigger('click')
-    await flushPromises()
-
-    expect(fetch).toHaveBeenCalledWith(
-      '/api/itineraries/it1',
-      expect.objectContaining({
-        method: 'PATCH',
-        body: JSON.stringify({ archived: false }),
-      }),
-    )
-    expect(vi.mocked(router.reload)).toHaveBeenCalled()
-  })
-
-  it('shows a toast on restore failure', async () => {
-    vi.mocked(fetch).mockResolvedValue({ ok: false } as Response)
-    const toast = useToast() as unknown as { error: ReturnType<typeof vi.fn> }
-    const wrapper = mountArchivedView()
-    await wrapper.findAll('button').find((b) => b.text().trim() === '恢復追蹤')!.trigger('click')
+    vi.mocked(fetch).mockClear()
+    vi.mocked(router.patch).mockClear()
+    vi.mocked(router.reload).mockClear()
+    vi.mocked(toast.success).mockClear()
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text().trim() === '恢復追蹤')!
+      .trigger('click')
 
     const confirmBtn = wrapper
       .findAll('button')
       .find((b) => b.text().trim() === '恢復追蹤' && b.attributes('type') === 'button')
     await confirmBtn!.trigger('click')
     await flushPromises()
+
+    expect(router.patch).toHaveBeenCalledWith(
+      '/itineraries/it1/status',
+      { archived: false },
+      expect.objectContaining({ onError: expect.any(Function), onFinish: expect.any(Function) }),
+    )
+    expect(fetch).not.toHaveBeenCalled()
+    // the server flash carries the success copy and the redirect keeps the archived view
+    expect(toast.success).not.toHaveBeenCalled()
+    expect(vi.mocked(router.reload)).not.toHaveBeenCalled()
+  })
+
+  it('shows a toast on restore failure', async () => {
+    const toast = useToast() as unknown as { error: ReturnType<typeof vi.fn> }
+    const wrapper = mountArchivedView()
+    vi.mocked(router.patch).mockClear()
+    vi.mocked(toast.error).mockClear()
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text().trim() === '恢復追蹤')!
+      .trigger('click')
+
+    const confirmBtn = wrapper
+      .findAll('button')
+      .find((b) => b.text().trim() === '恢復追蹤' && b.attributes('type') === 'button')
+    await confirmBtn!.trigger('click')
+    await flushPromises()
+
+    const options = vi.mocked(router.patch).mock.calls.at(-1)![2] as { onError: () => void }
+    options.onError()
 
     expect(toast.error).toHaveBeenCalledWith('恢復追蹤失敗，請稍後再試')
   })

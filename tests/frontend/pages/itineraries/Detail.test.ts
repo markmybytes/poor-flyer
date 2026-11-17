@@ -125,7 +125,9 @@ describe('Itineraries/Detail per-leg notifications', () => {
     expect(wrapper.text()).toContain('未開啟')
     expect(wrapper.text()).toContain('未啟用數據分析')
 
-    await wrapper.setProps({ itinerary: { ...itinerary, notifyPerLeg: true, deadline: '2026-06-01' } })
+    await wrapper.setProps({
+      itinerary: { ...itinerary, notifyPerLeg: true, deadline: '2026-06-01' },
+    })
 
     expect(wrapper.text()).toContain('已開啟')
     expect(wrapper.text()).toContain('收集數據中')
@@ -261,24 +263,28 @@ describe('Itineraries/Detail settings modal', () => {
   })
 })
 
-describe('Itineraries/Detail api actions', () => {
+describe('Itineraries/Detail status actions', () => {
   beforeEach(() => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({}) } as Response)
   })
 
-  it('pauses tracking through the API PATCH and reloads', async () => {
+  it('pauses tracking through the page route', async () => {
     const wrapper = mountDetail({ isActive: true })
     vi.mocked(fetch).mockClear()
+    vi.mocked(router.patch).mockClear()
     vi.mocked(router.reload).mockClear()
 
     await button(wrapper, '暫停追蹤').trigger('click')
     await flushPromises()
 
-    expect(fetch).toHaveBeenCalledWith(
-      '/api/itineraries/it-1',
-      expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ is_active: false }) }),
+    expect(router.patch).toHaveBeenCalledWith(
+      '/itineraries/it-1/status',
+      { is_active: false },
+      expect.objectContaining({ onFinish: expect.any(Function) }),
     )
-    expect(vi.mocked(router.reload)).toHaveBeenCalled()
+    expect(fetch).not.toHaveBeenCalled()
+    // the server redirect back to the detail page re-renders the props
+    expect(vi.mocked(router.reload)).not.toHaveBeenCalled()
   })
 
   it('posts a scrape request to the API without visiting the page route', async () => {
@@ -342,9 +348,13 @@ describe('Itineraries/Detail archived state', () => {
     expect(wrapper.text()).toContain('下載最新票價')
   })
 
-  it('confirms before restoring and PATCHes archived:false', async () => {
+  it('confirms before restoring and PATCHes archived:false through the page route', async () => {
+    const toast = useToast() as unknown as { success: ReturnType<typeof vi.fn> }
     const wrapper = mountDetail({ archivedAt: '2026-11-01T00:00:00Z' })
     vi.mocked(fetch).mockClear()
+    vi.mocked(router.patch).mockClear()
+    vi.mocked(router.reload).mockClear()
+    vi.mocked(toast.success).mockClear()
 
     // open the confirm modal from the join button group
     await wrapper
@@ -360,14 +370,14 @@ describe('Itineraries/Detail archived state', () => {
     await confirmBtn!.trigger('click')
     await flushPromises()
 
-    expect(fetch).toHaveBeenCalledWith(
-      '/api/itineraries/it-1',
-      expect.objectContaining({
-        method: 'PATCH',
-        body: JSON.stringify({ archived: false }),
-      }),
+    expect(router.patch).toHaveBeenCalledWith(
+      '/itineraries/it-1/status',
+      { archived: false },
+      expect.objectContaining({ onFinish: expect.any(Function) }),
     )
-    expect(vi.mocked(router.reload)).toHaveBeenCalled()
+    // the success copy rides the server flash, not a local toast
+    expect(toast.success).not.toHaveBeenCalled()
+    expect(vi.mocked(router.reload)).not.toHaveBeenCalled()
   })
 
   it('offers archive in the header join for non-archived itineraries', () => {
@@ -387,10 +397,13 @@ describe('Itineraries/Detail archived state', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 
-  it('archives via PATCH and reloads', async () => {
+  it('archives through the page route without a local success toast', async () => {
     const toast = useToast() as unknown as { success: ReturnType<typeof vi.fn> }
     const wrapper = mountDetail()
     vi.mocked(fetch).mockClear()
+    vi.mocked(router.patch).mockClear()
+    vi.mocked(router.reload).mockClear()
+    vi.mocked(toast.success).mockClear()
 
     await wrapper.find('button[title="封存此追蹤"]').trigger('click')
 
@@ -398,15 +411,32 @@ describe('Itineraries/Detail archived state', () => {
     await confirmBtn!.trigger('click')
     await flushPromises()
 
-    expect(fetch).toHaveBeenCalledWith(
-      '/api/itineraries/it-1',
-      expect.objectContaining({
-        method: 'PATCH',
-        body: JSON.stringify({ archived: true }),
-      }),
+    expect(router.patch).toHaveBeenCalledWith(
+      '/itineraries/it-1/status',
+      { archived: true },
+      expect.objectContaining({ onError: expect.any(Function) }),
     )
-    expect(toast.success).toHaveBeenCalledWith('已封存')
-    expect(vi.mocked(router.reload)).toHaveBeenCalled()
+    expect(fetch).not.toHaveBeenCalled()
+    expect(toast.success).not.toHaveBeenCalled()
+    expect(vi.mocked(router.reload)).not.toHaveBeenCalled()
+  })
+
+  it('shows the failure toast when the status PATCH reports an error', async () => {
+    const toast = useToast() as unknown as { error: ReturnType<typeof vi.fn> }
+    const wrapper = mountDetail()
+    vi.mocked(router.patch).mockClear()
+    vi.mocked(toast.error).mockClear()
+
+    await wrapper.find('button[title="封存此追蹤"]').trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text().trim() === '確認封存')!
+      .trigger('click')
+
+    const options = vi.mocked(router.patch).mock.calls.at(-1)![2] as { onError: () => void }
+    options.onError()
+
+    expect(toast.error).toHaveBeenCalledWith('封存失敗，請稍後再試')
   })
 
   it('hides the archive action when already archived', () => {

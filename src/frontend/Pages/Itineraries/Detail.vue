@@ -134,32 +134,18 @@ function runAction(action: Action): void {
     return
   }
 
-  fetch(`/api/itineraries/${props.itinerary.id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(
-      action === 'toggle'
-        ? { is_active: !props.itinerary.isActive }
-        : { archived: action === 'archive' },
-    ),
-  })
-    .then((res) => {
-      if (!res.ok) {
-        throw new Error()
-      }
-
-      if (action === 'restore') {
-        toast.success('已恢復追蹤')
-      }
-      if (action === 'archive') {
-        toast.success('已封存')
-      }
-      router.reload()
-    })
-    .catch(() => toast.error(`${ACTION_LABELS[action]}失敗，請稍後再試`))
-    .finally(() => {
-      ui.value.loading = null
-    })
+  router.patch(
+    `/itineraries/${props.itinerary.id}/status`,
+    action === 'toggle'
+      ? { is_active: !props.itinerary.isActive }
+      : { archived: action === 'archive' },
+    {
+      onError: () => toast.error(`${ACTION_LABELS[action]}失敗，請稍後再試`),
+      onFinish: () => {
+        ui.value.loading = null
+      },
+    },
+  )
 }
 </script>
 

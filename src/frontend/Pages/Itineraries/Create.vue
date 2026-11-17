@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import DatePicker from '@/Components/DatePicker.vue'
 import DeadlineDatePicker from '@/Components/DeadlineDatePicker.vue'
-import FetchFilters from '@/Components/FetchFilters.vue'
+import FlightFilters from '@/Components/FlightFilters.vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import { Link, router } from '@inertiajs/vue3'
 import { computed, ref, watch } from 'vue'
@@ -353,7 +353,7 @@ function submit() {
               留空表示套用系統預設；航空公司全部未選則不作限制。
             </p>
 
-            <FetchFilters v-model="filters" :airlines="props.airlines" />
+            <FlightFilters v-model="filters" :airlines="props.airlines" />
           </div>
 
           <div class="mt-8 flex flex-col gap-3 border-t border-base-300/70 pt-5 sm:flex-row">

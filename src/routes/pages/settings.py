@@ -61,10 +61,10 @@ def index():
 def save():
     try:
         setting.update(request.get_json(silent=True) or request.form.to_dict())
+        logger.info('settings updated from page form')
+
+        flash('設定已儲存', 'success')
+        return redirect('/settings/')
     except ValueError as exc:
         session['errors'] = {'settings': str(exc)}
         return redirect('/settings/')
-
-    logger.info('settings updated from page form')
-    flash('設定已儲存', 'success')
-    return redirect('/settings/')

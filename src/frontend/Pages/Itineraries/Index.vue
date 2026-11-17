@@ -57,23 +57,19 @@ function runRestore() {
 
   ui.value.restoring = true
 
-  fetch(`/api/itineraries/${id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ archived: false }),
-  })
-    .then((res) => {
-      if (!res.ok) throw new Error()
-      ui.value.pendingId = null
-      toast.success('已恢復追蹤')
-      router.reload()
-    })
-    .catch(() => {
-      toast.error('恢復追蹤失敗，請稍後再試')
-    })
-    .finally(() => {
-      ui.value.restoring = false
-    })
+  // Success toast and the list refresh arrive with the server redirect back here.
+  router.patch(
+    `/itineraries/${id}/status`,
+    { archived: false },
+    {
+      onError: () => {
+        toast.error('恢復追蹤失敗，請稍後再試')
+      },
+      onFinish: () => {
+        ui.value.restoring = false
+      },
+    },
+  )
 }
 </script>
 

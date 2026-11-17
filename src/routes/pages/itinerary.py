@@ -1,7 +1,8 @@
 import logging
 from dataclasses import asdict
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import Any
+from urllib.parse import urlsplit
 
 from flask import Blueprint, flash, g, redirect, request, session
 from flask.typing import ResponseReturnValue
@@ -29,6 +30,22 @@ logger = logging.getLogger(__name__)
 
 itineraries_bp = Blueprint('itineraries', __name__, url_prefix='/itineraries')
 
+_STATUS_FIELDS = frozenset({'is_active', 'archived'})
+
+
+def _safe_back_url(fallback: str) -> str:
+    """Land the flash on the page that sent the toggle, never on another origin."""
+    referrer = request.referrer
+    if not referrer:
+        return fallback
+
+    parts = urlsplit(referrer)
+    if parts.scheme not in ('', 'http', 'https') or parts.netloc not in ('', request.host):
+        return fallback
+    if not parts.path.startswith('/') or parts.path.startswith('//'):
+        return fallback
+    return f'{parts.path}?{parts.query}' if parts.query else parts.path
+
 
 def _serialize_snapshot(snapshot: FareSnapshot, currency: str) -> dict:
     """Clones snapshot columns into a dict and applies currency translations safely."""
@@ -50,9 +67,9 @@ def _serialize_itinerary(
     include_rule37: bool = True,
 ) -> dict:
     combined = get_combined_totals(itinerary, base_currency)
-    stats = compute_price_stats(combined)
-    stats_dict = asdict(stats) if stats else None
+    stats_dict = asdict(stats) if (stats := compute_price_stats(combined)) else None
     r37_dict = None
+
     if include_rule37 and itinerary.deadline and combined:
         it_created_at = (
             itinerary.created_at.date()
@@ -74,14 +91,6 @@ def _serialize_itinerary(
     }
 
 
-def _airline_options() -> list[dict[str, str]]:
-    """IATA code/name pairs, digit-leading enum keys normalized (``_7C`` -> ``7C``)."""
-    return sorted(
-        ({'code': code.removeprefix('_'), 'name': name} for code, name in AIRLINE_NAMES.items()),
-        key=lambda airline: airline['code'],
-    )
-
-
 def _parse_deadline(raw: Any) -> date | None:
     """Parse a page deadline; an empty value clears it."""
     if not raw:
@@ -96,20 +105,23 @@ def _parse_deadline(raw: Any) -> date | None:
 def index() -> ResponseReturnValue:
     base_currency = get_configured_base_currency()
     archived_view = request.args.get('archived') == '1'
-    archived_filter = (
-        Itinerary.archived_at.is_not(None) if archived_view else Itinerary.archived_at.is_(None)
-    )
+
     itineraries = (
         db.session.execute(
             select(Itinerary)
             .options(selectinload(Itinerary.flights).selectinload(Flight.fare_snapshots))
-            .where(archived_filter)
+            .where(
+                Itinerary.archived_at.is_not(None)
+                if archived_view
+                else Itinerary.archived_at.is_(None)
+            )
             .order_by(Itinerary.created_at)
         )
         .scalars()
         .unique()
         .all()
     )
+
     logger.debug('rendered itineraries index: itineraries=%d', len(itineraries))
     return render_inertia(
         'Itineraries/Index',
@@ -130,24 +142,38 @@ def index() -> ResponseReturnValue:
 
 @itineraries_bp.route('/create')
 def create() -> ResponseReturnValue:
-    return render_inertia('Itineraries/Create', props={'airlines': _airline_options()})
+    return render_inertia(
+        'Itineraries/Create',
+        props={
+            'airlines': sorted(
+                (
+                    {'code': code.removeprefix('_'), 'name': name}
+                    for code, name in AIRLINE_NAMES.items()
+                ),
+                key=lambda airline: airline['code'],
+            )
+        },
+    )
 
 
 @itineraries_bp.route('', methods=['POST'])
 def create_submit() -> ResponseReturnValue:
-    data = request.get_json(silent=True) or request.form.to_dict()
     try:
-        itinerary = create_itinerary(data, today=datetime.now(g.tz).date())
+        itinerary = create_itinerary(
+            request.get_json(silent=True) or request.form.to_dict(),
+            today=datetime.now(g.tz).date(),
+        )
         db.session.commit()
+        logger.info('created itinerary from page form: id=%s', itinerary.id)
+
+        flash('已成功建立票價追蹤', 'success')
+        return redirect('/')
     except (KeyError, TypeError, ValueError) as exc:
         db.session.rollback()
         logger.info('invalid itinerary submission: error=%s', exc)
+
         session['errors'] = {'itinerary': '請檢查輸入內容'}
         return redirect('/itineraries/create')
-
-    logger.info('created itinerary from page form: id=%s', itinerary.id)
-    flash('已成功建立票價追蹤', 'success')
-    return redirect('/')
 
 
 @itineraries_bp.route('/<itinerary_id>')
@@ -159,6 +185,7 @@ def show(itinerary_id: str) -> ResponseReturnValue:
             .options(selectinload(Itinerary.flights).selectinload(Flight.fare_snapshots))
             .where(Itinerary.id == itinerary_id)
         ).scalar_one_or_none()
+
         if not itinerary:
             logger.debug('itinerary not found: id=%s', itinerary_id)
             return redirect('/itineraries/')
@@ -181,6 +208,7 @@ def update_itinerary(itinerary_id: str) -> ResponseReturnValue:
     itinerary = db.session.execute(
         select(Itinerary).where(Itinerary.id == itinerary_id)
     ).scalar_one_or_none()
+
     if not itinerary:
         logger.debug('itinerary not found for update: id=%s', itinerary_id)
         return redirect('/itineraries/')
@@ -210,13 +238,64 @@ def update_itinerary(itinerary_id: str) -> ResponseReturnValue:
     if errors:
         db.session.rollback()
         logger.info('invalid itinerary update: id=%s fields=%s', itinerary_id, ','.join(errors))
+
         session['errors'] = errors
         return redirect(f'/itineraries/{itinerary_id}')
 
     db.session.commit()
     logger.info('updated itinerary from page form: id=%s', itinerary_id)
+
     flash('已更新設定', 'success')
     return redirect(f'/itineraries/{itinerary_id}')
+
+
+@itineraries_bp.route('/<itinerary_id>/status', methods=['PATCH'])
+def update_status(itinerary_id: str) -> ResponseReturnValue:
+    itinerary = db.session.execute(
+        select(Itinerary).where(Itinerary.id == itinerary_id)
+    ).scalar_one_or_none()
+
+    if not itinerary:
+        logger.debug('itinerary not found for status update: id=%s', itinerary_id)
+        return redirect('/itineraries/')
+
+    data = request.get_json(silent=True) or request.form.to_dict()
+    target = _safe_back_url(f'/itineraries/{itinerary_id}')
+
+    if unsupported := sorted(set(data) - _STATUS_FIELDS):
+        logger.info(
+            'rejected itinerary status update: id=%s fields=%s',
+            itinerary_id,
+            ','.join(unsupported),
+        )
+        session['errors'] = {'status': f'Unsupported field: {", ".join(unsupported)}'}
+        return redirect(target)
+
+    archived = None
+    try:
+        if 'is_active' in data:
+            itinerary.is_active = parse_bool(data['is_active'], 'is_active')
+        if 'archived' in data:
+            archived = parse_bool(data['archived'], 'archived')
+            if archived:
+                if itinerary.archived_at is None:
+                    itinerary.archived_at = datetime.now(UTC)
+            else:
+                itinerary.archived_at = None
+    except ValueError as exc:
+        db.session.rollback()
+        logger.info('invalid itinerary status update: id=%s error=%s', itinerary_id, exc)
+        session['errors'] = {'status': str(exc)}
+        return redirect(target)
+
+    db.session.commit()
+    logger.info('updated itinerary status: id=%s fields=%s', itinerary_id, ','.join(sorted(data)))
+
+    if archived is True:
+        flash('已封存', 'success')
+    elif archived is False:
+        flash('已恢復追蹤', 'success')
+    return redirect(target)
 
 
 @itineraries_bp.route('/<itinerary_id>', methods=['DELETE'])
@@ -224,11 +303,13 @@ def delete_itinerary(itinerary_id: str) -> ResponseReturnValue:
     itinerary = db.session.execute(
         select(Itinerary).where(Itinerary.id == itinerary_id)
     ).scalar_one_or_none()
+
     if not itinerary:
         logger.debug('itinerary not found for deletion: id=%s', itinerary_id)
         return redirect('/itineraries/')
 
     db.session.delete(itinerary)
     db.session.commit()
+
     logger.info('deleted itinerary from page form: id=%s', itinerary_id)
     return redirect('/itineraries/')

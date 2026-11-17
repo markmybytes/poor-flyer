@@ -1,4 +1,4 @@
-import FetchFilters from '@/Components/FetchFilters.vue'
+import FlightFilters from '@/Components/FlightFilters.vue'
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import { reactive } from 'vue'
@@ -19,7 +19,7 @@ function mountFilters(
     maxStops: '',
     airlines,
   })
-  const wrapper = mount(FetchFilters, { props: { modelValue: value, airlines: options } })
+  const wrapper = mount(FlightFilters, { props: { modelValue: value, airlines: options } })
   return { wrapper, value }
 }
 
@@ -27,7 +27,7 @@ function airlineInput(wrapper: ReturnType<typeof mountFilters>['wrapper']) {
   return wrapper.find('input[placeholder="搜尋航空公司名稱或代碼"]')
 }
 
-describe('Components/FetchFilters', () => {
+describe('Components/FlightFilters', () => {
   it('renders cabin and stops option lists', () => {
     const { wrapper } = mountFilters()
     const selects = wrapper.findAll('select')
