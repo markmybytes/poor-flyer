@@ -90,3 +90,36 @@ def test_logs_index_invalid_level_falls_back_to_all(client, app, tmp_path):
         resp = client.get('/logs/?levels=INVALID', headers=INERTIA_HEADERS)
     data = resp.get_json()
     assert len(data['props']['logs']) == 1
+
+
+def test_logs_clear_redirects_and_empties_file(client, app, tmp_path):
+    log_file = tmp_path / 'app.log'
+    log_file.write_text('2024-01-01 00:00:00,000 - INFO - src - test message\n')
+    with app.app_context():
+        app.config['LOG_FILE'] = str(log_file)
+        resp = client.delete('/logs')
+    assert resp.status_code in (302, 303)
+    assert resp.headers['Location'] == '/logs/'
+    assert log_file.read_text() == ''
+
+
+def test_logs_clear_missing_file_still_redirects(client, app, tmp_path):
+    with app.app_context():
+        app.config['LOG_FILE'] = str(tmp_path / 'nonexistent.log')
+        resp = client.delete('/logs')
+    assert resp.status_code in (302, 303)
+    assert resp.headers['Location'] == '/logs/'
+
+
+def test_logs_clear_failure_rerenders_index_with_error(client, app, tmp_path, mocker):
+    log_file = tmp_path / 'app.log'
+    log_file.write_text('2024-01-01 00:00:00,000 - INFO - src - kept message\n')
+    mocker.patch('src.routes.pages.logs.log_svc.clear_logs', side_effect=OSError('boom'))
+    with app.app_context():
+        app.config['LOG_FILE'] = str(log_file)
+        resp = client.delete('/logs', headers=INERTIA_HEADERS)
+    data = resp.get_json()
+    assert resp.status_code == 422
+    assert data['component'] == 'Logs/Index'
+    assert data['props']['errors']['logs']
+    assert 'kept message' in log_file.read_text()

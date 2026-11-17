@@ -94,9 +94,7 @@ def read_logs(
 
 
 def clear_logs() -> None:
-    try:
-        if (path := _log_path()).exists():
-            path.write_text('', encoding='utf-8')
-            logger.info('application logs cleared')
-    except Exception:
-        logger.exception('clear logs failed')
+    """Empty the log file; a missing file is a no-op. Raises OSError on write failure."""
+    if (path := _log_path()).exists():
+        path.write_text('', encoding='utf-8')
+        logger.info('application logs cleared')

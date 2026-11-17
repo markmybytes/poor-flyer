@@ -1,6 +1,10 @@
 import LogsIndexPage from '@/Pages/Logs/Index.vue'
+import { router, usePage } from '@inertiajs/vue3'
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useToast } from 'vue-toast-notification'
+
+const toast = useToast()
 
 const defaultProps = {
   logs: [],
@@ -19,10 +23,8 @@ const globalStubs = {
 
 describe('Logs/Index', () => {
   beforeEach(() => {
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      json: async () => ({ message: 'Logs cleared', data: null }),
-    } as Response)
+    vi.mocked(router.delete).mockClear()
+    vi.mocked(usePage).mockReturnValue({ props: {} } as never)
   })
 
   it('renders without crashing with empty logs', () => {
@@ -91,14 +93,51 @@ describe('Logs/Index', () => {
     expect(wrapper.text()).toContain('清理紀錄')
   })
 
-  it('calls DELETE /api/logs when clear is confirmed', async () => {
+  it('clears logs through the page route, never the JSON API', async () => {
+    const wrapper = mount(LogsIndexPage, {
+      props: defaultProps,
+      global: { stubs: globalStubs },
+    })
+    const modal = wrapper.find('dialog').element as HTMLDialogElement
+    modal.close = vi.fn()
+    const confirmButton = wrapper.findAll('button').find((b) => b.text().trim() === '確認清除')!
+
+    await confirmButton.trigger('click')
+
+    expect(router.delete).toHaveBeenCalledWith(
+      '/logs',
+      expect.objectContaining({
+        onSuccess: expect.any(Function),
+        onError: expect.any(Function),
+        onFinish: expect.any(Function),
+      }),
+    )
+    expect(fetch).not.toHaveBeenCalled()
+    expect(confirmButton.attributes('disabled')).toBeDefined()
+
+    const options = vi.mocked(router.delete).mock.calls[0][1]
+    options.onSuccess?.({} as never)
+    expect(modal.close).toHaveBeenCalled()
+    expect(toast.success).toHaveBeenCalledWith('已刪除所有紀錄')
+
+    options.onFinish?.({} as never)
+    await wrapper.vm.$nextTick()
+    expect(confirmButton.attributes('disabled')).toBeUndefined()
+  })
+
+  it('toasts the failure copy when the server rejects the clear', async () => {
+    vi.mocked(usePage).mockReturnValue({ props: { errors: { logs: '清除紀錄失敗' } } } as never)
     const wrapper = mount(LogsIndexPage, {
       props: defaultProps,
       global: { stubs: globalStubs },
     })
 
-    await fetch('/api/logs', { method: 'DELETE' })
-    expect(fetch).toHaveBeenCalledWith('/api/logs', expect.objectContaining({ method: 'DELETE' }))
+    const confirmButton = wrapper.findAll('button').find((b) => b.text().trim() === '確認清除')!
+    await confirmButton.trigger('click')
+    vi.mocked(router.delete).mock.calls[0][1].onError?.({} as never)
+
+    expect(fetch).not.toHaveBeenCalled()
+    expect(toast.error).toHaveBeenCalledWith('清除失敗，請稍後再試')
   })
 
   it('shows pagination total', () => {

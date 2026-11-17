@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import AppLayout from '@/Layouts/AppLayout.vue'
 import { formatLocalDateTime, parsePureCalendarDate } from '@/utils/timezone'
-import { router } from '@inertiajs/vue3'
+import { router, usePage } from '@inertiajs/vue3'
 import { VueDatePicker } from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
 import { computed, ref, useTemplateRef, watch } from 'vue'
@@ -137,18 +137,22 @@ const pageNumbers = computed((): (number | '...')[] => {
   return [1, '...', page - 1, page, page + 1, '...', total]
 })
 
-function clearLogs() {
+function clearLogs(): void {
   clearing.value = true
-  fetch('/api/logs', { method: 'DELETE' })
-    .then((r) => r.json().then((body: { message?: string }) => ({ ok: r.ok, body })))
-    .then(({ ok, body }) => {
-      if (!ok) throw new Error(body.message || '清除失敗')
+  router.delete('/logs', {
+    onSuccess: () => {
+      // Server flash is English; app copy is zh-Hant, so hardcode the fallback.
       toast.success('已刪除所有紀錄')
       confirmModal.value?.close()
-      router.reload()
-    })
-    .catch((e: Error) => toast.error(e.message))
-    .finally(() => (clearing.value = false))
+    },
+    onError: () => {
+      const errors = usePage().props.errors ?? {}
+      toast.error(errors.logs ? '清除失敗，請稍後再試' : '清除失敗')
+    },
+    onFinish: () => {
+      clearing.value = false
+    },
+  })
 }
 </script>
 
