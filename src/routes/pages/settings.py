@@ -62,8 +62,9 @@ def save():
     try:
         setting.update(request.get_json(silent=True) or request.form.to_dict())
     except ValueError as exc:
-        flash(str(exc), 'settings')
+        flash({'field': 'settings', 'message': str(exc)}, 'error')
         return redirect('/settings/')
 
     logger.info('settings updated from page form')
+    flash('設定已儲存', 'success')
     return redirect('/settings/')

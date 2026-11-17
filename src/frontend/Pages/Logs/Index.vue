@@ -141,8 +141,6 @@ function clearLogs(): void {
   clearing.value = true
   router.delete('/logs', {
     onSuccess: () => {
-      // Server flash is English; app copy is zh-Hant, so hardcode the fallback.
-      toast.success('已刪除所有紀錄')
       confirmModal.value?.close()
     },
     onError: () => {

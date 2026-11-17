@@ -109,7 +109,7 @@ describe('Settings/Index', () => {
     )
   })
 
-  it('shows toast success after saving', async () => {
+  it('leaves the success toast to the server flash router', async () => {
     const wrapper = mount(SettingsIndexPage, {
       props: defaultProps,
       global: { stubs: globalStubs },
@@ -118,7 +118,7 @@ describe('Settings/Index', () => {
     await flushPromises()
     lastSaveOptions().onSuccess?.()
     const { useToast } = await import('vue-toast-notification')
-    expect(vi.mocked(useToast)().success).toHaveBeenCalledWith('設定已儲存')
+    expect(vi.mocked(useToast)().success).not.toHaveBeenCalled()
   })
 
   it('shows toast error when save fails', async () => {

@@ -99,7 +99,6 @@ function saveSettings(sec: 'email' | 'currency' | 'smtp' | 'itinerary') {
     {
       preserveScroll: true,
       onSuccess: () => {
-        toast.success('設定已儲存')
         ui.lastSaved = new Date().toLocaleString('zh-HK')
 
         if (sec === 'smtp') {

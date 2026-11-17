@@ -550,6 +550,46 @@ def test_itinerary_update_invalid_notify_per_leg_redirects_with_errors(client, a
         assert db.session.get(Itinerary, iid).notify_per_leg is True
 
 
+def test_itinerary_create_submit_flashes_success_notice(client, app):
+    resp = client.post(
+        '/itineraries',
+        data=json.dumps(
+            {
+                'trip_type': 'SINGLE',
+                'flights': [{'origin': 'HKG', 'destination': 'NRT', 'flight_date': '2025-12-01'}],
+            }
+        ),
+        content_type='application/json',
+        headers=INERTIA_HEADERS,
+    )
+
+    assert resp.status_code == 302
+    assert resp.headers['Location'] == '/'
+    # '/' redirects again; follow both hops so the flash lands where the browser renders
+    target = client.get('/', headers=INERTIA_HEADERS).headers['Location']
+    props = client.get(target, headers=INERTIA_HEADERS).get_json()['props']
+    assert props['flash'] == {'success': '已成功建立票價追蹤'}
+    assert props['errors'] == {}
+
+
+def test_itinerary_update_flashes_success_notice(client, app):
+    with app.app_context():
+        it = _seed_itinerary(flight_date=_future_departure())
+        iid = it.id
+
+    resp = client.patch(
+        f'/itineraries/{iid}',
+        data=json.dumps({'notify_per_leg': True}),
+        content_type='application/json',
+        headers=INERTIA_HEADERS,
+    )
+
+    assert resp.status_code == 303
+    props = client.get(f'/itineraries/{iid}', headers=INERTIA_HEADERS).get_json()['props']
+    assert props['flash'] == {'success': '已更新設定'}
+    assert props['errors'] == {}
+
+
 def test_page_errors_are_consumed_on_first_render(client, app):
     with app.app_context():
         it = _seed_itinerary(flight_date=_future_departure())
@@ -567,6 +607,25 @@ def test_page_errors_are_consumed_on_first_render(client, app):
 
     assert first['props']['errors'] == {'deadline': 'Deadline must be a valid date'}
     assert second['props']['errors'] == {}
+
+
+def test_page_flash_is_consumed_on_first_render(client, app):
+    with app.app_context():
+        it = _seed_itinerary(flight_date=_future_departure())
+        iid = it.id
+
+    client.patch(
+        f'/itineraries/{iid}',
+        data=json.dumps({'notify_per_leg': True}),
+        content_type='application/json',
+        headers=INERTIA_HEADERS,
+    )
+
+    first = client.get(f'/itineraries/{iid}', headers=INERTIA_HEADERS).get_json()
+    second = client.get(f'/itineraries/{iid}', headers=INERTIA_HEADERS).get_json()
+
+    assert first['props']['flash'] == {'success': '已更新設定'}
+    assert second['props']['flash'] == {}
 
 
 def test_itinerary_update_not_found_redirects(client, app):

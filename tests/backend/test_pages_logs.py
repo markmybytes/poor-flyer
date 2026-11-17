@@ -111,6 +111,18 @@ def test_logs_clear_missing_file_still_redirects(client, app, tmp_path):
     assert resp.headers['Location'] == '/logs/'
 
 
+def test_logs_clear_flashes_success_notice(client, app, tmp_path):
+    log_file = tmp_path / 'app.log'
+    log_file.write_text('2024-01-01 00:00:00,000 - INFO - src - test message\n')
+    with app.app_context():
+        app.config['LOG_FILE'] = str(log_file)
+        resp = client.delete('/logs', headers=INERTIA_HEADERS)
+        assert resp.status_code == 303
+        props = client.get('/logs/', headers=INERTIA_HEADERS).get_json()['props']
+    assert props['flash'] == {'success': '已刪除所有紀錄'}
+    assert props['errors'] == {}
+
+
 def test_logs_clear_failure_redirects_with_error(client, app, tmp_path, mocker):
     log_file = tmp_path / 'app.log'
     log_file.write_text('2024-01-01 00:00:00,000 - INFO - src - kept message\n')

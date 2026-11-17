@@ -142,10 +142,11 @@ def create_submit() -> ResponseReturnValue:
     except (KeyError, TypeError, ValueError) as exc:
         db.session.rollback()
         logger.info('invalid itinerary submission: error=%s', exc)
-        flash('請檢查輸入內容', 'itinerary')
+        flash({'field': 'itinerary', 'message': '請檢查輸入內容'}, 'error')
         return redirect('/itineraries/create')
 
     logger.info('created itinerary from page form: id=%s', itinerary.id)
+    flash('已成功建立票價追蹤', 'success')
     return redirect('/')
 
 
@@ -210,11 +211,12 @@ def update_itinerary(itinerary_id: str) -> ResponseReturnValue:
         db.session.rollback()
         logger.info('invalid itinerary update: id=%s fields=%s', itinerary_id, ','.join(errors))
         for field, message in errors.items():
-            flash(message, field)
+            flash({'field': field, 'message': message}, 'error')
         return redirect(f'/itineraries/{itinerary_id}')
 
     db.session.commit()
     logger.info('updated itinerary from page form: id=%s', itinerary_id)
+    flash('已更新設定', 'success')
     return redirect(f'/itineraries/{itinerary_id}')
 
 

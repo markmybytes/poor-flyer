@@ -69,7 +69,8 @@ def clear() -> ResponseReturnValue:
         log_svc.clear_logs()
     except OSError:
         logger.exception('clear application logs from page failed')
-        flash('清除紀錄失敗', 'logs')
+        flash({'field': 'logs', 'message': '清除紀錄失敗'}, 'error')
         return redirect('/logs/')
 
+    flash('已刪除所有紀錄', 'success')
     return redirect('/logs/')

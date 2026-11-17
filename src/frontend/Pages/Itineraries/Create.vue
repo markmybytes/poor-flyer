@@ -94,7 +94,6 @@ function submit() {
 
   router.post('/itineraries', payload, {
     preserveScroll: true,
-    onSuccess: () => toast.success('已成功建立票價追蹤'),
     onError: (errors) => toast.error(errors.itinerary ?? '新增失敗，請檢查輸入內容'),
     onFinish: () => {
       form.value.processing = false

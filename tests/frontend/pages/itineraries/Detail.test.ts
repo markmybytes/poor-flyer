@@ -158,6 +158,7 @@ describe('Itineraries/Detail settings modal', () => {
 
   it('saves the deadline through the page route and closes the modal on success', async () => {
     const toast = useToast() as unknown as { success: ReturnType<typeof vi.fn> }
+    vi.mocked(toast.success).mockClear()
     const wrapper = mountDetail({ deadline: '2026-06-01' })
 
     await wrapper.find('button[title="設定通知與限期"]').trigger('click')
@@ -173,7 +174,7 @@ describe('Itineraries/Detail settings modal', () => {
     options.onSuccess()
     await nextTick()
 
-    expect(toast.success).toHaveBeenCalledWith('已更新設定')
+    expect(toast.success).not.toHaveBeenCalled()
     expect(wrapper.findAll('dialog.modal-open')).toHaveLength(0)
     // the redirect-back visit reloads the props; the component must not reload itself
     expect(router.reload).not.toHaveBeenCalled()

@@ -90,7 +90,7 @@ describe('Itineraries/Create', () => {
     )
   })
 
-  it('shows toast success when the visit succeeds', async () => {
+  it('leaves the success toast to the server flash router', async () => {
     const wrapper = mount(CreatePage, {
       props: { airlines: [{ code: 'CX', name: 'Cathay Pacific' }] },
       global: { stubs: globalStubs },
@@ -99,7 +99,7 @@ describe('Itineraries/Create', () => {
     await flushPromises()
     lastRequestOptions().onSuccess?.()
     const { useToast } = await import('vue-toast-notification')
-    expect(vi.mocked(useToast)().success).toHaveBeenCalled()
+    expect(vi.mocked(useToast)().success).not.toHaveBeenCalled()
   })
 
   it('shows toast error with the Inertia error bag message', async () => {

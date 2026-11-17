@@ -24,6 +24,7 @@ const globalStubs = {
 describe('Logs/Index', () => {
   beforeEach(() => {
     vi.mocked(router.delete).mockClear()
+    vi.mocked(toast.success).mockClear()
     vi.mocked(usePage).mockReturnValue({ props: {} } as never)
   })
 
@@ -118,7 +119,8 @@ describe('Logs/Index', () => {
     const options = vi.mocked(router.delete).mock.calls[0][1]
     options.onSuccess?.({} as never)
     expect(modal.close).toHaveBeenCalled()
-    expect(toast.success).toHaveBeenCalledWith('已刪除所有紀錄')
+    // success copy comes from the server flash router, not this page
+    expect(toast.success).not.toHaveBeenCalled()
 
     options.onFinish?.({} as never)
     await wrapper.vm.$nextTick()

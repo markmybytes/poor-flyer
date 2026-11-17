@@ -78,8 +78,6 @@ function submitSettings(): void {
     { deadline: settings.value.deadline, notify_per_leg: settings.value.notifyPerLeg },
     {
       onSuccess: () => {
-        // Server flash is English ('Entry updated'); app copy is zh-Hant, so hardcode the fallback.
-        toast.success('已更新設定')
         ui.value.settingsModal = false
       },
       onError: () => {
