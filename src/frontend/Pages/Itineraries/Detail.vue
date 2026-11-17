@@ -35,8 +35,9 @@ const settings = ref({
 })
 
 const ui = ref({
-  loading: null as string | null,
-  activeTab: 'graph' as 'graph' | string,
+  loading: null as
+    'update_settings' | 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive' | null,
+  activeTab: 'graph' as 'graph' | `${number}`,
   settingsModal: false,
   deleteModal: false,
   restoreModal: false,
@@ -532,7 +533,7 @@ function runAction(action: Action): void {
               :key="f.id"
               class="tab h-12 shrink-0 px-6 text-sm font-bold"
               :class="ui.activeTab === String(i) ? 'tab-active' : ''"
-              @click="ui.activeTab = String(i)"
+              @click="ui.activeTab = `${i}`"
             >
               {{ f.origin }} → {{ f.destination }}
             </button>
@@ -584,7 +585,10 @@ function runAction(action: Action): void {
 
           <DeadlineDatePicker
             v-model="settings.deadline"
-            :departure="props.itinerary.flights[0]?.flightDate"
+            :trip="{
+              start: itinerary.flights[0]?.flightDate,
+              end: itinerary.flights.at(-1)?.flightDate,
+            }"
             :disabled="ui.loading === 'update_settings'"
           />
         </fieldset>

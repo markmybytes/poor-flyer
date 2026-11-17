@@ -12,9 +12,8 @@ function dpProps(wrapper: ReturnType<typeof mountPicker>) {
 }
 
 describe('DeadlineDatePicker', () => {
-  it('bounds a future departure and dots it in blue', () => {
-    const wrapper = mountPicker({ departure: '2030-01-01' })
-    const props = dpProps(wrapper)
+  it('bounds a future trip and dots its outbound in blue', () => {
+    const props = dpProps(mountPicker({ trip: { start: '2030-01-01' } }))
 
     expect(props?.maxDate).toBe('2030-01-01')
     expect(props?.minDate).toBe(new Date().toLocaleDateString('en-CA'))
@@ -24,15 +23,30 @@ describe('DeadlineDatePicker', () => {
   })
 
   it('drops the upper bound for a departed trip but still dots the date', () => {
-    const wrapper = mountPicker({ departure: '2020-01-01' })
-    const props = dpProps(wrapper)
+    const props = dpProps(mountPicker({ trip: { start: '2020-01-01' } }))
 
     expect(props?.maxDate).toBeUndefined()
-    expect(props?.startDate).toBe(new Date().toLocaleDateString('en-CA'))
+    expect(props?.startDate).toBeUndefined()
     expect(props?.markers).toEqual([{ date: '2020-01-01', type: 'dot', color: '#007af0' }])
   })
 
-  it('renders no markers or presets without a departure', () => {
+  it('adds a green return dot when the trip has a distinct end', () => {
+    const props = dpProps(mountPicker({ trip: { start: '2030-01-01', end: '2030-01-10' } }))
+
+    expect(props?.markers).toEqual([
+      { date: '2030-01-01', type: 'dot', color: '#007af0' },
+      { date: '2030-01-10', type: 'dot', color: '#10b981' },
+    ])
+    expect(props?.presetDates).toHaveLength(5)
+  })
+
+  it('keeps a single dot when start and end are the same day', () => {
+    const props = dpProps(mountPicker({ trip: { start: '2030-01-01', end: '2030-01-01' } }))
+
+    expect(props?.markers).toEqual([{ date: '2030-01-01', type: 'dot', color: '#007af0' }])
+  })
+
+  it('renders no markers or presets without a trip', () => {
     const props = dpProps(mountPicker())
 
     expect(props?.maxDate).toBeUndefined()
@@ -40,24 +54,17 @@ describe('DeadlineDatePicker', () => {
     expect(props?.presetDates).toEqual([])
   })
 
-  it('passes a markers override through instead of the default dot', () => {
-    const override = [{ date: '2030-02-02', type: 'dot', color: '#10b981' }]
-    const props = dpProps(mountPicker({ departure: '2030-01-01', markers: override }))
-
-    expect(props?.markers).toEqual(override)
-  })
-
   it('forwards disabled to the trigger input', () => {
-    const wrapper = mountPicker({ departure: '2030-01-01', disabled: true })
+    const wrapper = mountPicker({ trip: { start: '2030-01-01' }, disabled: true })
 
     expect(wrapper.find('input').attributes('disabled')).toBeDefined()
-    expect(wrapper.find('button[aria-label="清除限期"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('button[aria-label="清除"]').attributes('disabled')).toBeDefined()
   })
 
   it('emits an empty string when the clear affordance is clicked', async () => {
-    const wrapper = mountPicker({ modelValue: '2030-01-01', departure: '2030-01-01' })
+    const wrapper = mountPicker({ modelValue: '2030-01-01', trip: { start: '2030-01-01' } })
 
-    await wrapper.find('button[aria-label="清除限期"]').trigger('click')
+    await wrapper.find('button[aria-label="清除"]').trigger('click')
 
     expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([''])
   })

@@ -273,30 +273,10 @@ function submit() {
             <DeadlineDatePicker
               v-model="form.deadline"
               placeholder="選擇日期"
-              :departure="form.flights[0]?.flightDate"
-              :markers="
-                form.flights
-                  .map((f, i) =>
-                    f.flightDate
-                      ? {
-                          date: f.flightDate,
-                          type: 'dot' as const,
-                          color: '#10b981',
-                          tooltip: [
-                            {
-                              text:
-                                form.tripType === 'ROUND_TRIP'
-                                  ? i === 0
-                                    ? '去程'
-                                    : '回程'
-                                  : `航段 ${i + 1}`,
-                            },
-                          ],
-                        }
-                      : null,
-                  )
-                  .filter((marker) => marker !== null)
-              "
+              :trip="{
+                start: form.flights[0]?.flightDate,
+                end: form.flights.at(-1)?.flightDate,
+              }"
             />
 
             <p class="label mt-1 p-0 text-xs text-base-content/55">

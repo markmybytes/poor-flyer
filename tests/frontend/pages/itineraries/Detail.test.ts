@@ -186,7 +186,7 @@ describe('Itineraries/Detail settings modal', () => {
     const wrapper = mountDetail()
     await wrapper.find('button[title="設定通知與限期"]').trigger('click')
 
-    const clearBtn = wrapper.find('button[aria-label="清除限期"]')
+    const clearBtn = wrapper.find('button[aria-label="清除"]')
     expect(clearBtn.exists()).toBe(true)
     expect(clearBtn.attributes('disabled')).toBeDefined()
     expect(wrapper.findAll('button').some((b) => b.text().trim() === '移除限期')).toBe(false)
@@ -196,7 +196,7 @@ describe('Itineraries/Detail settings modal', () => {
     const wrapper = mountDetail({ deadline: '2026-06-01' })
     await wrapper.find('button[title="設定通知與限期"]').trigger('click')
 
-    const clearBtn = wrapper.find('button[aria-label="清除限期"]')
+    const clearBtn = wrapper.find('button[aria-label="清除"]')
     expect(clearBtn.attributes('disabled')).toBeUndefined()
 
     await clearBtn.trigger('click')
