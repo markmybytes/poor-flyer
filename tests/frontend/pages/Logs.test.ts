@@ -21,7 +21,7 @@ describe('Logs/Index', () => {
   beforeEach(() => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
-      json: async () => ({ success: true }),
+      json: async () => ({ message: 'Logs cleared', data: null }),
     } as Response)
   })
 

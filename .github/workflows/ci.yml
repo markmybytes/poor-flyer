@@ -26,7 +26,7 @@ jobs:
           node-version-file: package.json
           cache: npm
 
-      - run: uv sync --frozen --all-extras
+      - run: uv sync --locked --all-extras
 
       - run: npm ci
 
@@ -53,7 +53,12 @@ jobs:
           node-version-file: package.json
           cache: npm
 
-      - run: uv sync --frozen --all-extras
+      - run: uv sync --locked --all-extras
+
+      - name: Check migrations
+        env:
+          PF_DATABASE_URL: sqlite:///${{ runner.temp }}/drift.sqlite
+        run: uv run flask --app wsgi.py db upgrade && uv run flask --app wsgi.py db check
 
       - run: npm ci
 

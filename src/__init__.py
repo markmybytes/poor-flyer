@@ -33,8 +33,8 @@ def _inject_vite_url():
     vite_dev_url = None
     if current_app.debug:
         hot_file = current_app.config.get('VITE_HOT_FILE')
-        if hot_file and Path(hot_file).exists():
-            with open(hot_file) as f:
+        if hot_file and (hot := Path(hot_file)).exists():
+            with hot.open() as f:
                 vite_dev_url = f.read().strip()
     return {'vite_dev_url': vite_dev_url}
 

@@ -89,7 +89,7 @@ def get_all_masked(namespace: str) -> dict[str, str]:
     return data
 
 
-def update(data: Mapping[str, Any]) -> None:
+def update(data: Mapping[str, Any]) -> None:  # noqa: C901 - four independent sections, each ~5 branches
     """Apply a partial settings payload, raising ValueError on invalid values."""
     from src.services.fx_rates import SUPPORTED_CURRENCIES
 

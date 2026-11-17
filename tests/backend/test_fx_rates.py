@@ -138,5 +138,3 @@ def test_fuzz_convert_amount_only_raises_fx_rates_error(app, amount, src, tgt):
                 assert isinstance(result, float)
             except FXRatesError:
                 pass
-            except Exception as exc:
-                pytest.fail(f'Unexpected exception type {type(exc).__name__}: {exc}')

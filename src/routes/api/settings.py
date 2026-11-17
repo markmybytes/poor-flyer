@@ -24,7 +24,7 @@ def get_settings():
 
         return jsonify(
             {
-                'success': True,
+                'message': None,
                 'data': {
                     'smtp': setting.get_all_masked('smtp') or {},
                     'email': setting.get_all_masked('email') or {},
@@ -34,7 +34,7 @@ def get_settings():
         )
     except Exception as e:
         logger.exception('read settings failed')
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'message': str(e), 'data': None}), 400
 
 
 @settings_bp.route('', methods=['PATCH'])
@@ -42,12 +42,12 @@ def patch_settings():
     try:
         setting.update(request.get_json(silent=True) or {})
 
-        return jsonify({'success': True, 'message': 'Settings updated successfully'})
+        return jsonify({'message': 'Settings updated successfully', 'data': None})
     except ValueError as e:
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'message': str(e), 'data': None}), 400
     except Exception as e:
         logger.exception('patch settings failed')
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'message': str(e), 'data': None}), 400
 
 
 @settings_bp.route('/fx-rates/refresh', methods=['POST'])
@@ -58,7 +58,6 @@ def refresh_fx_rates():
         rates = get_rates(base, force_refresh=True)
         return jsonify(
             {
-                'success': True,
                 'message': 'Latest FX rates fetched successfully',
                 'data': {
                     'base_currency': rates.get('base', base),
@@ -69,10 +68,10 @@ def refresh_fx_rates():
         )
     except FXRatesError as e:
         logger.warning('fx rates refresh failed: error=%s', e)
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'message': str(e), 'data': None}), 400
     except Exception as e:
         logger.exception('refresh fx rates failed: reason=unexpected')
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'message': str(e), 'data': None}), 400
 
 
 @settings_bp.route('/test-email', methods=['POST'])
@@ -81,9 +80,7 @@ def test_email():
         data = request.get_json(silent=True) or request.form.to_dict()
         recipient = data.get('recipient', '').strip()
         if not recipient:
-            return jsonify(
-                {'success': False, 'message': 'Recipient email address is required'}
-            ), 400
+            return jsonify({'message': 'Recipient email address is required', 'data': None}), 400
 
         if send_html_email(
             get_smtp_config(),
@@ -91,8 +88,8 @@ def test_email():
             'PoorFlyer - Test Email',
             render_template('email/test_email.html'),
         ):
-            return jsonify({'success': True, 'message': f'Test email sent to {recipient}'})
-        return jsonify({'success': False, 'message': 'Failed to send test email.'}), 400
+            return jsonify({'message': f'Test email sent to {recipient}', 'data': None})
+        return jsonify({'message': 'Failed to send test email.', 'data': None}), 400
     except Exception as e:
         logger.exception('send test email failed')
-        return jsonify({'success': False, 'message': str(e)}), 400
+        return jsonify({'message': str(e), 'data': None}), 400

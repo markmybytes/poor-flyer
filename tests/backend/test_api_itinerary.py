@@ -67,7 +67,7 @@ def test_create_itinerary_single_flight(client, app):
             )
     assert resp.status_code == 200
     data = resp.get_json()
-    assert data['success'] is True
+    assert data['message'] == 'Entry created'
     assert isinstance(data['data'], str)
 
 
@@ -87,7 +87,7 @@ def test_create_itinerary_with_deadline(client, app):
             content_type='application/json',
         )
     assert resp.status_code == 200
-    assert resp.get_json()['success'] is True
+    assert resp.get_json()['message'] == 'Entry created'
 
 
 def test_create_itinerary_invalid_date_returns_400(client, app):
@@ -105,7 +105,9 @@ def test_create_itinerary_invalid_date_returns_400(client, app):
             content_type='application/json',
         )
     assert resp.status_code == 400
-    assert resp.get_json()['success'] is False
+    body = resp.get_json()
+    assert body['message']
+    assert body['data'] is None
 
 
 def test_get_itinerary_not_found(client, app):
@@ -113,7 +115,9 @@ def test_get_itinerary_not_found(client, app):
         with patch('src.routes.api.itinerary.get_configured_base_currency', return_value='HKD'):
             resp = client.get(f'/api/itineraries/{uuid.uuid4()}')
     assert resp.status_code == 404
-    assert resp.get_json()['success'] is False
+    body = resp.get_json()
+    assert body['message'] == 'Entry not found'
+    assert body['data'] is None
 
 
 def test_get_itinerary_success_no_fare(client, app):
@@ -129,7 +133,8 @@ def test_get_itinerary_success_no_fare(client, app):
 
     assert resp.status_code == 200
     data = resp.get_json()
-    assert data['success'] is True
+    assert set(data) == {'message', 'data'}
+    assert data['message'] is None
     assert data['data']['id'] == iid
     assert data['data']['latestConvertedFare'] is None
 
@@ -163,7 +168,7 @@ def test_patch_itinerary_deadline(client, app):
         content_type='application/json',
     )
     assert resp.status_code == 200
-    assert resp.get_json()['success'] is True
+    assert resp.get_json()['message'] == 'Entry updated'
 
 
 def test_patch_itinerary_not_found(client, app):
@@ -174,7 +179,9 @@ def test_patch_itinerary_not_found(client, app):
             content_type='application/json',
         )
     assert resp.status_code == 404
-    assert resp.get_json()['success'] is False
+    body = resp.get_json()
+    assert body['message'] == 'Entry not found'
+    assert body['data'] is None
 
 
 def test_patch_itinerary_archive_and_unarchive(client, app):
@@ -251,7 +258,9 @@ def test_delete_itinerary(client, app):
 
     resp = client.delete(f'/api/itineraries/{iid}')
     assert resp.status_code == 200
-    assert resp.get_json()['success'] is True
+    body = resp.get_json()
+    assert body['message'] == 'Entry deleted'
+    assert body['data'] is None
 
 
 def test_delete_itinerary_not_found(client, app):

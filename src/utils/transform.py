@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime
 from flask.json.provider import DefaultJSONProvider
 from sqlalchemy import inspect
 
-from src.extensions.database import floating_datetime
+from src.extensions.database import FloatingDateTime
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,7 @@ class CamelCaseJSONProvider(DefaultJSONProvider):
         return super().dumps(obj, **kwargs)
 
     def default(self, obj):
-        if isinstance(obj, floating_datetime):
+        if isinstance(obj, FloatingDateTime):
             return obj.isoformat()
 
         if isinstance(obj, datetime):
