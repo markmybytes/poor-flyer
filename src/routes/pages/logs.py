@@ -2,7 +2,7 @@ import logging
 from contextlib import suppress
 from datetime import date
 
-from flask import Blueprint, flash, redirect, request
+from flask import Blueprint, flash, redirect, request, session
 from flask.typing import ResponseReturnValue
 from flask_inertia import render_inertia
 
@@ -69,7 +69,7 @@ def clear() -> ResponseReturnValue:
         log_svc.clear_logs()
     except OSError:
         logger.exception('clear application logs from page failed')
-        flash({'field': 'logs', 'message': '清除紀錄失敗'}, 'error')
+        session['errors'] = {'logs': '清除紀錄失敗'}
         return redirect('/logs/')
 
     flash('已刪除所有紀錄', 'success')

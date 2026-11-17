@@ -1,6 +1,6 @@
 import logging
 
-from flask import Blueprint, flash, redirect, request
+from flask import Blueprint, flash, redirect, request, session
 from flask_inertia import render_inertia
 
 from src.services import setting
@@ -62,7 +62,7 @@ def save():
     try:
         setting.update(request.get_json(silent=True) or request.form.to_dict())
     except ValueError as exc:
-        flash({'field': 'settings', 'message': str(exc)}, 'error')
+        session['errors'] = {'settings': str(exc)}
         return redirect('/settings/')
 
     logger.info('settings updated from page form')

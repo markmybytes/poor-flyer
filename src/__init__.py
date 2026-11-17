@@ -5,7 +5,7 @@ import secrets
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from flask import Flask, current_app, g, get_flashed_messages, request
+from flask import Flask, current_app, g, get_flashed_messages, request, session
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from src.cli import dev, run_scheduler
@@ -17,30 +17,6 @@ from src.routes.pages import pages_bp
 from src.utils.transform import CamelCaseJSONProvider
 
 logger = logging.getLogger(__name__)
-
-
-def _page_flashes() -> dict[str, dict[str, str]]:
-    """Split this request's flashes into `flash` notices and `errors` field messages.
-
-    Every flash category is a toast level. A string payload is a notice; a
-    `{'field', 'message'}` payload is a validation failure.
-
-    Reading pops the flash queue, so both shares must see one split: the result is
-    cached on the request. Cached on `request`, not `g`: `g` belongs to the app
-    context, which outlives a request when one is held open (tests, request contexts
-    pushed inside an app context), and a stale split would replay old flashes.
-    """
-    if (cached := getattr(request, '_page_flashes', None)) is not None:
-        return cached
-    split: dict[str, dict[str, str]] = {'flash': {}, 'errors': {}}
-    for level, message in get_flashed_messages(with_categories=True):
-        if isinstance(message, dict):
-            split['errors'][message['field']] = message['message']
-        else:
-            # one notice per level; a duplicated level keeps its last message
-            split['flash'][level] = message
-    request._page_flashes = split
-    return split
 
 
 def _resolve_timezone():
@@ -144,9 +120,10 @@ def create_app():
     init_extensions(app)
     logger.info('extensions initialized')
 
-    # notice categories (success/error/info/warning) are type-keyed; the rest are field-keyed.
-    inertia.share('flash', lambda: _page_flashes()['flash'])
-    inertia.share('errors', lambda: _page_flashes()['errors'])
+    # notices: the category is the toast level; a duplicated level keeps its last message
+    inertia.share('flash', lambda: dict(get_flashed_messages(with_categories=True)))
+    # validation bag: plain 'errors' key, since underscore-led keys round-trip unchanged
+    inertia.share('errors', lambda: session.pop('errors', None) or {})
 
     app.before_request(_resolve_timezone)
 

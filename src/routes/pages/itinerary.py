@@ -3,7 +3,7 @@ from dataclasses import asdict
 from datetime import date, datetime
 from typing import Any
 
-from flask import Blueprint, flash, g, redirect, request
+from flask import Blueprint, flash, g, redirect, request, session
 from flask.typing import ResponseReturnValue
 from flask_inertia import render_inertia
 from fli.models.airline import AIRLINE_NAMES
@@ -142,7 +142,7 @@ def create_submit() -> ResponseReturnValue:
     except (KeyError, TypeError, ValueError) as exc:
         db.session.rollback()
         logger.info('invalid itinerary submission: error=%s', exc)
-        flash({'field': 'itinerary', 'message': '請檢查輸入內容'}, 'error')
+        session['errors'] = {'itinerary': '請檢查輸入內容'}
         return redirect('/itineraries/create')
 
     logger.info('created itinerary from page form: id=%s', itinerary.id)
@@ -210,8 +210,7 @@ def update_itinerary(itinerary_id: str) -> ResponseReturnValue:
     if errors:
         db.session.rollback()
         logger.info('invalid itinerary update: id=%s fields=%s', itinerary_id, ','.join(errors))
-        for field, message in errors.items():
-            flash({'field': field, 'message': message}, 'error')
+        session['errors'] = errors
         return redirect(f'/itineraries/{itinerary_id}')
 
     db.session.commit()
