@@ -1,5 +1,4 @@
 import logging
-from collections import defaultdict
 from dataclasses import asdict
 from datetime import date, datetime
 
@@ -14,7 +13,7 @@ from src.services.fx_rates import (
     convert_amount,
     get_configured_base_currency,
 )
-from src.services.itinerary import create_itinerary
+from src.services.itinerary import create_itinerary, get_combined_totals
 from src.utils.rule37 import compute_37_best, compute_price_stats
 from src.utils.transform import model_to_dict
 
@@ -35,42 +34,6 @@ def _serialize_snapshot(snapshot: FareSnapshot, currency: str) -> dict:
     return data
 
 
-def _get_combined_totals(itinerary: Itinerary, currency: str) -> dict[date, float]:
-    """Computes daily combined price minimums across all legs of an itinerary."""
-    date_fares = defaultdict(dict)
-    for flight in itinerary.flights:
-        for s in flight.fare_snapshots:
-            if s.scrape_status == 'success' and s.fare is not None:
-                src_currency = (s.currency or currency).upper()
-                try:
-                    fare_value = convert_amount(s.fare, src_currency, currency)
-                except FXRatesError:
-                    logger.warning('convert itinerary fare snapshot failed: snapshot_id=%s', s.id)
-                    continue
-
-                s_date = (
-                    s.created_at.date()
-                    if isinstance(s.created_at, datetime)
-                    else getattr(s.created_at, 'date', lambda s=s: s.created_at)()
-                )
-                if (
-                    flight.id not in date_fares[s_date]
-                    or fare_value < date_fares[s_date][flight.id]
-                ):
-                    date_fares[s_date][flight.id] = fare_value
-
-    combined_totals = {}
-    num_flights = len(itinerary.flights)
-    if num_flights == 0:
-        return {}
-
-    for d, f_fares in date_fares.items():
-        if len(f_fares) == num_flights:
-            combined_totals[d] = float(sum(f_fares.values()))
-
-    return combined_totals
-
-
 def _serialize_itinerary(
     itinerary: Itinerary,
     base_currency: str,
@@ -78,7 +41,7 @@ def _serialize_itinerary(
     today: date,
     include_rule37: bool = True,
 ) -> dict:
-    combined = _get_combined_totals(itinerary, base_currency)
+    combined = get_combined_totals(itinerary, base_currency)
     stats = compute_price_stats(combined)
     stats_dict = asdict(stats) if stats else None
     r37_dict = None

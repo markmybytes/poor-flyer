@@ -14,6 +14,7 @@ const form = ref({
   tripType: 'SINGLE',
   deadline: '',
   isActive: true,
+  notifyPerLeg: false,
   flights: [{ origin: '', destination: '', flightDate: '' }],
   processing: false,
 })
@@ -101,6 +102,7 @@ function submit() {
     trip_type: form.value.tripType,
     deadline: form.value.deadline || null,
     is_active: form.value.isActive,
+    notify_per_leg: form.value.notifyPerLeg,
     cabin_class: filters.value.cabinClass || null,
     max_stops: filters.value.maxStops || null,
     ...(filters.value.airlines ? { airlines: filters.value.airlines } : {}),
@@ -323,41 +325,41 @@ function submit() {
 
           <div class="divider text-base-content/30">分析設定</div>
 
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend text-sm font-bold">
+              最遲購票限期 <span class="font-normal text-base-content/50">（選填）</span>
+            </legend>
+
+            <VueDatePicker
+              v-model="form.deadline"
+              :start-date="latestFlightDate"
+              :markers="deadlineMarkers"
+              :enable-time-picker="false"
+              :locale="zhHK"
+              auto-apply
+              model-type="yyyy-MM-dd"
+              teleport="body"
+            >
+              <template #trigger>
+                <input
+                  type="text"
+                  :value="form.deadline"
+                  placeholder="選擇日期"
+                  class="input-bordered input w-full cursor-pointer transition-colors focus:input-primary"
+                  readonly
+                />
+              </template>
+            </VueDatePicker>
+
+            <p class="label mt-1 p-0 text-xs text-base-content/55">
+              設定限期後系統方可計算最佳購買時機
+            </p>
+          </fieldset>
+
           <div class="grid gap-4 md:grid-cols-2">
-            <fieldset class="fieldset">
-              <legend class="fieldset-legend text-sm font-bold">
-                最遲購票限期 <span class="font-normal text-base-content/50">（選填）</span>
-              </legend>
-
-              <VueDatePicker
-                v-model="form.deadline"
-                :start-date="latestFlightDate"
-                :markers="deadlineMarkers"
-                :enable-time-picker="false"
-                :locale="zhHK"
-                auto-apply
-                model-type="yyyy-MM-dd"
-                teleport="body"
-              >
-                <template #trigger>
-                  <input
-                    type="text"
-                    :value="form.deadline"
-                    placeholder="選擇日期"
-                    class="input-bordered input w-full cursor-pointer transition-colors focus:input-primary"
-                    readonly
-                  />
-                </template>
-              </VueDatePicker>
-
-              <p class="label mt-1 p-0 text-xs text-base-content/55">
-                設定限期後系統方可計算最佳購買時機
-              </p>
-            </fieldset>
-
             <fieldset class="fieldset justify-end">
               <label
-                class="cursor-pointer.justify-start label gap-4 rounded-xl border border-base-200 bg-base-200/20 p-4 transition-colors hover:border-success/30"
+                class="label cursor-pointer justify-start gap-4 rounded-xl border border-base-200 bg-base-200/20 p-4 transition-colors hover:border-success/30"
               >
                 <input
                   v-model="form.isActive"
@@ -370,6 +372,27 @@ function submit() {
                   <span class="label-text block text-sm font-bold">啟用自動追蹤</span>
 
                   <span class="label-text-alt text-base-content/60">每日自動更新並記錄票價</span>
+                </div>
+              </label>
+            </fieldset>
+
+            <fieldset class="fieldset">
+              <label
+                class="label cursor-pointer justify-start gap-4 rounded-xl border border-base-200 bg-base-200/20 p-4 transition-colors hover:border-success/30"
+              >
+                <input
+                  v-model="form.notifyPerLeg"
+                  type="checkbox"
+                  class="toggle toggle-success"
+                  :disabled="form.processing"
+                />
+
+                <div>
+                  <span class="label-text block text-sm font-bold">逐航段通知</span>
+
+                  <span class="label-text-alt text-base-content/60">
+                    個別航段到達最佳購買時機，亦會另行發送電郵
+                  </span>
                 </div>
               </label>
             </fieldset>

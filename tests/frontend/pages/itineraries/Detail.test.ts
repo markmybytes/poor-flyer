@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { router } from '@inertiajs/vue3'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useToast } from 'vue-toast-notification'
+import { VueDatePicker } from '@vuepic/vue-datepicker'
 
 const itinerary = {
   id: 'it-1',
@@ -92,6 +93,149 @@ describe('Itineraries/Detail filters', () => {
   })
 })
 
+describe('Itineraries/Detail per-leg notifications', () => {
+  beforeEach(() => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({}) } as Response)
+  })
+
+  it('shows the flag as 已開啟 when enabled', () => {
+    const wrapper = mountDetail({ notifyPerLeg: true })
+
+    expect(wrapper.text()).toContain('逐航段通知')
+    expect(wrapper.text()).toContain('已開啟')
+  })
+
+  it('shows the flag as 未開啟 when disabled', () => {
+    const wrapper = mountDetail({ notifyPerLeg: false })
+
+    expect(wrapper.text()).toContain('逐航段通知')
+    expect(wrapper.text()).toContain('未開啟')
+    expect(wrapper.text()).not.toContain('已開啟')
+  })
+})
+
+describe('Itineraries/Detail settings modal', () => {
+  beforeEach(() => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ message: null, data: null }),
+    } as Response)
+  })
+
+  it('opens the settings modal from the gear button without fetching', async () => {
+    const wrapper = mountDetail()
+    vi.mocked(fetch).mockClear()
+
+    await wrapper.find('button[title="設定通知與限期"]').trigger('click')
+
+    expect(wrapper.text()).toContain('通知與限期設定')
+    expect(wrapper.text()).toContain('逐航段通知')
+    // daisyUI .label is nowrap inline-flex; flex-wrap keeps the toggle row from overflowing the box
+    expect(wrapper.find('label').classes()).toContain('flex-wrap')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('saves the deadline via PATCH and keeps the chip in sync', async () => {
+    const wrapper = mountDetail({ deadline: '2026-06-01' })
+    await wrapper.find('button[title="設定通知與限期"]').trigger('click')
+
+    const saveBtn = wrapper.findAll('button').find((b) => b.text().trim() === '儲存')
+    await saveBtn!.trigger('click')
+    await flushPromises()
+
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/itineraries/it-1',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ deadline: '2026-06-01', notify_per_leg: false }),
+      }),
+    )
+    expect(wrapper.text()).toContain('購票限期')
+    expect(wrapper.text()).toContain('天後')
+    expect(wrapper.findAll('dialog.modal-open')).toHaveLength(0)
+  })
+
+  it('keeps the in-field clear affordance disabled without a deadline and drops the footer button', async () => {
+    const wrapper = mountDetail()
+    await wrapper.find('button[title="設定通知與限期"]').trigger('click')
+
+    const clearBtn = wrapper.find('button[aria-label="清除限期"]')
+    expect(clearBtn.exists()).toBe(true)
+    expect(clearBtn.attributes('disabled')).toBeDefined()
+    expect(wrapper.findAll('button').some((b) => b.text().trim() === '移除限期')).toBe(false)
+  })
+
+  it('clears the draft in-field without PATCH; PATCH fires only on 儲存', async () => {
+    const wrapper = mountDetail({ deadline: '2026-06-01' })
+    await wrapper.find('button[title="設定通知與限期"]').trigger('click')
+    vi.mocked(fetch).mockClear()
+
+    const clearBtn = wrapper.find('button[aria-label="清除限期"]')
+    expect(clearBtn.attributes('disabled')).toBeUndefined()
+
+    await clearBtn.trigger('click')
+    expect(fetch).not.toHaveBeenCalled()
+
+    await wrapper.findAll('button').find((b) => b.text().trim() === '儲存')!.trigger('click')
+    await flushPromises()
+
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/itineraries/it-1',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ deadline: null, notify_per_leg: false }),
+      }),
+    )
+    expect(wrapper.findAll('dialog.modal-open')).toHaveLength(0)
+  })
+
+  it('marks the departure date with a blue dot marker', async () => {
+    const wrapper = mountDetail()
+    const dp = wrapper.findComponent(VueDatePicker)
+    expect(dp.exists()).toBe(true)
+    // VTU's props() reads $props, which stays empty for this package's root; vnode props carry the bindings.
+    const dpVNodeProps = dp.vm.$.vnode.props as Record<string, unknown> | null
+    expect(dpVNodeProps?.markers).toEqual([
+      { date: '2026-12-01', type: 'dot', color: '#007af0' },
+    ])
+  })
+
+  it('toggles notify_per_leg via PATCH', async () => {
+    const wrapper = mountDetail({ notifyPerLeg: false })
+    await wrapper.find('button[title="設定通知與限期"]').trigger('click')
+
+    await wrapper.find('input[type="checkbox"]').setValue(true)
+    const saveBtn = wrapper.findAll('button').find((b) => b.text().trim() === '儲存')
+    await saveBtn!.trigger('click')
+    await flushPromises()
+
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/itineraries/it-1',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ deadline: null, notify_per_leg: true }),
+      }),
+    )
+    expect(wrapper.text()).toContain('已開啟')
+  })
+
+  it('shows an inline error and keeps the modal open on failure', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: false,
+      json: async () => ({ message: 'Entry not found', data: null }),
+    } as Response)
+    const wrapper = mountDetail()
+    await wrapper.find('button[title="設定通知與限期"]').trigger('click')
+
+    const saveBtn = wrapper.findAll('button').find((b) => b.text().trim() === '儲存')
+    await saveBtn!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('更新失敗')
+    expect(wrapper.find('dialog.modal.modal-open').exists()).toBe(true)
+  })
+})
+
 describe('Itineraries/Detail archived state', () => {
   beforeEach(() => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({}) } as Response)
@@ -103,7 +247,7 @@ describe('Itineraries/Detail archived state', () => {
     expect(wrapper.text()).toContain('已封存')
     expect(wrapper.text()).not.toContain('下載最新票價')
     expect(wrapper.findAll('button').some((b) => ['暫停追蹤', '開始追蹤'].includes(b.text().trim()))).toBe(false)
-    expect(wrapper.find('button[title="修改購票限期"]').exists()).toBe(true)
+    expect(wrapper.find('button[title="設定通知與限期"]').exists()).toBe(true)
   })
 
   it('keeps 已封存 badge precedence when itinerary is also inactive', () => {

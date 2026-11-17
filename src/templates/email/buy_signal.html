@@ -54,8 +54,8 @@
           <tr>
             <td style="padding: 8px 0; font-weight: bold; color: #6b7280">可節省：</td>
             <td style="padding: 8px 0; font-size: 16px; font-weight: bold; color: #22c55e">
-              {{ '%.2f'|format(current_fare - lowest_fare) }} {{ display_currency }} ({{
-              ((current_fare - lowest_fare) / lowest_fare * 100)|round(1) }}%)
+              {{ '%.2f'|format(savings) }} {{ display_currency }} ({{
+              '%.1f'|format(savings_pct) }}%)
             </td>
           </tr>
         </table>

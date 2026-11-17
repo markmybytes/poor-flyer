@@ -135,4 +135,31 @@ describe('Itineraries/Create', () => {
     await flushPromises()
     expect(lastRequestBody().airlines).toEqual([])
   })
+
+  function notifyToggle(wrapper: ReturnType<typeof mount>) {
+    const label = wrapper.findAll('label').find((l) => l.text().includes('逐航段通知'))
+    return label!.find('input[type="checkbox"]')
+  }
+
+  it('renders the per-leg notification checkbox, off by default', () => {
+    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    const toggle = notifyToggle(wrapper)
+    expect(toggle.exists()).toBe(true)
+    expect((toggle.element as HTMLInputElement).checked).toBe(false)
+  })
+
+  it('sends notify_per_leg as false by default', async () => {
+    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(lastRequestBody().notify_per_leg).toBe(false)
+  })
+
+  it('sends notify_per_leg as true once the checkbox is toggled', async () => {
+    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    await notifyToggle(wrapper).setValue(true)
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(lastRequestBody().notify_per_leg).toBe(true)
+  })
 })

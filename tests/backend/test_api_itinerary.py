@@ -136,6 +136,7 @@ def test_get_itinerary_success_no_fare(client, app):
     assert set(data) == {'message', 'data'}
     assert data['message'] is None
     assert data['data']['id'] == iid
+    assert data['data']['notifyPerLeg'] is False
     assert data['data']['latestConvertedFare'] is None
 
 
@@ -168,7 +169,9 @@ def test_patch_itinerary_deadline(client, app):
         content_type='application/json',
     )
     assert resp.status_code == 200
-    assert resp.get_json()['message'] == 'Entry updated'
+    body = resp.get_json()
+    assert body['message'] == 'Entry updated'
+    assert body['data'] == iid
 
 
 def test_patch_itinerary_not_found(client, app):
@@ -289,3 +292,94 @@ def test_create_itinerary_origins_uppercased(client, app):
         flight = db.session.query(Flight).filter_by(itinerary_id=it_id).first()
         assert flight.origin == 'HKG'
         assert flight.destination == 'NRT'
+
+
+def test_create_itinerary_notify_per_leg_defaults_to_false(client, app):
+    resp = client.post(
+        '/api/itineraries',
+        data=json.dumps(
+            {
+                'trip_type': 'SINGLE',
+                'flights': [{'origin': 'HKG', 'destination': 'NRT', 'flight_date': '2025-12-01'}],
+            }
+        ),
+        content_type='application/json',
+    )
+    assert resp.status_code == 200
+    with app.app_context():
+        assert db.session.get(Itinerary, resp.get_json()['data']).notify_per_leg is False
+
+
+def test_create_itinerary_honors_notify_per_leg(client, app):
+    resp = client.post(
+        '/api/itineraries',
+        data=json.dumps(
+            {
+                'trip_type': 'SINGLE',
+                'notify_per_leg': True,
+                'flights': [{'origin': 'HKG', 'destination': 'NRT', 'flight_date': '2025-12-01'}],
+            }
+        ),
+        content_type='application/json',
+    )
+    assert resp.status_code == 200
+    with app.app_context():
+        assert db.session.get(Itinerary, resp.get_json()['data']).notify_per_leg is True
+
+
+def test_create_itinerary_invalid_notify_per_leg_returns_400(client, app):
+    resp = client.post(
+        '/api/itineraries',
+        data=json.dumps(
+            {
+                'trip_type': 'SINGLE',
+                'notify_per_leg': 'maybe',
+                'flights': [{'origin': 'HKG', 'destination': 'NRT', 'flight_date': '2025-12-01'}],
+            }
+        ),
+        content_type='application/json',
+    )
+    assert resp.status_code == 400
+    assert resp.get_json()['data'] is None
+    with app.app_context():
+        assert db.session.query(Itinerary).count() == 0
+
+
+def test_patch_itinerary_notify_per_leg(client, app):
+    with app.app_context():
+        it = _make_itinerary()
+        db.session.commit()
+        iid = it.id
+
+    resp = client.patch(
+        f'/api/itineraries/{iid}',
+        data=json.dumps({'notify_per_leg': True}),
+        content_type='application/json',
+    )
+    assert resp.status_code == 200
+    with app.app_context():
+        assert db.session.get(Itinerary, iid).notify_per_leg is True
+
+    resp = client.patch(
+        f'/api/itineraries/{iid}',
+        data={'notify_per_leg': 'false'},
+    )
+    assert resp.status_code == 200
+    with app.app_context():
+        assert db.session.get(Itinerary, iid).notify_per_leg is False
+
+
+def test_patch_itinerary_invalid_notify_per_leg_returns_400(client, app):
+    with app.app_context():
+        it = _make_itinerary()
+        db.session.commit()
+        iid = it.id
+
+    resp = client.patch(
+        f'/api/itineraries/{iid}',
+        data=json.dumps({'notify_per_leg': 'maybe'}),
+        content_type='application/json',
+    )
+    assert resp.status_code == 400
+    assert resp.get_json()['message'] == 'Invalid notify_per_leg'
+    assert resp.get_json()['data'] is None
