@@ -22,8 +22,7 @@ Flask 3 + Vue 3 (Inertia SPA) flight-price tracker. Scrapes airline fares daily 
 
 ### File Structure
 
-- `src/routes/{pages,api}` — Inertia page views own reads and mutations; `api/` is the exception surface for isolated interactions: inline state toggles, background actions, data queries
-  - `lookup.py` registers `GET /api/airlines` (full fli Airline list, route-cached 24h)
+- `src/routes/{pages,api}` — Inertia page views own reads and mutations; `api/` is the exception surface for isolated interactions: inline state toggles and background actions
 - `src/services/` — domain logic and scheduler jobs
 - `src/utils/` — pure helpers (no Flask globals, no I/O)
 - `src/extensions/` — Flask extension singletons + `init_extensions(app)`; SQLAlchemy `Base` / `db` in `database.py`

@@ -29,24 +29,36 @@ describe('Itineraries/Create', () => {
   })
 
   it('renders without crashing', () => {
-    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    const wrapper = mount(CreatePage, {
+      props: { airlines: [{ code: 'CX', name: 'Cathay Pacific' }] },
+      global: { stubs: globalStubs },
+    })
     expect(wrapper.exists()).toBe(true)
   })
 
   it('defaults trip type to SINGLE', () => {
-    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    const wrapper = mount(CreatePage, {
+      props: { airlines: [{ code: 'CX', name: 'Cathay Pacific' }] },
+      global: { stubs: globalStubs },
+    })
     const radios = wrapper.findAll('input[type="radio"]')
     const singleRadio = radios.find((r) => r.attributes('value') === 'SINGLE')
     expect((singleRadio?.element as HTMLInputElement).checked).toBe(true)
   })
 
   it('shows one flight leg for SINGLE by default', () => {
-    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    const wrapper = mount(CreatePage, {
+      props: { airlines: [{ code: 'CX', name: 'Cathay Pacific' }] },
+      global: { stubs: globalStubs },
+    })
     expect(wrapper.findAll('input[placeholder="例如: HKG"]').length).toBeGreaterThanOrEqual(1)
   })
 
   it('switching to ROUND_TRIP adds second flight leg', async () => {
-    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    const wrapper = mount(CreatePage, {
+      props: { airlines: [{ code: 'CX', name: 'Cathay Pacific' }] },
+      global: { stubs: globalStubs },
+    })
     const roundTripRadio = wrapper.find('input[value="ROUND_TRIP"]')
     await roundTripRadio.setValue(true)
     await roundTripRadio.trigger('change')
@@ -56,13 +68,19 @@ describe('Itineraries/Create', () => {
   })
 
   it('submit button is present in the form', () => {
-    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    const wrapper = mount(CreatePage, {
+      props: { airlines: [{ code: 'CX', name: 'Cathay Pacific' }] },
+      global: { stubs: globalStubs },
+    })
     const submitBtn = wrapper.find('button[type="submit"]')
     expect(submitBtn.exists()).toBe(true)
   })
 
   it('posts to /itineraries through the Inertia router on submit', async () => {
-    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    const wrapper = mount(CreatePage, {
+      props: { airlines: [{ code: 'CX', name: 'Cathay Pacific' }] },
+      global: { stubs: globalStubs },
+    })
     await wrapper.find('form').trigger('submit')
     await flushPromises()
     expect(router.post).toHaveBeenCalledWith(
@@ -73,7 +91,10 @@ describe('Itineraries/Create', () => {
   })
 
   it('shows toast success when the visit succeeds', async () => {
-    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    const wrapper = mount(CreatePage, {
+      props: { airlines: [{ code: 'CX', name: 'Cathay Pacific' }] },
+      global: { stubs: globalStubs },
+    })
     await wrapper.find('form').trigger('submit')
     await flushPromises()
     lastRequestOptions().onSuccess?.()
@@ -82,7 +103,10 @@ describe('Itineraries/Create', () => {
   })
 
   it('shows toast error with the Inertia error bag message', async () => {
-    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    const wrapper = mount(CreatePage, {
+      props: { airlines: [{ code: 'CX', name: 'Cathay Pacific' }] },
+      global: { stubs: globalStubs },
+    })
     await wrapper.find('form').trigger('submit')
     await flushPromises()
     lastRequestOptions().onError?.({ itinerary: '請檢查輸入內容' })
@@ -91,7 +115,10 @@ describe('Itineraries/Create', () => {
   })
 
   it('renders the fetch filter controls', () => {
-    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    const wrapper = mount(CreatePage, {
+      props: { airlines: [{ code: 'CX', name: 'Cathay Pacific' }] },
+      global: { stubs: globalStubs },
+    })
     const selects = wrapper.findAll('select')
     expect(selects).toHaveLength(2)
     expect(selects[0].findAll('option')).toHaveLength(5)
@@ -100,7 +127,10 @@ describe('Itineraries/Create', () => {
   })
 
   it('sends snake_case filter keys and omits untouched airlines', async () => {
-    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    const wrapper = mount(CreatePage, {
+      props: { airlines: [{ code: 'CX', name: 'Cathay Pacific' }] },
+      global: { stubs: globalStubs },
+    })
     const selects = wrapper.findAll('select')
     await selects[0].setValue('BUSINESS')
     await selects[1].setValue('NON_STOP')
@@ -114,7 +144,10 @@ describe('Itineraries/Create', () => {
   })
 
   it('sends airlines as an include list', async () => {
-    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    const wrapper = mount(CreatePage, {
+      props: { airlines: [{ code: 'CX', name: 'Cathay Pacific' }] },
+      global: { stubs: globalStubs },
+    })
     const input = wrapper.find('input[placeholder="搜尋航空公司名稱或代碼"]')
     await input.setValue('uo')
     await input.trigger('keydown.enter')
@@ -126,7 +159,10 @@ describe('Itineraries/Create', () => {
   })
 
   it('sends an empty airline array when a selected carrier is cleared', async () => {
-    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    const wrapper = mount(CreatePage, {
+      props: { airlines: [{ code: 'CX', name: 'Cathay Pacific' }] },
+      global: { stubs: globalStubs },
+    })
     const input = wrapper.find('input[placeholder="搜尋航空公司名稱或代碼"]')
     await input.setValue('UO')
     await input.trigger('keydown.enter')
@@ -142,21 +178,30 @@ describe('Itineraries/Create', () => {
   }
 
   it('renders the per-leg notification checkbox, off by default', () => {
-    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    const wrapper = mount(CreatePage, {
+      props: { airlines: [{ code: 'CX', name: 'Cathay Pacific' }] },
+      global: { stubs: globalStubs },
+    })
     const toggle = notifyToggle(wrapper)
     expect(toggle.exists()).toBe(true)
     expect((toggle.element as HTMLInputElement).checked).toBe(false)
   })
 
   it('sends notify_per_leg as false by default', async () => {
-    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    const wrapper = mount(CreatePage, {
+      props: { airlines: [{ code: 'CX', name: 'Cathay Pacific' }] },
+      global: { stubs: globalStubs },
+    })
     await wrapper.find('form').trigger('submit')
     await flushPromises()
     expect(lastRequestBody().notify_per_leg).toBe(false)
   })
 
   it('sends notify_per_leg as true once the checkbox is toggled', async () => {
-    const wrapper = mount(CreatePage, { global: { stubs: globalStubs } })
+    const wrapper = mount(CreatePage, {
+      props: { airlines: [{ code: 'CX', name: 'Cathay Pacific' }] },
+      global: { stubs: globalStubs },
+    })
     await notifyToggle(wrapper).setValue(true)
     await wrapper.find('form').trigger('submit')
     await flushPromises()

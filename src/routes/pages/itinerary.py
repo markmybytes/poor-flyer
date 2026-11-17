@@ -6,6 +6,7 @@ from typing import Any
 from flask import Blueprint, g, make_response, redirect, request
 from flask.typing import ResponseReturnValue
 from flask_inertia import render_inertia
+from fli.models.airline import AIRLINE_NAMES
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -92,6 +93,14 @@ def _detail_props(itinerary_id: str) -> dict | None:
     }
 
 
+def _airline_options() -> list[dict[str, str]]:
+    """IATA code/name pairs, digit-leading enum keys normalized (``_7C`` -> ``7C``)."""
+    return sorted(
+        ({'code': code.removeprefix('_'), 'name': name} for code, name in AIRLINE_NAMES.items()),
+        key=lambda airline: airline['code'],
+    )
+
+
 def _parse_deadline(raw: Any) -> date | None:
     """Parse a page deadline; an empty value clears it."""
     if not raw:
@@ -152,7 +161,7 @@ def index() -> ResponseReturnValue:
 
 @itineraries_bp.route('/create')
 def create() -> ResponseReturnValue:
-    return render_inertia('Itineraries/Create')
+    return render_inertia('Itineraries/Create', props={'airlines': _airline_options()})
 
 
 @itineraries_bp.route('', methods=['POST'])
@@ -167,7 +176,10 @@ def create_submit() -> ResponseReturnValue:
         response = make_response(
             render_inertia(
                 'Itineraries/Create',
-                props={'errors': {'itinerary': '請檢查輸入內容'}},
+                props={
+                    'airlines': _airline_options(),
+                    'errors': {'itinerary': '請檢查輸入內容'},
+                },
             )
         )
         response.status_code = 422

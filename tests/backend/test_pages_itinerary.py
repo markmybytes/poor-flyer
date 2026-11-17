@@ -3,6 +3,7 @@ from datetime import UTC, date, datetime, timedelta
 from unittest.mock import patch
 
 import pytest
+from fli.models.airline import AIRLINE_NAMES
 
 from src.extensions.database import FareSnapshot, Flight, Itinerary, db
 from src.routes.pages.itinerary import _serialize_itinerary
@@ -165,6 +166,20 @@ def test_itinerary_create_renders_correct_component(client, app):
     assert resp.get_json()['component'] == 'Itineraries/Create'
 
 
+def test_itinerary_create_props_include_airlines(client, app):
+    with app.app_context():
+        resp = client.get('/itineraries/create', headers=INERTIA_HEADERS)
+    airlines = resp.get_json()['props']['airlines']
+    codes = [airline['code'] for airline in airlines]
+
+    assert set(airlines[0]) == {'code', 'name'}
+    assert len(airlines) == len(AIRLINE_NAMES)
+    assert codes == sorted(codes)
+    assert {'code': 'CX', 'name': 'Cathay Pacific'} in airlines
+    assert '7C' in codes
+    assert '_7C' not in codes
+
+
 def test_itinerary_create_submit_persists_and_redirects(client, app):
     resp = client.post(
         '/itineraries',
@@ -261,6 +276,7 @@ def test_itinerary_create_submit_invalid_payload_returns_422(client, app):
     data = resp.get_json()
     assert data['component'] == 'Itineraries/Create'
     assert data['props']['errors']['itinerary'] == '請檢查輸入內容'
+    assert 'airlines' in data['props']
     with app.app_context():
         assert db.session.query(Itinerary).count() == 0
 

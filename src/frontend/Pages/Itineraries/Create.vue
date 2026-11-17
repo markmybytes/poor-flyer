@@ -7,6 +7,8 @@ import { Link, router } from '@inertiajs/vue3'
 import { computed, ref, watch } from 'vue'
 import { useToast } from 'vue-toast-notification'
 
+const props = defineProps<{ airlines: { code: string; name: string }[] }>()
+
 const toast = useToast()
 
 const form = ref({
@@ -352,7 +354,7 @@ function submit() {
               留空表示套用系統預設；航空公司全部未選則不作限制。
             </p>
 
-            <FetchFilters v-model="filters" />
+            <FetchFilters v-model="filters" :airlines="props.airlines" />
           </div>
 
           <div class="mt-8 flex flex-col gap-3 border-t border-base-300/70 pt-5 sm:flex-row">
