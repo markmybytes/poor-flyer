@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import FareGraph from '@/Components/FareGraph.vue'
-import FaretList from '@/Components/FareList.vue'
+import FareList from '@/Components/FareList.vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import { CABIN_CLASS_OPTIONS, MAX_STOPS_OPTIONS } from '@/options'
 import type { Itinerary } from '@/types'
-import { fmtDate, fmtFare, fmtItineraryName } from '@/utils'
-import { router } from '@inertiajs/vue3'
+import { fmtDate, fmtFare, fmtFlightRange, fmtItineraryName } from '@/utils'
+import { router, usePage } from '@inertiajs/vue3'
 import { computed, ref } from 'vue'
 import { useToast } from 'vue-toast-notification'
 
@@ -16,20 +16,16 @@ import { Icon } from '@iconify/vue'
 const props = defineProps<{ itinerary: Itinerary; baseCurrency: string }>()
 const toast = useToast()
 
-const applied = ref({
-  deadline: props.itinerary.deadline,
-  notifyPerLeg: props.itinerary.notifyPerLeg ?? false,
-})
-
 const settings = ref({
   deadline: '',
   notifyPerLeg: false,
-  error: '',
 })
 
 const ui = ref({
-  loading: null as string | null,
-  activeTab: 'graph' as 'graph' | string,
+  loading: null as
+    'update_settings' | 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive' | null,
+  activeTab: 'graph' as 'graph' | `${number}`,
+  settingsError: '',
   settingsModal: false,
   deleteModal: false,
   restoreModal: false,
@@ -56,104 +52,89 @@ const filterSummary = computed(() => {
 function openSettingsModal(): void {
   ui.value.settingsModal = true
   settings.value = {
-    deadline: applied.value.deadline || '',
-    notifyPerLeg: applied.value.notifyPerLeg,
-    error: '',
+    deadline: props.itinerary.deadline || '',
+    notifyPerLeg: props.itinerary.notifyPerLeg ?? false,
   }
+  ui.value.settingsError = ''
 }
 
 function submitSettings(): void {
   ui.value.loading = 'update_settings'
-  settings.value.error = ''
-  const targetDeadline = settings.value.deadline || null
+  ui.value.settingsError = ''
 
-  fetch(`/api/itineraries/${props.itinerary.id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ deadline: targetDeadline, notify_per_leg: settings.value.notifyPerLeg }),
-  })
-    .then((res) => {
-      if (!res.ok) {
-        throw new Error()
-      }
-
-      applied.value = { deadline: targetDeadline, notifyPerLeg: settings.value.notifyPerLeg }
-      // Server flash is English ('Entry updated'); app copy is zh-Hant, so hardcode the fallback.
-      toast.success('已更新設定')
-      ui.value.settingsModal = false
-      router.reload()
-    })
-    .catch(() => {
-      settings.value.error = '更新失敗，請稍後再試'
-    })
-    .finally(() => {
-      ui.value.loading = null
-    })
+  router.patch(
+    `/itineraries/${props.itinerary.id}`,
+    { deadline: settings.value.deadline, notify_per_leg: settings.value.notifyPerLeg },
+    {
+      onSuccess: () => {
+        ui.value.settingsModal = false
+      },
+      onError: () => {
+        const errors = usePage().props.errors ?? {}
+        ui.value.settingsError = errors.deadline
+          ? '購票限期無效，請重新選擇'
+          : errors.notifyPerLeg
+            ? '通知設定無效'
+            : '更新失敗，請稍後再試'
+      },
+      onFinish: () => {
+        ui.value.loading = null
+      },
+    },
+  )
 }
 
-function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive'): void {
+type Action = 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive'
+
+const ACTION_LABELS: Record<Action, string> = {
+  toggle: '操作',
+  scrape: '更新票價',
+  delete: '刪除',
+  restore: '恢復追蹤',
+  archive: '封存',
+}
+
+function runAction(action: Action): void {
   if (action !== 'toggle' && action !== 'scrape') {
     ui.value[`${action}Modal`] = false
   }
   ui.value.loading = action
 
-  const opts: RequestInit = {
-    method:
-      action === 'toggle' || action === 'restore' || action === 'archive'
-        ? 'PATCH'
-        : action === 'scrape'
-          ? 'POST'
-          : 'DELETE',
-  }
-  if (action === 'toggle') {
-    opts.headers = { 'Content-Type': 'application/json' }
-    opts.body = JSON.stringify({ is_active: !props.itinerary.isActive })
-  }
-  if (action === 'restore') {
-    opts.headers = { 'Content-Type': 'application/json' }
-    opts.body = JSON.stringify({ archived: false })
-  }
-  if (action === 'archive') {
-    opts.headers = { 'Content-Type': 'application/json' }
-    opts.body = JSON.stringify({ archived: true })
+  if (action === 'delete') {
+    router.delete(`/itineraries/${props.itinerary.id}`, {
+      onError: () => toast.error(`${ACTION_LABELS.delete}失敗，請稍後再試`),
+      onFinish: () => {
+        ui.value.loading = null
+      },
+    })
+    return
   }
 
-  fetch(`/api/itineraries/${props.itinerary.id}${action === 'scrape' ? '/scrape' : ''}`, opts)
-    .then((res) => {
-      if (!res.ok) {
-        throw new Error()
-      }
+  if (action === 'scrape') {
+    fetch(`/api/itineraries/${props.itinerary.id}/scrape`, { method: 'POST' })
+      .then((res) => {
+        if (!res.ok) throw new Error()
+        return router.reload()
+      })
+      .catch(() => toast.error(`${ACTION_LABELS.scrape}失敗，請稍後再試`))
+      .finally(() => {
+        ui.value.loading = null
+      })
+    return
+  }
 
-      if (action === 'delete') {
-        router.visit('/itineraries/')
-      } else {
-        if (action === 'restore') {
-          toast.success('已恢復追蹤')
-        }
-        if (action === 'archive') {
-          toast.success('已封存')
-        }
-        router.reload()
-      }
-    })
-    .catch(() => {
-      toast.error(
-        `${
-          action === 'scrape'
-            ? '更新票價'
-            : action === 'delete'
-              ? '刪除'
-              : action === 'restore'
-                ? '恢復追蹤'
-                : action === 'archive'
-                  ? '封存'
-                  : '操作'
-        }失敗，請稍後再試`,
-      )
-    })
-    .finally(() => {
-      ui.value.loading = null
-    })
+  router.patch(
+    `/itineraries/${props.itinerary.id}/status`,
+    action === 'toggle'
+      ? { is_active: !props.itinerary.isActive }
+      : { archived: action === 'archive' },
+    {
+      onError: () => toast.error(`${ACTION_LABELS[action]}失敗，請稍後再試`),
+      onFinish: () => {
+        ui.value.loading = null
+      },
+    },
+  )
 }
 </script>
 
@@ -165,15 +146,18 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
           <div class="flex flex-col gap-2">
             <div class="flex items-start justify-between gap-3">
               <h1 class="text-lg font-black tracking-tight text-base-content md:text-xl">
-                {{ fmtItineraryName(itinerary) }}
+                {{ fmtItineraryName(props.itinerary) }}
               </h1>
 
               <div class="shrink-0">
-                <span v-if="itinerary.archivedAt" class="badge badge-soft badge-neutral"
+                <span v-if="props.itinerary.archivedAt" class="badge badge-soft badge-neutral"
                   >已封存</span
                 >
 
-                <span v-else-if="!itinerary.isActive" class="badge gap-2 badge-soft badge-warning">
+                <span
+                  v-else-if="!props.itinerary.isActive"
+                  class="badge gap-2 badge-soft badge-warning"
+                >
                   已暫停
                 </span>
 
@@ -186,13 +170,7 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
             <p
               class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-base-content/60"
             >
-              <span
-                >日期：{{
-                  itinerary.flights.length == 1
-                    ? fmtDate(itinerary.flights.at(0).flightDate)
-                    : `${fmtDate(itinerary.flights.at(0).flightDate)} - ${fmtDate(itinerary.flights.at(-1).flightDate)}`
-                }}</span
-              >
+              <span>日期：{{ fmtFlightRange(props.itinerary.flights) }}</span>
             </p>
 
             <p
@@ -234,7 +212,7 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
         </div>
 
         <div class="flex flex-wrap justify-end gap-2 px-4 py-4 md:px-6 md:py-5">
-          <template v-if="itinerary.archivedAt">
+          <template v-if="props.itinerary.archivedAt">
             <button
               class="btn btn-sm btn-primary"
               :disabled="ui.loading === 'restore'"
@@ -250,12 +228,12 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
               :disabled="ui.loading === 'toggle'"
               @click="runAction('toggle')"
             >
-              {{ itinerary.isActive ? '暫停追蹤' : '開始追蹤' }}
+              {{ props.itinerary.isActive ? '暫停追蹤' : '開始追蹤' }}
             </button>
           </template>
 
           <button
-            v-if="!itinerary.archivedAt"
+            v-if="!props.itinerary.archivedAt"
             type="button"
             title="封存此追蹤"
             aria-label="封存此追蹤"
@@ -276,7 +254,7 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
           </button>
 
           <button
-            v-if="!itinerary.archivedAt"
+            v-if="!props.itinerary.archivedAt"
             class="btn btn-sm btn-primary"
             :disabled="ui.loading === 'scrape'"
             @click="runAction('scrape')"
@@ -291,10 +269,10 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
     <div
       class="tracker-panel mb-8 overflow-hidden rounded-xl border transition-all"
       :class="{
-        'border-success/30 bg-success/5': itinerary.rule37Analysis?.phase === 'BUY_SIGNAL',
-        'border-info/30 bg-info/5': itinerary.rule37Analysis?.phase === 'WAITING',
-        'border-base-300 bg-base-200/30': itinerary.rule37Analysis?.phase === 'OBSERVING',
-        'border-base-200 bg-base-100': !itinerary.rule37Analysis?.phase,
+        'border-success/30 bg-success/5': props.itinerary.rule37Analysis?.phase === 'BUY_SIGNAL',
+        'border-info/30 bg-info/5': props.itinerary.rule37Analysis?.phase === 'WAITING',
+        'border-base-300 bg-base-200/30': props.itinerary.rule37Analysis?.phase === 'OBSERVING',
+        'border-base-200 bg-base-100': !props.itinerary.rule37Analysis?.phase,
       }"
     >
       <div class="flex flex-col xl:flex-row xl:items-stretch">
@@ -304,58 +282,63 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
               <span
                 class="status shadow-sm"
                 :class="{
-                  'animate-pulse status-success': itinerary.rule37Analysis?.phase === 'BUY_SIGNAL',
-                  'status-info': itinerary.rule37Analysis?.phase === 'WAITING',
-                  'status-neutral': itinerary.rule37Analysis?.phase === 'OBSERVING',
-                  'status-warning': !itinerary.rule37Analysis?.phase && applied.deadline,
-                  'status-neutral opacity-40': !applied.deadline,
+                  'animate-pulse status-success':
+                    props.itinerary.rule37Analysis?.phase === 'BUY_SIGNAL',
+                  'status-info': props.itinerary.rule37Analysis?.phase === 'WAITING',
+                  'status-neutral': props.itinerary.rule37Analysis?.phase === 'OBSERVING',
+                  'status-warning':
+                    !props.itinerary.rule37Analysis?.phase && props.itinerary.deadline,
+                  'status-neutral opacity-40': !props.itinerary.deadline,
                 }"
               ></span>
 
               <span
                 class="text-lg font-extrabold tracking-tight"
                 :class="{
-                  'text-success': itinerary.rule37Analysis?.phase === 'BUY_SIGNAL',
-                  'text-info': itinerary.rule37Analysis?.phase === 'WAITING',
-                  'text-neutral': itinerary.rule37Analysis?.phase === 'OBSERVING',
-                  'text-warning': !itinerary.rule37Analysis?.phase && applied.deadline,
-                  'text-base-content/40': !applied.deadline,
+                  'text-success': props.itinerary.rule37Analysis?.phase === 'BUY_SIGNAL',
+                  'text-info': props.itinerary.rule37Analysis?.phase === 'WAITING',
+                  'text-neutral': props.itinerary.rule37Analysis?.phase === 'OBSERVING',
+                  'text-warning':
+                    !props.itinerary.rule37Analysis?.phase && props.itinerary.deadline,
+                  'text-base-content/40': !props.itinerary.deadline,
                 }"
               >
-                <template v-if="itinerary.rule37Analysis?.phase === 'BUY_SIGNAL'">
+                <template v-if="props.itinerary.rule37Analysis?.phase === 'BUY_SIGNAL'">
                   入手訊號
                 </template>
 
-                <template v-else-if="itinerary.rule37Analysis?.phase === 'WAITING'">
+                <template v-else-if="props.itinerary.rule37Analysis?.phase === 'WAITING'">
                   決策期
                 </template>
 
-                <template v-else-if="itinerary.rule37Analysis?.phase === 'OBSERVING'">
+                <template v-else-if="props.itinerary.rule37Analysis?.phase === 'OBSERVING'">
                   數據觀察期
                 </template>
 
-                <template v-else-if="applied.deadline">收集數據中</template>
+                <template v-else-if="props.itinerary.deadline">收集數據中</template>
 
                 <template v-else>未啟用數據分析</template>
               </span>
             </div>
 
             <p class="mt-1.5 text-xs font-medium text-base-content/60">
-              <template v-if="itinerary.rule37Analysis?.phase === 'BUY_SIGNAL'">
+              <template v-if="props.itinerary.rule37Analysis?.phase === 'BUY_SIGNAL'">
                 最新總計已跌穿觀察期錄得的最低價格。
               </template>
 
-              <template v-else-if="itinerary.rule37Analysis?.phase === 'WAITING'">
+              <template v-else-if="props.itinerary.rule37Analysis?.phase === 'WAITING'">
                 已進入決策階段。系統將會分析價格變化，找出最佳購買時機。
               </template>
 
-              <template v-else-if="itinerary.rule37Analysis?.phase === 'OBSERVING'">
+              <template v-else-if="props.itinerary.rule37Analysis?.phase === 'OBSERVING'">
                 系統現正收集票價數據，決策期將於
-                <span class="font-bold">{{ fmtDate(itinerary.rule37Analysis.cutoffDate) }}</span>
+                <span class="font-bold">{{
+                  fmtDate(props.itinerary.rule37Analysis.cutoffDate)
+                }}</span>
                 開始。
               </template>
 
-              <template v-else-if="applied.deadline">未有足夠數據分析購買時機。</template>
+              <template v-else-if="props.itinerary.deadline">未有足夠數據分析購買時機。</template>
 
               <template v-else>
                 <button class="inline-block link font-bold link-primary" @click="openSettingsModal">
@@ -370,7 +353,7 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
             <div class="my-2 border-t border-base-300/60"></div>
 
             <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
-              <template v-if="itinerary.rule37Analysis?.phase === 'OBSERVING'">
+              <template v-if="props.itinerary.rule37Analysis?.phase === 'OBSERVING'">
                 <div class="flex items-center gap-1.5">
                   <span class="font-medium text-base-content/50">決策期</span>
 
@@ -378,12 +361,12 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
                     class="rounded bg-base-300/50 px-1.5 py-0.5 font-bold text-base-content"
                     :class="{
                       'bg-error/10 text-error':
-                        calculateDaysRemaining(itinerary.rule37Analysis.cutoffDate) <= 0,
+                        calculateDaysRemaining(props.itinerary.rule37Analysis.cutoffDate) <= 0,
                     }"
                   >
                     {{
-                      calculateDaysRemaining(itinerary.rule37Analysis.cutoffDate) > 0
-                        ? calculateDaysRemaining(itinerary.rule37Analysis.cutoffDate) + '天後'
+                      calculateDaysRemaining(props.itinerary.rule37Analysis.cutoffDate) > 0
+                        ? calculateDaysRemaining(props.itinerary.rule37Analysis.cutoffDate) + '天後'
                         : '已過'
                     }}
                   </span>
@@ -392,19 +375,20 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
                 <span class="hidden text-base-content/25 sm:inline">|</span>
               </template>
 
-              <template v-else-if="applied.deadline">
+              <template v-else-if="props.itinerary.deadline">
                 <div class="flex items-center gap-1.5">
                   <span class="font-medium text-base-content/50">購票限期</span>
 
                   <span
                     class="rounded bg-base-300/50 px-1.5 py-0.5 font-bold text-base-content"
                     :class="{
-                      'bg-error/10 text-error': calculateDaysRemaining(applied.deadline) <= 0,
+                      'bg-error/10 text-error':
+                        calculateDaysRemaining(props.itinerary.deadline) <= 0,
                     }"
                   >
                     {{
-                      calculateDaysRemaining(applied.deadline) > 0
-                        ? calculateDaysRemaining(applied.deadline) + '天後'
+                      calculateDaysRemaining(props.itinerary.deadline) > 0
+                        ? calculateDaysRemaining(props.itinerary.deadline) + '天後'
                         : '已過'
                     }}
                   </span>
@@ -413,19 +397,19 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
                 <span class="hidden text-base-content/25 sm:inline">|</span>
               </template>
 
-              <div v-if="itinerary.flights?.length" class="flex items-center gap-1.5">
+              <div v-if="props.itinerary.flights?.length" class="flex items-center gap-1.5">
                 <span class="font-medium text-base-content/50">出發日期</span>
 
                 <span
                   class="rounded bg-base-300/50 px-1.5 py-0.5 font-bold text-base-content"
                   :class="{
                     'bg-error/10 text-error':
-                      calculateDaysRemaining(itinerary.flights[0].flightDate) <= 0,
+                      calculateDaysRemaining(props.itinerary.flights[0].flightDate) <= 0,
                   }"
                 >
                   {{
-                    calculateDaysRemaining(itinerary.flights[0].flightDate) > 0
-                      ? calculateDaysRemaining(itinerary.flights[0].flightDate) + '天後'
+                    calculateDaysRemaining(props.itinerary.flights[0].flightDate) > 0
+                      ? calculateDaysRemaining(props.itinerary.flights[0].flightDate) + '天後'
                       : '已過'
                   }}
                 </span>
@@ -436,9 +420,9 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
 
                 <span
                   class="rounded bg-base-300/50 px-1.5 py-0.5 font-bold text-base-content"
-                  :class="applied.notifyPerLeg ? 'bg-success/10 text-success' : ''"
+                  :class="props.itinerary.notifyPerLeg ? 'bg-success/10 text-success' : ''"
                 >
-                  {{ applied.notifyPerLeg ? '已開啟' : '未開啟' }}
+                  {{ props.itinerary.notifyPerLeg ? '已開啟' : '未開啟' }}
                 </span>
               </div>
 
@@ -468,16 +452,16 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
             <span
               class="mt-1 text-2xl font-black text-primary tabular-nums md:text-3xl xl:text-2xl"
             >
-              {{ fmtFare(itinerary.statistics?.latestVal ?? null, baseCurrency) }}
+              {{ fmtFare(props.itinerary.statistics?.latestVal ?? null, props.baseCurrency) }}
             </span>
 
             <span
-              v-if="applied.deadline"
+              v-if="props.itinerary.deadline"
               class="mt-1.5 text-xs font-medium text-base-content/40 tabular-nums"
             >
               門檻：{{
-                itinerary.rule37Analysis?.historyBestVal
-                  ? fmtFare(itinerary.rule37Analysis.historyBestVal, baseCurrency)
+                props.itinerary.rule37Analysis?.historyBestVal
+                  ? fmtFare(props.itinerary.rule37Analysis.historyBestVal, props.baseCurrency)
                   : '--'
               }}
             </span>
@@ -493,7 +477,7 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
             <span
               class="mt-1 text-base font-black text-success tabular-nums sm:text-lg md:text-xl xl:mt-0 xl:text-lg"
             >
-              {{ fmtFare(itinerary.statistics?.allTimeLow ?? null, baseCurrency) }}
+              {{ fmtFare(props.itinerary.statistics?.allTimeLow ?? null, props.baseCurrency) }}
             </span>
           </div>
 
@@ -507,7 +491,7 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
             <span
               class="mt-1 text-base font-black text-error tabular-nums sm:text-lg md:text-xl xl:mt-0 xl:text-lg"
             >
-              {{ fmtFare(itinerary.statistics?.allTimeHigh ?? null, baseCurrency) }}
+              {{ fmtFare(props.itinerary.statistics?.allTimeHigh ?? null, props.baseCurrency) }}
             </span>
           </div>
         </div>
@@ -526,7 +510,7 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
           </button>
 
           <button
-            v-if="itinerary.tripType === 'SINGLE'"
+            v-if="props.itinerary.tripType === 'SINGLE'"
             class="tab h-12 shrink-0 px-6 text-sm font-bold"
             :class="ui.activeTab === '0' ? 'tab-active' : ''"
             @click="ui.activeTab = '0'"
@@ -536,11 +520,11 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
 
           <template v-else>
             <button
-              v-for="(f, i) in itinerary.flights"
+              v-for="(f, i) in props.itinerary.flights"
               :key="f.id"
               class="tab h-12 shrink-0 px-6 text-sm font-bold"
               :class="ui.activeTab === String(i) ? 'tab-active' : ''"
-              @click="ui.activeTab = String(i)"
+              @click="ui.activeTab = `${i}`"
             >
               {{ f.origin }} → {{ f.destination }}
             </button>
@@ -549,7 +533,7 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
 
         <div class="grid overflow-hidden">
           <Transition
-            v-for="(f, i) in itinerary.flights"
+            v-for="(f, i) in props.itinerary.flights"
             :key="f.id"
             enter-active-class="transition-all duration-300 ease-out"
             enter-from-class="opacity-0 -translate-x-8"
@@ -559,10 +543,10 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
             leave-to-class="opacity-0 -translate-x-8"
           >
             <div v-show="ui.activeTab === String(i)" class="col-start-1 row-start-1">
-              <FaretList
+              <FareList
                 :flight="f"
-                :rule37-analysis="itinerary.rule37Analysis"
-                :display-currency="baseCurrency"
+                :rule37-analysis="props.itinerary.rule37Analysis"
+                :display-currency="props.baseCurrency"
               />
             </div>
           </Transition>
@@ -576,7 +560,7 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
             leave-to-class="opacity-0 translate-x-8"
           >
             <div v-show="ui.activeTab === 'graph'" class="col-start-1 row-start-1 min-w-0">
-              <FareGraph :itinerary="itinerary" />
+              <FareGraph :itinerary="props.itinerary" />
             </div>
           </Transition>
         </div>
@@ -592,7 +576,10 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
 
           <DeadlineDatePicker
             v-model="settings.deadline"
-            :departure="props.itinerary.flights[0]?.flightDate"
+            :trip="{
+              start: props.itinerary.flights[0]?.flightDate,
+              end: props.itinerary.flights.at(-1)?.flightDate,
+            }"
             :disabled="ui.loading === 'update_settings'"
           />
         </fieldset>
@@ -616,7 +603,9 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
           </div>
         </label>
 
-        <p v-if="settings.error" class="mt-2 text-xs font-bold text-error">{{ settings.error }}</p>
+        <p v-if="ui.settingsError" class="mt-2 text-xs font-bold text-error">
+          {{ ui.settingsError }}
+        </p>
 
         <div class="modal-action mt-6 justify-end gap-2 border-t border-base-200 pt-4">
           <button type="button" class="btn btn-ghost btn-sm" @click="ui.settingsModal = false">
@@ -649,7 +638,7 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
         <h3 class="mb-2 text-lg font-extrabold text-base-content">恢復追蹤？</h3>
 
         <p class="text-sm text-base-content/60">
-          確定恢復追蹤「{{ fmtItineraryName(itinerary) }}」？
+          確定恢復追蹤「{{ fmtItineraryName(props.itinerary) }}」？
         </p>
 
         <p class="mt-1.5 text-sm text-base-content/60">
@@ -684,7 +673,7 @@ function runAction(action: 'toggle' | 'scrape' | 'delete' | 'restore' | 'archive
         <h3 class="mb-2 text-lg font-extrabold text-base-content">封存？</h3>
 
         <p class="text-sm text-base-content/60">
-          確定封存「{{ fmtItineraryName(itinerary) }}」？追蹤將停止，並移至已封存列表。
+          確定封存「{{ fmtItineraryName(props.itinerary) }}」？追蹤將停止，並移至已封存列表。
         </p>
 
         <div class="modal-action mt-6 justify-end gap-2 border-t border-base-200 pt-4">

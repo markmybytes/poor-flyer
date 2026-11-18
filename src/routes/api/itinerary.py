@@ -2,186 +2,22 @@ import logging
 import uuid
 from datetime import UTC, datetime, time
 
-from flask import Blueprint, g, jsonify, request
+from flask import Blueprint, g, jsonify
+from flask.typing import ResponseReturnValue
 from sqlalchemy import delete, select
 from sqlalchemy.orm import selectinload
 
-from src.extensions.database import FareSnapshot, Flight, Itinerary, db
+from src.extensions.database import FareSnapshot, Itinerary, db
 from src.services.fli_search import FlightQuery, filters_for_itinerary, scrape_prices
-from src.services.fx_rates import FXRatesError, convert_amount, get_configured_base_currency
-from src.services.itinerary import create_itinerary, validate_deadline
+from src.services.fx_rates import get_configured_base_currency
 
 logger = logging.getLogger(__name__)
 
 itineraries_bp = Blueprint('itineraries', __name__, url_prefix='/itineraries')
 
 
-def _as_bool(value) -> bool:
-    """Coerce JSON booleans and form-encoded strings ('false', '0', '', 'none') to bool."""
-    return (
-        value
-        if isinstance(value, bool)
-        else str(value).strip().lower()
-        not in (
-            'false',
-            '0',
-            'none',
-            '',
-        )
-    )
-
-
-@itineraries_bp.route('', methods=['POST'])
-def create_flight():
-    try:
-        data = request.get_json(silent=True) or request.form.to_dict()
-        itinerary = create_itinerary(data)
-
-        db.session.commit()
-        logger.info(
-            'itinerary created: id=%s flights=%d', itinerary.id, len(data.get('flights', []))
-        )
-        return jsonify({'message': 'Entry created', 'data': itinerary.id})
-    except Exception as e:
-        db.session.rollback()
-        logger.exception('create itinerary failed')
-        return jsonify({'message': str(e), 'data': None}), 400
-
-
-@itineraries_bp.route('/<itinerary_id>', methods=['GET'])
-def get_flight(itinerary_id):
-    try:
-        base_currency = get_configured_base_currency()
-        entry = db.session.execute(
-            select(Itinerary)
-            .options(selectinload(Itinerary.flights).selectinload(Flight.fare_snapshots))
-            .where(Itinerary.id == itinerary_id)
-        ).scalar_one_or_none()
-
-        if not entry:
-            logger.debug('itinerary not found: id=%s', itinerary_id)
-            return jsonify({'message': 'Entry not found', 'data': None}), 404
-
-        latest_success: FareSnapshot | None = None
-        for flight in entry.flights:
-            for snapshot in flight.fare_snapshots:
-                if snapshot.scrape_status != 'success' or snapshot.fare is None:
-                    continue
-                if latest_success is None or snapshot.created_at > latest_success.created_at:
-                    latest_success = snapshot
-
-        converted_preview = None
-        if latest_success is not None:
-            src_currency = (latest_success.currency or base_currency).strip().upper()
-            converted_value = float(latest_success.fare)
-            try:
-                converted_value = convert_amount(converted_value, src_currency, base_currency)
-            except FXRatesError:
-                logger.warning('convert fare failed: itinerary_id=%s', itinerary_id)
-                pass
-
-            converted_preview = {
-                'amount': converted_value,
-                'currency': base_currency,
-                'source_currency': src_currency,
-                'created_at': latest_success.created_at,
-            }
-
-        return jsonify(
-            {
-                'message': None,
-                'data': {
-                    'id': entry.id,
-                    'notify_per_leg': entry.notify_per_leg,
-                    'base_currency': base_currency,
-                    'latest_converted_fare': converted_preview,
-                },
-            }
-        )
-    except Exception as e:
-        db.session.rollback()
-        logger.exception('retrieve itinerary failed: id=%s', itinerary_id)
-        return jsonify({'message': str(e), 'data': None}), 400
-
-
-@itineraries_bp.route('/<itinerary_id>', methods=['PATCH'])
-def update_flight(itinerary_id):  # noqa: C901 - notify_per_leg branch; split validation out when it grows
-    try:
-        entry = db.session.execute(
-            select(Itinerary).where(Itinerary.id == itinerary_id)
-        ).scalar_one_or_none()
-
-        if not entry:
-            logger.debug('itinerary not found for update: id=%s', itinerary_id)
-            return jsonify({'message': 'Entry not found', 'data': None}), 404
-
-        data = request.get_json(silent=True) or request.form.to_dict()
-
-        if {'cabin_class', 'max_stops', 'airlines'} & data.keys():
-            return jsonify({'message': '搜尋條件於建立後不可修改', 'data': None}), 400
-
-        if 'is_active' in data:
-            entry.is_active = _as_bool(data['is_active'])
-            logger.info('updated itinerary: id=%s is_active=%s', itinerary_id, entry.is_active)
-
-        if 'archived' in data:
-            archived = _as_bool(data['archived'])
-            if archived:
-                if entry.archived_at is None:
-                    entry.archived_at = datetime.now(UTC)
-            else:
-                entry.archived_at = None
-            logger.info('updated itinerary: id=%s archived=%s', itinerary_id, archived)
-
-        entry.deadline = None
-        if 'deadline' in data and data['deadline']:
-            deadline = datetime.strptime(data['deadline'], '%Y-%m-%d').date()
-            validate_deadline(deadline, entry.flights[0].flight_date if entry.flights else None)
-            entry.deadline = deadline
-        logger.info('updated itinerary: id=%s deadline=%s', itinerary_id, entry.deadline)
-
-        if 'notify_per_leg' in data:
-            raw = data['notify_per_leg']
-            token = str(raw).strip().lower()
-            if not isinstance(raw, bool) and token not in ('true', 'false', '1', '0', 'none', ''):
-                logger.info('invalid notify_per_leg: itinerary_id=%s', itinerary_id)
-                return jsonify({'message': 'Invalid notify_per_leg', 'data': None}), 400
-            entry.notify_per_leg = _as_bool(raw)
-            logger.info(
-                'updated itinerary: id=%s notify_per_leg=%s', itinerary_id, entry.notify_per_leg
-            )
-
-        db.session.commit()
-        return jsonify({'message': 'Entry updated', 'data': entry.id})
-    except Exception as e:
-        db.session.rollback()
-        logger.exception('update itinerary failed: id=%s', itinerary_id)
-        return jsonify({'message': str(e), 'data': None}), 400
-
-
-@itineraries_bp.route('/<itinerary_id>', methods=['DELETE'])
-def delete_flight(itinerary_id):
-    try:
-        entry = db.session.execute(
-            select(Itinerary).where(Itinerary.id == itinerary_id)
-        ).scalar_one_or_none()
-
-        if not entry:
-            logger.debug('itinerary not found for deletion: id=%s', itinerary_id)
-            return jsonify({'message': 'Entry not found', 'data': None}), 404
-
-        db.session.delete(entry)
-        db.session.commit()
-        logger.info('deleted itinerary: id=%s', itinerary_id)
-        return jsonify({'message': 'Entry deleted', 'data': None})
-    except Exception as e:
-        db.session.rollback()
-        logger.exception('delete itinerary failed: id=%s', itinerary_id)
-        return jsonify({'message': str(e), 'data': None}), 400
-
-
 @itineraries_bp.route('/<itinerary_id>/scrape', methods=['POST'])
-def scrape_flight(itinerary_id):
+def scrape_flight(itinerary_id: str) -> ResponseReturnValue:
     try:
         itinerary = db.session.execute(
             select(Itinerary)
@@ -260,7 +96,7 @@ def scrape_flight(itinerary_id):
         db.session.commit()
         logger.info('scrape completed: itinerary_id=%s', itinerary_id)
         return jsonify({'message': 'Scrape completed', 'data': itinerary.id})
-    except Exception as e:
+    except Exception as exc:
         db.session.rollback()
         logger.exception('scrape itinerary failed: id=%s', itinerary_id)
-        return jsonify({'message': str(e), 'data': None}), 400
+        return jsonify({'message': str(exc), 'data': None}), 400

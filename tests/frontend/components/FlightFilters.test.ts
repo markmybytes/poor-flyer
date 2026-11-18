@@ -1,6 +1,6 @@
-import FetchFilters from '@/Components/FetchFilters.vue'
-import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import FlightFilters from '@/Components/FlightFilters.vue'
+import { mount } from '@vue/test-utils'
+import { describe, expect, it } from 'vitest'
 import { reactive } from 'vue'
 
 const AIRLINES = [
@@ -10,13 +10,16 @@ const AIRLINES = [
   { code: 'GK', name: 'Jetstar Japan' },
 ]
 
-function mountFilters(airlines: string[] | null = null) {
+function mountFilters(
+  airlines: string[] | null = null,
+  options: { code: string; name: string }[] = AIRLINES,
+) {
   const value = reactive({
     cabinClass: '',
     maxStops: '',
     airlines,
   })
-  const wrapper = mount(FetchFilters, { props: { modelValue: value } })
+  const wrapper = mount(FlightFilters, { props: { modelValue: value, airlines: options } })
   return { wrapper, value }
 }
 
@@ -24,14 +27,7 @@ function airlineInput(wrapper: ReturnType<typeof mountFilters>['wrapper']) {
   return wrapper.find('input[placeholder="搜尋航空公司名稱或代碼"]')
 }
 
-describe('Components/FetchFilters', () => {
-  beforeEach(() => {
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      json: async () => ({ message: null, data: AIRLINES }),
-    } as Response)
-  })
-
+describe('Components/FlightFilters', () => {
   it('renders cabin and stops option lists', () => {
     const { wrapper } = mountFilters()
     const selects = wrapper.findAll('select')
@@ -42,21 +38,12 @@ describe('Components/FetchFilters', () => {
     expect(selects[1].text()).toContain('直飛')
   })
 
-  it('loads airline options on mount without dumping the catalog', async () => {
+  it('builds suggestions from the airlines prop without fetching', async () => {
     const { wrapper } = mountFilters()
-    await flushPromises()
-
-    expect(fetch).toHaveBeenCalledWith('/api/airlines')
-    await airlineInput(wrapper).trigger('focus')
-    expect(wrapper.findAll('.airline-suggestion')).toHaveLength(0)
-  })
-
-  it('filters suggestions by code or name on input', async () => {
-    const { wrapper } = mountFilters()
-    await flushPromises()
 
     await airlineInput(wrapper).setValue('je')
 
+    expect(fetch).not.toHaveBeenCalled()
     const labels = wrapper.findAll('.airline-suggestion').map((row) => row.text())
     expect(labels).toContain('GK · Jetstar Japan')
     expect(labels).toContain('7C · Jeju Air')
@@ -68,13 +55,8 @@ describe('Components/FetchFilters', () => {
       code: `Z${index}`,
       name: `Airline ${index}`,
     }))
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      json: async () => ({ message: null, data: many }),
-    } as Response)
 
-    const { wrapper } = mountFilters()
-    await flushPromises()
+    const { wrapper } = mountFilters(null, many)
     await airlineInput(wrapper).setValue('air')
 
     expect(wrapper.findAll('.airline-suggestion')).toHaveLength(20)
@@ -82,7 +64,6 @@ describe('Components/FetchFilters', () => {
 
   it('adds a chip when a suggestion row is clicked', async () => {
     const { wrapper, value } = mountFilters()
-    await flushPromises()
 
     const input = airlineInput(wrapper)
     await input.setValue('je')
@@ -98,7 +79,6 @@ describe('Components/FetchFilters', () => {
 
   it('adds a valid IATA code uppercased and renders a chip', async () => {
     const { wrapper, value } = mountFilters()
-    await flushPromises()
 
     const input = airlineInput(wrapper)
     await input.setValue('cx')
@@ -110,7 +90,6 @@ describe('Components/FetchFilters', () => {
 
   it('adds by airline name', async () => {
     const { wrapper, value } = mountFilters()
-    await flushPromises()
 
     const input = airlineInput(wrapper)
     await input.setValue('Jeju Air')
@@ -121,7 +100,6 @@ describe('Components/FetchFilters', () => {
 
   it('ignores invalid input', async () => {
     const { wrapper, value } = mountFilters()
-    await flushPromises()
 
     const input = airlineInput(wrapper)
     await input.setValue('TOOLONG')
@@ -135,7 +113,6 @@ describe('Components/FetchFilters', () => {
 
   it('deduplicates an already selected airline', async () => {
     const { wrapper, value } = mountFilters()
-    await flushPromises()
 
     const input = airlineInput(wrapper)
     await input.setValue('CX')
@@ -148,7 +125,6 @@ describe('Components/FetchFilters', () => {
 
   it('hides suggestions on Escape', async () => {
     const { wrapper } = mountFilters()
-    await flushPromises()
 
     const input = airlineInput(wrapper)
     await input.setValue('je')
@@ -160,7 +136,6 @@ describe('Components/FetchFilters', () => {
 
   it('removes a chip with its × button', async () => {
     const { wrapper, value } = mountFilters(['CX', 'UO'])
-    await flushPromises()
 
     await wrapper.find('button[aria-label="移除 CX"]').trigger('click')
 

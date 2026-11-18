@@ -129,7 +129,22 @@ def test_settings_save_retyped_password_overwrites(client, app):
         assert setting.get('smtp', 'password') == 'new-secret'
 
 
-def test_settings_save_invalid_currency_returns_422(client, app):
+def test_settings_save_flashes_success_notice(client, app):
+    resp = client.post(
+        '/settings',
+        data=json.dumps({'currency': {'base_currency': 'usd'}}),
+        content_type='application/json',
+        headers=INERTIA_HEADERS,
+    )
+
+    assert resp.status_code == 302
+    with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
+        props = client.get('/settings/', headers=INERTIA_HEADERS).get_json()['props']
+    assert props['flash'] == {'success': '設定已儲存'}
+    assert props['errors'] == {}
+
+
+def test_settings_save_invalid_currency_redirects_with_errors(client, app):
     with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
         resp = client.post(
             '/settings',
@@ -138,7 +153,10 @@ def test_settings_save_invalid_currency_returns_422(client, app):
             headers=INERTIA_HEADERS,
         )
 
-    assert resp.status_code == 422
-    data = resp.get_json()
+    assert resp.status_code == 302
+    assert resp.headers['Location'] == '/settings/'
+
+    with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
+        data = client.get('/settings/', headers=INERTIA_HEADERS).get_json()
     assert data['component'] == 'Settings/Index'
     assert data['props']['errors']['settings'] == 'Unsupported base currency'

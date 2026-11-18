@@ -3,7 +3,7 @@ import AppLayout from '@/Layouts/AppLayout.vue'
 import type { Settings } from '@/types'
 import { formatLocalDateTime } from '@/utils/timezone'
 import { router } from '@inertiajs/vue3'
-import { computed, reactive } from 'vue'
+import { ref } from 'vue'
 import { useToast } from 'vue-toast-notification'
 
 const props = defineProps<{
@@ -19,77 +19,61 @@ const props = defineProps<{
 
 const toast = useToast()
 
-const form = reactive({
-  currency: {
-    base_currency: props.settings.currency?.baseCurrency ?? 'HKD',
-    fxrates_api_key: props.settings.currency?.fxratesApiKey ?? '',
-    cache_ttl: Number(props.settings.currency?.cacheTtl ?? 86400),
-  },
-  email: {
-    recipients: props.settings.email?.recipients ?? '',
-  },
-  itinerary: {
-    disable_departured_itineraries:
-      props.settings.itinerary?.disableDeparturedItineraries === 'true',
-  },
-  smtp: {
-    host: props.settings.smtp?.host ?? '',
-    port: Number(props.settings.smtp?.port ?? 587),
-    user: props.settings.smtp?.user ?? '',
-    password: '',
-    sender_email: props.settings.smtp?.senderEmail ?? '',
-    require_auth: props.settings.smtp?.requireAuth !== 'false',
-    protocol: props.settings.smtp?.protocol ?? 'STARTTLS',
-  },
-})
+function settingsFrom(source: Settings) {
+  return {
+    currency: {
+      base_currency: source.currency?.baseCurrency ?? 'HKD',
+      fxrates_api_key: source.currency?.fxratesApiKey ?? '',
+      cache_ttl: Number(source.currency?.cacheTtl ?? 86400),
+    },
+    email: {
+      recipients: source.email?.recipients ?? '',
+    },
+    itinerary: {
+      disable_departured_itineraries: source.itinerary?.disableDeparturedItineraries === 'true',
+    },
+    smtp: {
+      host: source.smtp?.host ?? '',
+      port: Number(source.smtp?.port ?? 587),
+      user: source.smtp?.user ?? '',
+      password: '',
+      sender_email: source.smtp?.senderEmail ?? '',
+      require_auth: source.smtp?.requireAuth !== 'false',
+      protocol: source.smtp?.protocol ?? 'STARTTLS',
+    },
+  }
+}
 
-const fxStatusState = reactive({
-  base_currency: props.fxStatus?.baseCurrency ?? form.currency.base_currency,
-  last_updated: props.fxStatus?.lastUpdated ?? null,
-  rates: props.fxStatus?.rates ?? ({} as Record<string, number>),
-  error: props.fxStatus?.error ?? null,
-})
+const form = ref(settingsFrom(props.settings))
 
-const ui = reactive({
-  saving: false,
-  testAddress: '',
-  testLoading: false,
+const testEmail = ref({ address: '' })
+
+const ui = ref({
+  loading: null as 'itinerary' | 'currency' | 'smtp' | 'email' | 'refresh' | 'test-email' | null,
   lastSaved: null as string | null,
-  refreshingRates: false,
   fxModalOpen: false,
 })
 
-const displayedRates = computed(() => {
-  return props.supportedCurrencies
-    .filter((code) => code !== fxStatusState.base_currency)
-    .map((code) => ({ code, value: (fxStatusState.rates ?? {})[code] }))
-    .filter((item) => item.value !== undefined)
-})
-
-const fxStatusTime = computed(() => {
-  return formatLocalDateTime(fxStatusState.last_updated)
-})
-
 function saveSettings(sec: 'email' | 'currency' | 'smtp' | 'itinerary') {
-  ui.saving = true
+  ui.value.loading = sec
   const payloads = {
     smtp: {
-      host: form.smtp.host,
-      port: form.smtp.port,
-      user: form.smtp.user,
-      sender_email: form.smtp.sender_email,
-      require_auth: form.smtp.require_auth,
-      protocol: form.smtp.protocol,
-      ...(form.smtp.password && { password: form.smtp.password }),
+      host: form.value.smtp.host,
+      port: form.value.smtp.port,
+      user: form.value.smtp.user,
+      sender_email: form.value.smtp.sender_email,
+      require_auth: form.value.smtp.require_auth,
+      protocol: form.value.smtp.protocol,
+      ...(form.value.smtp.password && { password: form.value.smtp.password }),
     },
-    email: { recipients: form.email.recipients },
+    email: { recipients: form.value.email.recipients },
     currency: {
-      base_currency: form.currency.base_currency,
-      fxrates_api_key: form.currency.fxrates_api_key,
-      cache_ttl: form.currency.cache_ttl,
+      base_currency: form.value.currency.base_currency,
+      fxrates_api_key: form.value.currency.fxrates_api_key,
+      cache_ttl: form.value.currency.cache_ttl,
     },
     itinerary: {
-      disable_departured_itineraries: form.itinerary.disable_departured_itineraries,
+      disable_departured_itineraries: form.value.itinerary.disable_departured_itineraries,
     },
   }
 
@@ -99,76 +83,59 @@ function saveSettings(sec: 'email' | 'currency' | 'smtp' | 'itinerary') {
     {
       preserveScroll: true,
       onSuccess: () => {
-        toast.success('設定已儲存')
-        ui.lastSaved = new Date().toLocaleString('zh-HK')
-
-        if (sec === 'smtp') {
-          form.smtp.password = ''
-        }
+        // Inertia applies the new page props before firing onSuccess, so this is the saved state
+        form.value = settingsFrom(props.settings)
+        ui.value.lastSaved = new Date().toLocaleString('zh-HK')
       },
       onError: (errors) => toast.error(errors.settings ?? '儲存失敗'),
       onFinish: () => {
-        ui.saving = false
+        ui.value.loading = null
       },
     },
   )
 }
 
 function refreshFxRates() {
-  ui.refreshingRates = true
+  ui.value.loading = 'refresh'
   fetch('/api/settings/fx-rates/refresh', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ base_currency: form.currency.base_currency }),
+    body: JSON.stringify({ base_currency: form.value.currency.base_currency }),
   })
-    .then((res) => res.json().then((body) => ({ ok: res.ok, body })))
-    .then(({ ok, body }) => {
-      if (!ok) {
-        throw new Error(body.message || '無法更新匯率數據')
-      }
-
-      const d = body.data || {}
-      Object.assign(fxStatusState, {
-        base_currency: d.baseCurrency ?? form.currency.base_currency,
-        last_updated: d.lastUpdated ?? null,
-        rates: d.rates ?? {},
-        error: null,
-      })
-
-      toast.success('已成功更新最新匯率')
+    .then((res) => {
+      if (!res.ok) throw new Error()
+      return router.reload()
     })
-    .catch((err: Error) => {
-      fxStatusState.error = err.message
-      toast.error(err.message || '更新匯率失敗')
-    })
+    // fetch action, not a page visit: the server flash is unreachable, so the failure copy is local
+    .catch(() => toast.error('更新匯率失敗，請稍後再試'))
     .finally(() => {
-      ui.refreshingRates = false
+      ui.value.loading = null
     })
 }
 
 function sendTestEmail() {
-  if (!ui.testAddress) {
+  if (!testEmail.value.address) {
     return
   }
 
-  ui.testLoading = true
+  ui.value.loading = 'test-email'
   fetch('/api/settings/test-email', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ recipient: ui.testAddress }),
+    body: JSON.stringify({ recipient: testEmail.value.address }),
   })
     .then((res) => res.json().then((body) => ({ ok: res.ok, body })))
     .then(({ ok, body }) => {
       if (ok) {
         toast.success(body.message || '測試電郵已發送')
-        ui.testAddress = ''
+        testEmail.value.address = ''
       } else {
         toast.error(body.message || '發送失敗')
       }
     })
     .catch(() => toast.error('發送測試電郵時發生錯誤'))
     .finally(() => {
-      ui.testLoading = false
+      ui.value.loading = null
     })
 }
 </script>
@@ -215,9 +182,12 @@ function sendTestEmail() {
             <div
               class="flex flex-col items-start gap-3 border-t border-base-300/70 pt-4 sm:flex-row sm:items-center"
             >
-              <button type="submit" :disabled="ui.saving" class="btn btn-primary">
-                <span v-if="ui.saving" class="loading loading-sm loading-spinner"></span>
-                {{ ui.saving ? '儲存中...' : '儲存設定' }}
+              <button type="submit" :disabled="ui.loading === 'itinerary'" class="btn btn-primary">
+                <span
+                  v-if="ui.loading === 'itinerary'"
+                  class="loading loading-sm loading-spinner"
+                ></span>
+                {{ ui.loading === 'itinerary' ? '儲存中...' : '儲存設定' }}
               </button>
 
               <p v-if="ui.lastSaved" class="text-xs font-medium text-success">
@@ -243,7 +213,7 @@ function sendTestEmail() {
               <legend class="fieldset-legend text-sm font-bold">基準貨幣 / 顯示貨幣</legend>
 
               <select v-model="form.currency.base_currency" class="select-bordered select w-full">
-                <option v-for="code in supportedCurrencies" :key="code" :value="code">
+                <option v-for="code in props.supportedCurrencies" :key="code" :value="code">
                   {{ code }}
                 </option>
               </select>
@@ -285,9 +255,12 @@ function sendTestEmail() {
             <div
               class="flex flex-col items-start gap-3 border-t border-base-300/70 pt-4 sm:flex-row sm:items-center"
             >
-              <button type="submit" :disabled="ui.saving" class="btn btn-primary">
-                <span v-if="ui.saving" class="loading loading-sm loading-spinner"></span>
-                {{ ui.saving ? '儲存中...' : '儲存設定' }}
+              <button type="submit" :disabled="ui.loading === 'currency'" class="btn btn-primary">
+                <span
+                  v-if="ui.loading === 'currency'"
+                  class="loading loading-sm loading-spinner"
+                ></span>
+                {{ ui.loading === 'currency' ? '儲存中...' : '儲存設定' }}
               </button>
 
               <button type="button" class="btn btn-outline" @click="ui.fxModalOpen = true">
@@ -421,9 +394,12 @@ function sendTestEmail() {
             <div
               class="flex flex-col items-start gap-3 border-t border-base-300/70 pt-4 sm:flex-row sm:items-center"
             >
-              <button type="submit" :disabled="ui.saving" class="btn btn-primary">
-                <span v-if="ui.saving" class="loading loading-sm loading-spinner"></span>
-                {{ ui.saving ? '儲存中...' : '儲存設定' }}
+              <button type="submit" :disabled="ui.loading === 'smtp'" class="btn btn-primary">
+                <span
+                  v-if="ui.loading === 'smtp'"
+                  class="loading loading-sm loading-spinner"
+                ></span>
+                {{ ui.loading === 'smtp' ? '儲存中...' : '儲存設定' }}
               </button>
 
               <p v-if="ui.lastSaved" class="text-xs font-medium text-success">
@@ -446,7 +422,7 @@ function sendTestEmail() {
 
           <div class="p-6">
             <div
-              v-if="!$props.settings.smtp?.host || !$props.settings.smtp?.port"
+              v-if="!props.settings.smtp?.host || !props.settings.smtp?.port"
               class="alert rounded-lg alert-warning"
             >
               <span>請先完成 SMTP 伺服器設定</span>
@@ -457,7 +433,7 @@ function sendTestEmail() {
                 <legend class="fieldset-legend text-sm font-bold">收件者電郵地址</legend>
 
                 <input
-                  v-model="ui.testAddress"
+                  v-model="testEmail.address"
                   type="email"
                   placeholder="test@example.com"
                   class="input-bordered input w-full"
@@ -465,12 +441,15 @@ function sendTestEmail() {
               </fieldset>
 
               <button
-                :disabled="!ui.testAddress || ui.testLoading"
+                :disabled="!testEmail.address || ui.loading === 'test-email'"
                 class="btn w-full btn-neutral"
                 @click="sendTestEmail"
               >
-                <span v-if="ui.testLoading" class="loading loading-sm loading-spinner"></span>
-                {{ ui.testLoading ? '發送中...' : '發送測試電郵' }}
+                <span
+                  v-if="ui.loading === 'test-email'"
+                  class="loading loading-sm loading-spinner"
+                ></span>
+                {{ ui.loading === 'test-email' ? '發送中...' : '發送測試電郵' }}
               </button>
             </div>
           </div>
@@ -501,12 +480,12 @@ function sendTestEmail() {
 
             <button
               type="submit"
-              :disabled="ui.saving"
+              :disabled="ui.loading === 'email'"
               class="btn w-full btn-primary"
               @click.prevent="saveSettings('email')"
             >
-              <span v-if="ui.saving" class="loading loading-sm loading-spinner"></span>
-              {{ ui.saving ? '儲存中...' : '儲存設定' }}
+              <span v-if="ui.loading === 'email'" class="loading loading-sm loading-spinner"></span>
+              {{ ui.loading === 'email' ? '儲存中...' : '儲存設定' }}
             </button>
           </form>
         </div>
@@ -520,7 +499,7 @@ function sendTestEmail() {
             <h3 class="text-base font-bold text-base-content">貨幣匯率</h3>
 
             <p class="mt-0.5 text-sm font-medium text-base-content/60">
-              目前以 {{ fxStatusState.base_currency }} 作為基準貨幣
+              目前以 {{ props.fxStatus?.baseCurrency ?? 'HKD' }} 作為基準貨幣
             </p>
           </div>
 
@@ -540,23 +519,28 @@ function sendTestEmail() {
                 最後更新時間
               </p>
 
-              <p class="mt-1 text-sm font-semibold text-base-content">{{ fxStatusTime }}</p>
+              <p class="mt-1 text-sm font-semibold text-base-content">
+                {{ formatLocalDateTime(props.fxStatus?.lastUpdated) }}
+              </p>
             </div>
 
             <div class="flex items-center justify-end">
               <button
                 class="btn btn-neutral"
-                :disabled="ui.refreshingRates"
+                :disabled="ui.loading === 'refresh'"
                 @click="refreshFxRates"
               >
-                <span v-if="ui.refreshingRates" class="loading loading-sm loading-spinner"></span>
-                {{ ui.refreshingRates ? '更新中...' : '更新匯率' }}
+                <span
+                  v-if="ui.loading === 'refresh'"
+                  class="loading loading-sm loading-spinner"
+                ></span>
+                {{ ui.loading === 'refresh' ? '更新中...' : '更新匯率' }}
               </button>
             </div>
           </div>
 
-          <div v-if="fxStatusState.error" class="alert rounded-lg alert-warning">
-            <span>{{ fxStatusState.error }}</span>
+          <div v-if="props.fxStatus?.error" class="alert rounded-lg alert-warning">
+            <span>{{ props.fxStatus?.error }}</span>
           </div>
 
           <div class="overflow-x-auto rounded-xl border border-base-300/70">
@@ -565,22 +549,25 @@ function sendTestEmail() {
                 <tr>
                   <th>貨幣</th>
 
-                  <th class="text-right">1 {{ fxStatusState.base_currency }} =</th>
+                  <th class="text-right">1 {{ props.fxStatus?.baseCurrency ?? 'HKD' }} =</th>
                 </tr>
               </thead>
 
               <tbody>
-                <tr v-if="displayedRates.length === 0">
+                <tr v-if="!Object.keys(props.fxStatus?.rates ?? {}).length">
                   <td colspan="2" class="text-center text-base-content/55">暫無匯率資料</td>
                 </tr>
 
                 <tr
-                  v-for="item in displayedRates.toSorted((a, b) => a.code.localeCompare(b.code))"
-                  :key="item.code"
+                  v-for="code in props.supportedCurrencies
+                    .filter((code) => code !== (props.fxStatus?.baseCurrency ?? 'HKD'))
+                    .filter((code) => (props.fxStatus?.rates ?? {})[code] !== undefined)
+                    .toSorted((a, b) => a.localeCompare(b))"
+                  :key="code"
                 >
-                  <td class="font-semibold">{{ item.code }}</td>
+                  <td class="font-semibold">{{ code }}</td>
 
-                  <td class="text-right">{{ Number(item.value).toFixed(6) }}</td>
+                  <td class="text-right">{{ Number(props.fxStatus?.rates?.[code]).toFixed(6) }}</td>
                 </tr>
               </tbody>
             </table>

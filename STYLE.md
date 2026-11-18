@@ -43,6 +43,7 @@ A higher rule wins a conflict. Ask when a requirement is ambiguous.
 | Pages                                        | `src/frontend/Pages/`        |
 | Shared components                            | `src/frontend/Components/`   |
 | Layouts                                      | `src/frontend/Layouts/`      |
+| Composables                                  | `src/frontend/composables/`  |
 
 - Keep views thin. Move non-trivial business logic to a service.
 - Scheduler jobs live in `src/services/scheduler.py`. Reusable workhorses (`scrape_prices`, `convert_amount`) stay in their owning service module.
@@ -195,7 +196,8 @@ package = db.session.execute(
 - Type component-local shapes inline at the point of use (props, grouped refs, computed). A shared `interface` only when several files need it.
 - Prefer `ref` over `reactive`. Group a page's state by what it holds, one object `ref` per context — form values, the values currently shown, and mode/visibility (running action, active tab, dialog visibility) — and never mix form values into visibility state.
 - Named functions for component methods and root handlers. Arrow functions for inline handlers, callbacks, and `.then()` chains.
-- Toast messages come from the server flash (prop shared by Inertia). Hardcode one in `onSuccess` / `onError` only with a reason, such as a fallback when nothing was flashed.
+- Templates read props as `props.<name>`; local refs stay bare, so prop state and component state stay distinguishable at a glance.
+- Toast messages come from the server flash (prop shared by Inertia). Two channels, two mechanisms: a notice flashes a string under a toast level (`success`/`error`/`info`/`warning`) and arrives in `props.flash`; a validation failure writes `session['errors'] = {field: message}`, popped into `props.errors` on the next render. `useFlashToasts`, mounted once in `main.ts`, routes every flash level to its toast: pages never hardcode server-flashed success copy. Hardcode a toast in `onSuccess` / `onError` only with a reason, such as a fallback when nothing was flashed or an API `fetch` action.
 - Name a shared component for what it is (`LineChart`, `DatePicker`), never for its first user. No domain prefixes on generic components (`DatePicker`); domain wrappers are named for their domain (`DeadlineDatePicker`).
 - Wrapping a third-party library: accept a library-native options prop to spread over defaults, not one prop per knob.
 
@@ -244,5 +246,5 @@ interface ApiResponse<T = unknown> {
 
 ### Frontend
 
-- The JSON provider emits every key, nested included, in `camelCase`: `latest_converted_fare` arrives as `latestConvertedFare`.
+- The JSON provider emits every key, nested included, in `camelCase`: `flight_date` arrives as `flightDate`.
 - Branch on status (`.then` for 2xx, `.catch` for the rest) and toast `response.data.message`.

@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import DatePicker from '@/Components/DatePicker.vue'
 import DeadlineDatePicker from '@/Components/DeadlineDatePicker.vue'
-import FetchFilters from '@/Components/FetchFilters.vue'
+import FlightFilters from '@/Components/FlightFilters.vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import { Link, router } from '@inertiajs/vue3'
 import { computed, ref, watch } from 'vue'
 import { useToast } from 'vue-toast-notification'
+
+const props = defineProps<{ airlines: { code: string; name: string }[] }>()
 
 const toast = useToast()
 
@@ -15,8 +17,9 @@ const form = ref({
   isActive: true,
   notifyPerLeg: false,
   flights: [{ origin: '', destination: '', flightDate: '' }],
-  processing: false,
 })
+
+const ui = ref({ processing: false })
 
 const filters = ref<{
   cabinClass: string
@@ -40,7 +43,7 @@ const roundTripDates = computed<string | string[]>({
   },
 })
 
-const getStartDate = (index: number) => {
+function getStartDate(index: number): Date {
   const prevDate = form.value.flights[index - 1]?.flightDate
   return prevDate ? new Date(prevDate) : new Date()
 }
@@ -67,7 +70,7 @@ watch(
 )
 
 function submit() {
-  form.value.processing = true
+  ui.value.processing = true
 
   const payload = {
     trip_type: form.value.tripType,
@@ -92,10 +95,9 @@ function submit() {
 
   router.post('/itineraries', payload, {
     preserveScroll: true,
-    onSuccess: () => toast.success('已成功建立票價追蹤'),
     onError: (errors) => toast.error(errors.itinerary ?? '新增失敗，請檢查輸入內容'),
     onFinish: () => {
-      form.value.processing = false
+      ui.value.processing = false
     },
   })
 }
@@ -216,7 +218,7 @@ function submit() {
                       class="input-bordered input w-full uppercase transition-colors focus:input-primary"
                       required
                       maxlength="3"
-                      :disabled="form.processing"
+                      :disabled="ui.processing"
                     />
                   </fieldset>
 
@@ -230,7 +232,7 @@ function submit() {
                       class="input-bordered input w-full uppercase transition-colors focus:input-primary"
                       required
                       maxlength="3"
-                      :disabled="form.processing"
+                      :disabled="ui.processing"
                     />
                   </fieldset>
 
@@ -244,7 +246,7 @@ function submit() {
                       v-model="roundTripDates"
                       placeholder="選擇日期"
                       required
-                      :disabled="form.processing"
+                      :disabled="ui.processing"
                       :options="{ range: true }"
                     />
 
@@ -253,7 +255,7 @@ function submit() {
                       v-model="leg.flightDate"
                       placeholder="選擇日期"
                       required
-                      :disabled="form.processing"
+                      :disabled="ui.processing"
                       :options="{ startDate: getStartDate(index) }"
                     />
                   </fieldset>
@@ -272,30 +274,10 @@ function submit() {
             <DeadlineDatePicker
               v-model="form.deadline"
               placeholder="選擇日期"
-              :departure="form.flights[0]?.flightDate"
-              :markers="
-                form.flights
-                  .map((f, i) =>
-                    f.flightDate
-                      ? {
-                          date: f.flightDate,
-                          type: 'dot' as const,
-                          color: '#10b981',
-                          tooltip: [
-                            {
-                              text:
-                                form.tripType === 'ROUND_TRIP'
-                                  ? i === 0
-                                    ? '去程'
-                                    : '回程'
-                                  : `航段 ${i + 1}`,
-                            },
-                          ],
-                        }
-                      : null,
-                  )
-                  .filter((marker) => marker !== null)
-              "
+              :trip="{
+                start: form.flights[0]?.flightDate,
+                end: form.flights.at(-1)?.flightDate,
+              }"
             />
 
             <p class="label mt-1 p-0 text-xs text-base-content/55">
@@ -312,7 +294,7 @@ function submit() {
                   v-model="form.isActive"
                   type="checkbox"
                   class="toggle toggle-success"
-                  :disabled="form.processing"
+                  :disabled="ui.processing"
                 />
 
                 <div>
@@ -331,7 +313,7 @@ function submit() {
                   v-model="form.notifyPerLeg"
                   type="checkbox"
                   class="toggle toggle-success"
-                  :disabled="form.processing"
+                  :disabled="ui.processing"
                 />
 
                 <div>
@@ -352,7 +334,7 @@ function submit() {
               留空表示套用系統預設；航空公司全部未選則不作限制。
             </p>
 
-            <FetchFilters v-model="filters" />
+            <FlightFilters v-model="filters" :airlines="props.airlines" />
           </div>
 
           <div class="mt-8 flex flex-col gap-3 border-t border-base-300/70 pt-5 sm:flex-row">
@@ -361,10 +343,10 @@ function submit() {
             <button
               type="submit"
               class="btn flex-1 shadow-sm btn-primary"
-              :disabled="form.processing"
+              :disabled="ui.processing"
             >
-              <span v-if="form.processing" class="loading loading-spinner"></span>
-              {{ form.processing ? '處理中...' : '建立' }}
+              <span v-if="ui.processing" class="loading loading-spinner"></span>
+              {{ ui.processing ? '處理中...' : '建立' }}
             </button>
           </div>
         </form>

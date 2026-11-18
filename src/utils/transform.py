@@ -42,7 +42,9 @@ def camelize(obj):
 
     # Handle dicts AND SQLAlchemy RowMappings (anything that acts like a dict)
     if isinstance(obj, collections.abc.Mapping):
-        return {to_camel(k): camelize(v) for k, v in obj.items()}
+        # underscore-led keys are Flask session internals (_flashes, _permanent) and
+        # must round-trip unchanged: flask.json.dumps serialises the session too
+        return {k if k.startswith('_') else to_camel(k): camelize(v) for k, v in obj.items()}
 
     # Handle SQLAlchemy Raw Rows (converts them to dicts first)
     if hasattr(obj, '_mapping'):

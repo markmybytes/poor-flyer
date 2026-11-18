@@ -2,6 +2,7 @@ import type { Itinerary } from '@/types'
 import {
   fmtDate,
   fmtFare,
+  fmtFlightRange,
   fmtItineraryName,
   fmtTime,
   fmtTz,
@@ -80,6 +81,32 @@ describe('fmtDate', () => {
 
   it('handles already formatted date', () => {
     expect(fmtDate('2025-01-01')).toBe('2025/01/01')
+  })
+})
+
+describe('fmtFlightRange', () => {
+  it('shows a single date for a one-leg trip', () => {
+    expect(fmtFlightRange([{ flightDate: '2026-12-01' }])).toBe('2026/12/01')
+  })
+
+  it('shows first - last for a two-leg trip', () => {
+    expect(fmtFlightRange([{ flightDate: '2026-12-01' }, { flightDate: '2026-12-09' }])).toBe(
+      '2026/12/01 - 2026/12/09',
+    )
+  })
+
+  it('shows first - last for three or more legs', () => {
+    expect(
+      fmtFlightRange([
+        { flightDate: '2026-12-01' },
+        { flightDate: '2026-12-05' },
+        { flightDate: '2026-12-09' },
+      ]),
+    ).toBe('2026/12/01 - 2026/12/09')
+  })
+
+  it('falls back to em dashes for an empty trip', () => {
+    expect(fmtFlightRange([])).toBe('— - —')
   })
 })
 

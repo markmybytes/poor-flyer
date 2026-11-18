@@ -4,6 +4,7 @@ import { createApp, h } from 'vue'
 import VueToast from 'vue-toast-notification'
 import 'vue-toast-notification/dist/theme-bootstrap.css'
 
+import { useFlashToasts } from './composables/useFlashToasts'
 import './bootstrap'
 import './css/app.css'
 
@@ -28,7 +29,12 @@ createInertiaApp({
     return pages[`./Pages/${name}.vue`] as DefineComponent
   },
   setup({ el, App: app, props, plugin }) {
-    const root = createApp({ render: () => h(app, props) })
+    const root = createApp({
+      setup: () => {
+        useFlashToasts()
+        return () => h(app, props)
+      },
+    })
     root.use(plugin)
     root.use(routePlugin)
     root.use(VueToast, { position: 'top-right' })

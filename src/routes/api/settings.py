@@ -1,8 +1,8 @@
 import logging
 
 from flask import Blueprint, jsonify, render_template, request
+from flask.typing import ResponseReturnValue
 
-from src.services import setting
 from src.services.fx_rates import (
     FXRatesError,
     get_configured_base_currency,
@@ -14,44 +14,8 @@ logger = logging.getLogger(__name__)
 settings_bp = Blueprint('settings', __name__, url_prefix='/settings')
 
 
-@settings_bp.route('', methods=['GET'])
-def get_settings():
-    try:
-        currency = setting.get_all_masked('currency') or {}
-        currency['base_currency'] = currency.get('base_currency') or 'HKD'
-        currency['cache_ttl'] = currency.get('cache_ttl') or '86400'
-        currency['fxrates_api_key'] = currency.get('fxrates_api_key') or ''
-
-        return jsonify(
-            {
-                'message': None,
-                'data': {
-                    'smtp': setting.get_all_masked('smtp') or {},
-                    'email': setting.get_all_masked('email') or {},
-                    'currency': currency,
-                },
-            }
-        )
-    except Exception as e:
-        logger.exception('read settings failed')
-        return jsonify({'message': str(e), 'data': None}), 400
-
-
-@settings_bp.route('', methods=['PATCH'])
-def patch_settings():
-    try:
-        setting.update(request.get_json(silent=True) or {})
-
-        return jsonify({'message': 'Settings updated successfully', 'data': None})
-    except ValueError as e:
-        return jsonify({'message': str(e), 'data': None}), 400
-    except Exception as e:
-        logger.exception('patch settings failed')
-        return jsonify({'message': str(e), 'data': None}), 400
-
-
 @settings_bp.route('/fx-rates/refresh', methods=['POST'])
-def refresh_fx_rates():
+def refresh_fx_rates() -> ResponseReturnValue:
     try:
         payload = request.get_json(silent=True) or {}
         base = (payload.get('base_currency') or get_configured_base_currency()).strip().upper()
@@ -75,7 +39,7 @@ def refresh_fx_rates():
 
 
 @settings_bp.route('/test-email', methods=['POST'])
-def test_email():
+def test_email() -> ResponseReturnValue:
     try:
         data = request.get_json(silent=True) or request.form.to_dict()
         recipient = data.get('recipient', '').strip()

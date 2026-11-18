@@ -29,6 +29,11 @@ def test_camelize_flat_dict():
     assert camelize({'snake_case': 1, 'another_key': 2}) == {'snakeCase': 1, 'anotherKey': 2}
 
 
+def test_camelize_keeps_underscore_keys_verbatim():
+    # Flask session internals (_flashes) must survive flask.json.dumps unchanged
+    assert camelize({'_flashes': [['logs', 'boom']]}) == {'_flashes': [['logs', 'boom']]}
+
+
 def test_camelize_nested_dict():
     assert camelize({'outer_key': {'inner_key': 'val'}}) == {'outerKey': {'innerKey': 'val'}}
 

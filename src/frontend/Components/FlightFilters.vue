@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { CABIN_CLASS_OPTIONS, MAX_STOPS_OPTIONS, normalizeAirlineCode } from '@/options'
 import { Icon } from '@iconify/vue'
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
+
+const props = defineProps<{ airlines: { code: string; name: string }[] }>()
 
 const model = defineModel<{
   cabinClass: string
@@ -10,7 +12,6 @@ const model = defineModel<{
 }>({ required: true })
 
 const airlineInput = ref('')
-const airlineOptions = ref<{ code: string; name: string }[]>([])
 const showSuggestions = ref(false)
 
 const selectedAirlines = computed(() => model.value.airlines ?? [])
@@ -20,23 +21,12 @@ const suggestions = computed(() => {
   if (!query) {
     return []
   }
-  return airlineOptions.value
+  return props.airlines
     .filter(
       (airline) =>
         airline.code.toLowerCase().startsWith(query) || airline.name.toLowerCase().includes(query),
     )
     .slice(0, 20)
-})
-
-onMounted(() => {
-  fetch('/api/airlines')
-    .then((response) => (response.ok ? response.json() : null))
-    .then((body) => {
-      if (Array.isArray(body?.data)) {
-        airlineOptions.value = body.data
-      }
-    })
-    .catch(() => {})
 })
 
 function addAirlineCode(code: string | null) {
@@ -54,7 +44,7 @@ function addAirline() {
     return
   }
 
-  const known = airlineOptions.value.find(
+  const known = props.airlines.find(
     (airline) =>
       airline.code === raw.toUpperCase() || airline.name.toLowerCase() === raw.toLowerCase(),
   )
@@ -72,7 +62,7 @@ function removeAirline(code: string) {
 }
 
 function airlineName(code: string) {
-  return airlineOptions.value.find((airline) => airline.code === code)?.name
+  return props.airlines.find((airline) => airline.code === code)?.name
 }
 </script>
 

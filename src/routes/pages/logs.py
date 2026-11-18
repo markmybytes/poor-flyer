@@ -2,7 +2,8 @@ import logging
 from contextlib import suppress
 from datetime import date
 
-from flask import Blueprint, request
+from flask import Blueprint, flash, redirect, request, session
+from flask.typing import ResponseReturnValue
 from flask_inertia import render_inertia
 
 from src.services import logs as log_svc
@@ -19,7 +20,7 @@ def _parse_date(d_str: str) -> date | None:
 
 
 @logs_bp.route('/')
-def index():
+def index() -> ResponseReturnValue:
     try:
         raw_levels = request.args.get('levels') or request.args.get('level', '')
         selected_levels = [
@@ -40,7 +41,10 @@ def index():
         start_idx = (page - 1) * per_page
 
         logger.debug(
-            'rendered logs page: entries=%d page=%d levels=%s', len(all_logs), page, selected_levels
+            'rendered logs page: entries=%d page=%d levels=%s',
+            len(all_logs),
+            page,
+            selected_levels,
         )
         return render_inertia(
             'Logs/Index',
@@ -57,3 +61,16 @@ def index():
     except Exception:
         logger.exception('render logs page failed')
         raise
+
+
+@logs_bp.route('', methods=['DELETE'])
+def clear() -> ResponseReturnValue:
+    try:
+        log_svc.clear_logs()
+
+        flash('已刪除所有紀錄', 'success')
+        return redirect('/logs/')
+    except OSError:
+        logger.exception('clear application logs from page failed')
+        session['errors'] = {'logs': '清除紀錄失敗'}
+        return redirect('/logs/')
