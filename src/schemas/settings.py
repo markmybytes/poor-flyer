@@ -7,28 +7,11 @@ the service's checks so the page's error bag keeps its current wording.
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict
 
-from src.schemas.validators import reject_none
-
-
-def _cache_ttl(value: Any) -> int:
-    try:
-        ttl = int(value)
-    except TypeError, ValueError:
-        raise ValueError('快取有效時間必須是大於 0 的整數') from None
-    if ttl <= 0:
-        raise ValueError('快取有效時間必須是大於 0 的整數')
-    return ttl
-
-
-def _port(value: Any) -> int:
-    try:
-        return int(value)
-    except TypeError, ValueError:
-        raise ValueError('SMTP 連接埠必須是整數') from None
+from src.schemas.validators import integer, reject_none
 
 
 class CurrencySection(BaseModel):
@@ -36,7 +19,10 @@ class CurrencySection(BaseModel):
 
     base_currency: str | None = None
     fxrates_api_key: str | None = None
-    cache_ttl: Annotated[int, BeforeValidator(_cache_ttl)] | None = None
+    cache_ttl: (
+        Annotated[int, BeforeValidator(integer('快取有效時間必須是大於 0 的整數', minimum=1))]
+        | None
+    ) = None
 
 
 class EmailSection(BaseModel):
@@ -57,7 +43,7 @@ class SmtpSection(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
     host: str | None = None
-    port: Annotated[int, BeforeValidator(_port)] | None = None
+    port: Annotated[int, BeforeValidator(integer('SMTP 連接埠必須是整數'))] | None = None
     user: str | None = None
     sender_email: str | None = None
     require_auth: Annotated[bool | None, BeforeValidator(reject_none('格式不正確'))] = None

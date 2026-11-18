@@ -11,17 +11,13 @@ from sqlalchemy.orm import selectinload
 
 from src.extensions.database import FareSnapshot, Flight, Itinerary, db
 from src.schemas.itinerary import ItineraryCreate, ItinerarySettings, ItineraryStatus
-from src.services.errors import InvalidFieldsError
+from src.schemas.validators import date_cmp
 from src.services.fx_rates import (
     FXRatesError,
     convert_amount,
     get_configured_base_currency,
 )
-from src.services.itinerary import (
-    create_itinerary,
-    get_combined_totals,
-    validate_deadline,
-)
+from src.services.itinerary import create_itinerary, get_combined_totals
 from src.utils.rule37 import compute_37_best, compute_price_stats
 from src.utils.transform import model_to_dict
 from src.validation import back_url, validated
@@ -192,16 +188,28 @@ def update_itinerary(itinerary_id: str) -> ResponseReturnValue:
     errors: dict[str, str] = {}
 
     if 'deadline' in payload.model_fields_set:
-        try:
-            validate_deadline(
-                payload.deadline,
-                itinerary.flights[0].flight_date if itinerary.flights else None,
-                today=datetime.now(g.tz).date(),
-            )
-        except InvalidFieldsError as exc:
-            errors['deadline'] = exc.errors[0].message
+        if payload.deadline is None:
+            itinerary.deadline = None
         else:
-            itinerary.deadline = payload.deadline
+            first_departure = itinerary.flights[0].flight_date if itinerary.flights else None
+            try:
+                date_cmp(
+                    payload.deadline,
+                    datetime.now(g.tz).date(),
+                    op='ge',
+                    copy='購票限期不能早於今天',
+                )
+                if first_departure is not None:
+                    date_cmp(
+                        payload.deadline,
+                        first_departure,
+                        op='le',
+                        copy='購票限期不能晚於首程出發日期',
+                    )
+            except ValueError as exc:
+                errors['deadline'] = str(exc)
+            else:
+                itinerary.deadline = payload.deadline
 
     if 'notify_per_leg' in payload.model_fields_set:
         itinerary.notify_per_leg = payload.notify_per_leg

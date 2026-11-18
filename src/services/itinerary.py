@@ -11,6 +11,7 @@ from enum import StrEnum
 from typing import Any
 
 from src.extensions.database import Flight, Itinerary, db
+from src.schemas.validators import date_cmp
 from src.services.errors import FieldIssue, InvalidFieldsError
 from src.services.fx_rates import FXRatesError, convert_amount
 from src.utils.filters import CabinClass, MaxStops, parse_airlines
@@ -30,16 +31,6 @@ def _enum_value(enum_type: type[StrEnum], value: Any, label: str) -> str:
         ) from None
 
 
-def validate_deadline(deadline: date | None, first_departure: date | None, today: date) -> None:
-    """Reject a deadline outside today..first departure; both bounds are inclusive."""
-    if deadline is None:
-        return
-    if deadline < today:
-        raise InvalidFieldsError([FieldIssue('deadline', '購票限期不能早於今天')])
-    if first_departure is not None and deadline > first_departure:
-        raise InvalidFieldsError([FieldIssue('deadline', '購票限期不能晚於首程出發日期')])
-
-
 def create_itinerary(data: Mapping[str, Any], today: date) -> Itinerary:
     """Build an itinerary and its flights from a raw payload.
 
@@ -55,14 +46,13 @@ def create_itinerary(data: Mapping[str, Any], today: date) -> Itinerary:
 
     if deadline is not None:
         first_date = flights_data[0].get('flight_date') if flights_data else None
+        first_departure = datetime.strptime(first_date, '%Y-%m-%d').date() if first_date else None
         try:
-            validate_deadline(
-                deadline,
-                datetime.strptime(first_date, '%Y-%m-%d').date() if first_date else None,
-                today,
-            )
-        except InvalidFieldsError as exc:
-            errors.extend(exc.errors)
+            date_cmp(deadline, today, op='ge', copy='購票限期不能早於今天')
+            if first_departure is not None:
+                date_cmp(deadline, first_departure, op='le', copy='購票限期不能晚於首程出發日期')
+        except ValueError as exc:
+            errors.append(FieldIssue('deadline', str(exc)))
 
     cabin_class = None
     if data.get('cabin_class'):

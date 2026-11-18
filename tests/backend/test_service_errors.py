@@ -5,9 +5,10 @@ from datetime import date
 import pytest
 
 from src.extensions.database import Config, Itinerary, db
+from src.schemas.validators import date_cmp
 from src.services import setting
 from src.services.errors import FieldIssue, InvalidFieldsError
-from src.services.itinerary import create_itinerary, validate_deadline
+from src.services.itinerary import create_itinerary
 
 LEG = {'origin': 'HKG', 'destination': 'NRT', 'flight_date': '2026-06-01'}
 TODAY = date(2026, 1, 1)
@@ -63,8 +64,9 @@ def test_itinerary_reports_every_failing_field(app):
 
 
 def test_deadline_rule_is_still_a_value_error():
-    with pytest.raises(ValueError):
-        validate_deadline(date(2025, 12, 1), None, today=TODAY)
+    with pytest.raises(ValueError) as caught:
+        date_cmp(date(2025, 12, 1), TODAY, op='ge', copy='購票限期不能早於今天')
+    assert str(caught.value) == '購票限期不能早於今天'
 
 
 @pytest.mark.parametrize(

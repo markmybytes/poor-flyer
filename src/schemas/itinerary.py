@@ -1,8 +1,8 @@
 """Pydantic models for itinerary write payloads.
 
-Schemas validate shape, types, and pure cross-field rules only. Domain rules that
-need database state or the viewer's timezone (deadline bounds, first departure)
-stay in `src.services.itinerary`.
+Schemas validate shape, types, and pure cross-field rules only. Rules that compare
+against database state or the viewer's timezone (deadline bounds, first departure)
+live in `src.schemas.validators` and are called by the view or the service.
 """
 
 from __future__ import annotations
@@ -14,9 +14,14 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator
 
-from src.schemas.validators import iso_date, reject_none
+from src.schemas.validators import iso_date, regex_match, reject_none
 
-IATA_PATTERN = re.compile(r'^[A-Z]{3}$')
+_IataCode = Annotated[
+    str,
+    BeforeValidator(
+        regex_match(re.compile(r'^[A-Z]{3}$'), 'IATA 代碼無效', prepare=lambda s: s.strip().upper())
+    ),
+]
 
 
 class TripType(StrEnum):
@@ -30,17 +35,9 @@ class TripType(StrEnum):
 class FlightPayload(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
-    origin: str
-    destination: str
+    origin: _IataCode
+    destination: _IataCode
     flight_date: Annotated[date, BeforeValidator(iso_date('航班日期無效'))]
-
-    @field_validator('origin', 'destination', mode='before')
-    @classmethod
-    def _iata(cls, value: Any) -> str:
-        code = str(value or '').strip().upper()
-        if not IATA_PATTERN.fullmatch(code):
-            raise ValueError('IATA 代碼無效')
-        return code
 
 
 class ItineraryCreate(BaseModel):
