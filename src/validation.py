@@ -77,7 +77,7 @@ def back_url(fallback: str | None = None) -> str:
     if referrer:
         parts = urlsplit(referrer)
         same_origin = parts.scheme in ('', 'http', 'https') and parts.netloc in ('', request.host)
-        if same_origin and parts.path.startswith('/') and not parts.path.startswith('//'):
+        if same_origin and parts.path.startswith('/') and not parts.path.startswith(('//', '/\\')):
             return f'{parts.path}?{parts.query}' if parts.query else parts.path
     return fallback or request.path
 

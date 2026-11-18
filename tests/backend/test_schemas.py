@@ -33,6 +33,76 @@ def test_create_bool_copy_is_pinned(field, copy):
     assert caught.value.errors()[0]['ctx']['error'].args[0] == copy
 
 
+@pytest.mark.parametrize('token', ['on', 'off', 'yes', 'no', 't', 'f', 'enable'])
+def test_create_bool_tokens_stay_strict(token):
+    # pydantic's lax bool would accept these; parse_bool's vocabulary must not
+    with pytest.raises(ValidationError):
+        _create(is_active=token)
+
+
+@pytest.mark.parametrize('code', ['hkg', 'HKG', ' Hkg '])
+def test_leg_codes_normalize_to_iata(code):
+    model = ItineraryCreate.model_validate(
+        {'flights': [{'origin': code, 'destination': code, 'flight_date': '2026-12-01'}]}
+    )
+    assert model.flights[0].origin == 'HKG'
+    assert model.flights[0].destination == 'HKG'
+
+
+@pytest.mark.parametrize('code', ['', 'HK', 'HKG1', 'hk g', None])
+def test_malformed_iata_is_rejected(code):
+    with pytest.raises(ValidationError):
+        ItineraryCreate.model_validate(
+            {'flights': [{'origin': code, 'destination': 'NRT', 'flight_date': '2026-12-01'}]}
+        )
+
+
+@pytest.mark.parametrize('field', ['origin', 'destination'])
+def test_absent_leg_code_is_rejected(field):
+    leg = {'origin': 'HKG', 'destination': 'NRT', 'flight_date': '2026-12-01'}
+    leg.pop(field)
+    with pytest.raises(ValidationError):
+        ItineraryCreate.model_validate({'flights': [leg]})
+
+
+@pytest.mark.parametrize('value', ['SINGLE', 'ROUND_TRIP', 'MULTI_CITY'])
+def test_trip_type_membership(value):
+    assert _create(trip_type=value).trip_type == value
+
+
+def test_trip_type_is_normalized_before_membership():
+    assert _create(trip_type=' round_trip ').trip_type == 'ROUND_TRIP'
+
+
+@pytest.mark.parametrize('value', ['BIZARRE', '', None])
+def test_unknown_trip_type_is_rejected(value):
+    with pytest.raises(ValidationError):
+        _create(trip_type=value)
+
+
+@pytest.mark.parametrize(
+    ('value', 'expected'), [('2026-12-01', '2026-12-01'), ('2026-1-5', '2026-01-05')]
+)
+def test_flight_date_accepts_lenient_calendar_dates(value, expected):
+    model = ItineraryCreate.model_validate(
+        {'flights': [{'origin': 'HKG', 'destination': 'NRT', 'flight_date': value}]}
+    )
+    assert model.flights[0].flight_date.isoformat() == expected
+
+
+@pytest.mark.parametrize('value', ['2026-13-45', 'nope', '2026/12/01', None, ''])
+def test_flight_date_rejects_garbage(value):
+    with pytest.raises(ValidationError) as caught:
+        ItineraryCreate.model_validate(
+            {'flights': [{'origin': 'HKG', 'destination': 'NRT', 'flight_date': value}]}
+        )
+    assert caught.value.errors()[0]['ctx']['error'].args[0] == 'Invalid flight_date'
+
+
+def test_deadline_accepts_lenient_calendar_dates():
+    assert _create(deadline='2026-1-5').deadline.isoformat() == '2026-01-05'
+
+
 def test_create_uppercases_leg_codes_and_filters():
     model = _create(cabin_class=' business ', max_stops='non_stop')
     assert model.flights[0].origin == 'HKG'

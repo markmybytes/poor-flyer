@@ -7,39 +7,54 @@ stay in `src.services.itinerary`.
 
 from __future__ import annotations
 
+import re
+from collections.abc import Callable
 from datetime import date, datetime
+from enum import StrEnum
+from functools import partial
 from typing import Annotated, Any
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator, model_validator
+
+from src.utils.filters import parse_bool
+
+IATA_PATTERN = re.compile(r'^[A-Z]{3}$')
+
+
+class TripType(StrEnum):
+    """The create form's three trip types (`Pages/Itineraries/Create.vue`)."""
+
+    SINGLE = 'SINGLE'
+    ROUND_TRIP = 'ROUND_TRIP'
+    MULTI_CITY = 'MULTI_CITY'
+
+
+def _iso_date(value: Any, copy: str) -> date:
+    """Lenient calendar-date parse shared by deadline and flight dates."""
+    try:
+        return datetime.strptime(str(value), '%Y-%m-%d').date()
+    except ValueError:
+        raise ValueError(copy) from None
 
 
 def _deadline(value: Any) -> date | None:
     """Parse a page deadline; an empty value clears it."""
     if value in (None, ''):
         return None
-    try:
-        return datetime.strptime(str(value), '%Y-%m-%d').date()
-    except ValueError:
-        raise ValueError('Deadline must be a valid date') from None
+    return _iso_date(value, 'Deadline must be a valid date')
 
 
-def _flag(label: str):
-    """Bool tokens exactly as `utils.filters.parse_bool` accepts them, with the old copy."""
+def _flight_date(value: Any) -> date:
+    return _iso_date(value, 'Invalid flight_date')
 
-    def parse(value: Any) -> bool:
-        if isinstance(value, bool):
-            return value
-        token = str(value).strip().lower()
-        if token in ('true', '1'):
-            return True
-        if token in ('false', '0'):
-            return False
-        raise ValueError(f'Invalid {label}')
 
-    return parse
+def _flag(label: str) -> Callable[[Any], bool]:
+    """The strict token vocabulary and copy of `utils.filters.parse_bool`."""
+    return partial(parse_bool, label=label)
 
 
 Deadline = Annotated[date | None, BeforeValidator(_deadline)]
+FlightDate = Annotated[date, BeforeValidator(_flight_date)]
 IsActive = Annotated[bool, BeforeValidator(_flag('is_active'))]
 NotifyPerLeg = Annotated[bool, BeforeValidator(_flag('notify_per_leg'))]
 OptionalIsActive = Annotated[bool | None, BeforeValidator(_flag('is_active'))]
@@ -49,20 +64,23 @@ OptionalArchived = Annotated[bool | None, BeforeValidator(_flag('archived'))]
 class FlightPayload(BaseModel):
     model_config = ConfigDict(extra='ignore')
 
-    origin: str = ''
-    destination: str = ''
-    flight_date: date
+    origin: str
+    destination: str
+    flight_date: FlightDate
 
-    @field_validator('origin', 'destination')
+    @field_validator('origin', 'destination', mode='before')
     @classmethod
-    def _upper(cls, value: str) -> str:
-        return value.strip().upper()
+    def _iata(cls, value: Any) -> str:
+        code = str(value or '').strip().upper()
+        if not IATA_PATTERN.fullmatch(code):
+            raise ValueError('Invalid IATA code')
+        return code
 
 
 class ItineraryCreate(BaseModel):
     model_config = ConfigDict(extra='ignore')
 
-    trip_type: str = 'SINGLE'
+    trip_type: TripType = TripType.SINGLE
     deadline: Deadline = None
     is_active: IsActive = True
     notify_per_leg: NotifyPerLeg = False
@@ -70,6 +88,11 @@ class ItineraryCreate(BaseModel):
     max_stops: str | None = None
     airlines: list[str] | str | None = None
     flights: list[FlightPayload] = Field(min_length=1)
+
+    @field_validator('trip_type', mode='before')
+    @classmethod
+    def _trip_type(cls, value: Any) -> str:
+        return str(value).strip().upper()
 
     @field_validator('cabin_class', 'max_stops', mode='before')
     @classmethod
