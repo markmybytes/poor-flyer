@@ -184,6 +184,19 @@ describe('Settings/Index', () => {
     expect(vi.mocked(useToast)().success).not.toHaveBeenCalled()
   })
 
+  it('renders inline server errors for the section fields', () => {
+    vi.mocked(usePage).mockReturnValue({
+      props: { errors: { baseCurrency: '不支援的基準貨幣' } },
+    } as never)
+    const wrapper = mount(SettingsIndexPage, {
+      props: defaultProps,
+      global: { stubs: globalStubs },
+    })
+    expect(wrapper.text()).toContain('不支援的基準貨幣')
+    // exactly one field shows it: the base-currency select in the currency section
+    expect(wrapper.text().split('不支援的基準貨幣').length - 1).toBe(1)
+  })
+
   it('toasts the error bag copy when save fails', async () => {
     vi.mocked(usePage).mockReturnValue({
       props: { errors: { settings: 'Unsupported base currency' } },

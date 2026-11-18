@@ -5,11 +5,12 @@ from datetime import UTC, date, datetime
 from typing import Any
 
 from flask.json.provider import DefaultJSONProvider
+from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import inspect
 
 from src.extensions.database import FloatingDateTime
 
-logger = logging.getLogger(__name__)
+_BOOL_ADAPTER = TypeAdapter(bool)
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +22,15 @@ def to_camel(snake_str):
 
 
 def to_bool(value: Any) -> bool:
-    """Lenient store-side flag coercion; `parse_bool` is the strict input-side variant."""
-    if isinstance(value, bool):
-        return value
-    return str(value).strip().lower() in ('1', 'enable', 'enabled', 'true', 'yes', 'y', 'on')
+    """Store-side legacy normalization: the schema's bool vocabulary, total on garbage.
+
+    Whitespace is stripped from stored strings; anything pydantic rejects (garbage, the
+    retired `enable`/`enabled` tokens, None) reads as False.
+    """
+    try:
+        return _BOOL_ADAPTER.validate_python(value.strip() if isinstance(value, str) else value)
+    except ValidationError:
+        return False
 
 
 def model_to_dict(model):

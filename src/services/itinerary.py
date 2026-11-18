@@ -11,17 +11,23 @@ from enum import StrEnum
 from typing import Any
 
 from src.extensions.database import Flight, Itinerary, db
+from src.services.errors import FieldIssue, InvalidFieldsError
 from src.services.fx_rates import FXRatesError, convert_amount
-from src.utils.filters import CabinClass, MaxStops, parse_airlines, parse_bool
+from src.utils.filters import CabinClass, MaxStops, parse_airlines
 
 logger = logging.getLogger(__name__)
+
+
+INVALID_FILTER_COPY = {'cabin_class': '艙等無效', 'max_stops': '轉機次數無效'}
 
 
 def _enum_value(enum_type: type[StrEnum], value: Any, label: str) -> str:
     try:
         return enum_type(str(value).strip().upper()).value
     except ValueError:
-        raise ValueError(f'Invalid {label}') from None
+        raise InvalidFieldsError(
+            [FieldIssue(label, INVALID_FILTER_COPY.get(label, f'{label} 無效'))]
+        ) from None
 
 
 def validate_deadline(deadline: date | None, first_departure: date | None, today: date) -> None:
@@ -29,43 +35,63 @@ def validate_deadline(deadline: date | None, first_departure: date | None, today
     if deadline is None:
         return
     if deadline < today:
-        raise ValueError('Deadline must not be in the past')
+        raise InvalidFieldsError([FieldIssue('deadline', '購票限期不能早於今天')])
     if first_departure is not None and deadline > first_departure:
-        raise ValueError('Deadline must not be after the first departure')
+        raise InvalidFieldsError([FieldIssue('deadline', '購票限期不能晚於首程出發日期')])
 
 
 def create_itinerary(data: Mapping[str, Any], today: date) -> Itinerary:
     """Build an itinerary and its flights from a raw payload.
 
-    Raises ValueError, KeyError, or TypeError on malformed input; the caller
-    owns the commit and rollback.
+    Runs every domain check first and raises InvalidFieldsError with all failures, so one
+    bad field never hides another. Raises KeyError or TypeError on malformed input; the
+    caller owns the commit and rollback.
     """
-    deadline_str = data.get('deadline')
-    deadline = datetime.strptime(deadline_str, '%Y-%m-%d').date() if deadline_str else None
+    deadline = (
+        datetime.strptime(data.get('deadline'), '%Y-%m-%d').date() if data.get('deadline') else None
+    )
     flights_data = data.get('flights', [])
+    errors: list[FieldIssue] = []
+
     if deadline is not None:
         first_date = flights_data[0].get('flight_date') if flights_data else None
-        validate_deadline(
-            deadline,
-            datetime.strptime(first_date, '%Y-%m-%d').date() if first_date else None,
-            today,
-        )
+        try:
+            validate_deadline(
+                deadline,
+                datetime.strptime(first_date, '%Y-%m-%d').date() if first_date else None,
+                today,
+            )
+        except InvalidFieldsError as exc:
+            errors.extend(exc.errors)
+
+    cabin_class = None
+    if data.get('cabin_class'):
+        try:
+            cabin_class = _enum_value(CabinClass, data['cabin_class'], 'cabin_class')
+        except InvalidFieldsError as exc:
+            errors.extend(exc.errors)
+
+    max_stops = None
+    if data.get('max_stops'):
+        try:
+            max_stops = _enum_value(MaxStops, data['max_stops'], 'max_stops')
+        except InvalidFieldsError as exc:
+            errors.extend(exc.errors)
+
+    if errors:
+        raise InvalidFieldsError(errors)
 
     itinerary = Itinerary(
         id=str(uuid.uuid4()),
         trip_type=data.get('trip_type', 'SINGLE'),
         deadline=deadline,
-        is_active=parse_bool(data.get('is_active', True), 'is_active'),
-        cabin_class=_enum_value(CabinClass, data['cabin_class'], 'cabin_class')
-        if data.get('cabin_class')
-        else None,
-        max_stops=_enum_value(MaxStops, data['max_stops'], 'max_stops')
-        if data.get('max_stops')
-        else None,
+        is_active=data.get('is_active', True),
+        cabin_class=cabin_class,
+        max_stops=max_stops,
         airlines=list(parse_airlines(data['airlines']))
         if data.get('airlines') is not None
         else None,
-        notify_per_leg=parse_bool(data.get('notify_per_leg', False), 'notify_per_leg'),
+        notify_per_leg=data.get('notify_per_leg', False),
         created_at=datetime.now(UTC),
     )
 

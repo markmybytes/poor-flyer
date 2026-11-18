@@ -11,12 +11,10 @@ import re
 from collections.abc import Callable
 from datetime import date, datetime
 from enum import StrEnum
-from functools import partial
 from typing import Annotated, Any
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator, model_validator
-
-from src.utils.filters import parse_bool
+from pydantic_core import PydanticCustomError
 
 IATA_PATTERN = re.compile(r'^[A-Z]{3}$')
 
@@ -41,24 +39,22 @@ def _deadline(value: Any) -> date | None:
     """Parse a page deadline; an empty value clears it."""
     if value in (None, ''):
         return None
-    return _iso_date(value, 'Deadline must be a valid date')
+    return _iso_date(value, '購票限期日期無效')
 
 
 def _flight_date(value: Any) -> date:
-    return _iso_date(value, 'Invalid flight_date')
+    return _iso_date(value, '航班日期無效')
 
 
-def _flag(label: str) -> Callable[[Any], bool]:
-    """The strict token vocabulary and copy of `utils.filters.parse_bool`."""
-    return partial(parse_bool, label=label)
+def _reject_none(copy: str) -> Callable[[Any], Any]:
+    """Reject an explicit null with this field's copy; absent keys never reach it."""
 
+    def validate(value: Any) -> Any:
+        if value is None:
+            raise ValueError(copy)
+        return value
 
-Deadline = Annotated[date | None, BeforeValidator(_deadline)]
-FlightDate = Annotated[date, BeforeValidator(_flight_date)]
-IsActive = Annotated[bool, BeforeValidator(_flag('is_active'))]
-NotifyPerLeg = Annotated[bool, BeforeValidator(_flag('notify_per_leg'))]
-OptionalIsActive = Annotated[bool | None, BeforeValidator(_flag('is_active'))]
-OptionalArchived = Annotated[bool | None, BeforeValidator(_flag('archived'))]
+    return validate
 
 
 class FlightPayload(BaseModel):
@@ -66,14 +62,14 @@ class FlightPayload(BaseModel):
 
     origin: str
     destination: str
-    flight_date: FlightDate
+    flight_date: Annotated[date, BeforeValidator(_flight_date)]
 
     @field_validator('origin', 'destination', mode='before')
     @classmethod
     def _iata(cls, value: Any) -> str:
         code = str(value or '').strip().upper()
         if not IATA_PATTERN.fullmatch(code):
-            raise ValueError('Invalid IATA code')
+            raise ValueError('IATA 代碼無效')
         return code
 
 
@@ -81,9 +77,9 @@ class ItineraryCreate(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
     trip_type: TripType = TripType.SINGLE
-    deadline: Deadline = None
-    is_active: IsActive = True
-    notify_per_leg: NotifyPerLeg = False
+    deadline: Annotated[date | None, BeforeValidator(_deadline)] = None
+    is_active: Annotated[bool, BeforeValidator(_reject_none('追蹤狀態無效'))] = True
+    notify_per_leg: Annotated[bool, BeforeValidator(_reject_none('逐航段通知設定無效'))] = False
     cabin_class: str | None = None
     max_stops: str | None = None
     airlines: list[str] | str | None = None
@@ -106,21 +102,26 @@ class ItinerarySettings(BaseModel):
 
     model_config = ConfigDict(extra='forbid')
 
-    deadline: Deadline = None
-    notify_per_leg: Annotated[bool | None, BeforeValidator(_flag('notify_per_leg'))] = None
+    deadline: Annotated[date | None, BeforeValidator(_deadline)] = None
+    notify_per_leg: Annotated[bool | None, BeforeValidator(_reject_none('逐航段通知設定無效'))] = (
+        None
+    )
 
 
 class ItineraryStatus(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
-    is_active: OptionalIsActive = None
-    archived: OptionalArchived = None
+    is_active: Annotated[bool | None, BeforeValidator(_reject_none('追蹤狀態無效'))] = None
+    archived: Annotated[bool | None, BeforeValidator(_reject_none('封存狀態無效'))] = None
 
     @model_validator(mode='before')
     @classmethod
     def _reject_unknown(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            unsupported = sorted(set(data) - set(cls.model_fields))
-            if unsupported:
-                raise ValueError(f'Unsupported field: {", ".join(unsupported)}')
+        if isinstance(data, dict) and (unsupported := sorted(set(data) - set(cls.model_fields))):
+            # model-level error carries no loc; the bridge splits `fields` into one key each
+            raise PydanticCustomError(
+                'unsupported_field',
+                '不允許的欄位：{fields}',
+                {'fields': ', '.join(unsupported)},
+            )
         return data

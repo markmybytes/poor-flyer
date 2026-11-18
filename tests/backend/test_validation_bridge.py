@@ -1,12 +1,18 @@
 """Bridge transport tests: one ValidationError handler, two response shapes."""
 
 import json
+import logging
 from datetime import UTC, datetime
 from unittest.mock import patch
 
 import pytest
+from flask import g, session
+from pydantic import ValidationError
 
 from src.extensions.database import Itinerary, db
+from src.schemas.itinerary import ItineraryCreate
+from src.services.errors import FieldIssue, InvalidFieldsError
+from src.validation import handle_invalid_fields, handle_validation_error
 
 INERTIA_HEADERS = {'X-Inertia': 'true', 'X-Inertia-Version': ''}
 
@@ -37,8 +43,8 @@ def test_page_error_lands_in_the_session_bag_as_plain_strings(client, app):
     assert resp.headers['Location'] == '/settings/'
     with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
         props = client.get('/settings/', headers=INERTIA_HEADERS).get_json()['props']
-    assert props['errors'] == {'settings': 'Cache TTL must be an integer greater than 0'}
-    assert isinstance(props['errors']['settings'], str)
+    assert props['errors'] == {'currency.cacheTtl': '快取有效時間必須是大於 0 的整數'}
+    assert isinstance(props['errors']['currency.cacheTtl'], str)
 
 
 def test_page_error_redirects_to_the_same_origin_referrer(client, app):
@@ -63,7 +69,7 @@ def test_api_error_uses_the_422_envelope_with_string_arrays(client):
 
     assert resp.status_code == 422
     body = resp.get_json()
-    assert body['message'] == 'Validation failed'
+    assert body['message'] == '驗證失敗'
     assert body['data'] is None
     # the bridge emits snake keys; the provider camelizes them exactly once
     assert set(body['errors']) == {'baseCurrency'}
@@ -81,6 +87,32 @@ def test_api_passes_validation_through_to_the_service(client):
 
     assert resp.status_code == 200
     assert resp.get_json()['data']['baseCurrency'] == 'HKD'
+
+
+def test_api_error_keeps_dotted_keys_and_camelizes_each_snake_key(app):
+    """A nested payload yields dotted keys; the provider camelizes each snake segment once."""
+    with pytest.raises(ValidationError) as excinfo:
+        ItineraryCreate.model_validate(
+            {
+                'flights': [
+                    {'origin': 'HK', 'destination': 'NRT', 'flight_date': '2026-12-01'},
+                    {'origin': 'HKG', 'destination': 'NRT', 'flight_date': '2026-12-32'},
+                ],
+                'notify_per_leg': 'maybe',
+            }
+        )
+
+    with app.test_request_context('/api/settings/fx-rates/refresh', method='POST'):
+        response, status = handle_validation_error(excinfo.value)
+        body = response.get_json()
+
+    assert status == 422
+    assert body['message'] == '驗證失敗'
+    assert body['data'] is None
+    assert set(body['errors']) == {'flights.0.origin', 'flights.1.flightDate', 'notifyPerLeg'}
+    assert body['errors']['flights.0.origin'] == ['IATA 代碼無效']
+    assert body['errors']['flights.1.flightDate'] == ['航班日期無效']
+    assert body['errors']['notifyPerLeg'] == ['格式不正確']
 
 
 @pytest.mark.parametrize(
@@ -101,19 +133,25 @@ def test_referrer_that_browsers_normalize_off_origin_falls_back(client, app, ref
 
 
 @pytest.mark.parametrize(
-    'payload',
+    ('payload', 'field'),
     [
-        {
-            'trip_type': 'SINGLE',
-            'flights': [{'origin': 'HK', 'destination': 'NRT', 'flight_date': '2026-12-01'}],
-        },
-        {
-            'trip_type': 'BIZARRE',
-            'flights': [{'origin': 'HKG', 'destination': 'NRT', 'flight_date': '2026-12-01'}],
-        },
+        (
+            {
+                'trip_type': 'SINGLE',
+                'flights': [{'origin': 'HK', 'destination': 'NRT', 'flight_date': '2026-12-01'}],
+            },
+            'flights.0.origin',
+        ),
+        (
+            {
+                'trip_type': 'BIZARRE',
+                'flights': [{'origin': 'HKG', 'destination': 'NRT', 'flight_date': '2026-12-01'}],
+            },
+            'tripType',
+        ),
     ],
 )
-def test_create_schema_errors_collapse_to_the_itinerary_bag(client, app, payload):
+def test_create_schema_errors_keep_their_own_field_key(client, app, payload, field):
     resp = client.post(
         '/itineraries',
         data=json.dumps(payload),
@@ -126,7 +164,8 @@ def test_create_schema_errors_collapse_to_the_itinerary_bag(client, app, payload
     with app.app_context():
         assert db.session.query(Itinerary).count() == 0
     props = client.get('/itineraries/create', headers=INERTIA_HEADERS).get_json()['props']
-    assert props['errors'] == {'itinerary': '請檢查輸入內容'}
+    assert set(props['errors']) == {field}
+    assert isinstance(props['errors'][field], str)
 
 
 def test_create_with_a_camel_case_key_is_rejected(client, app):
@@ -148,7 +187,8 @@ def test_create_with_a_camel_case_key_is_rejected(client, app):
     with app.app_context():
         assert db.session.query(Itinerary).count() == 0
     props = client.get('/itineraries/create', headers=INERTIA_HEADERS).get_json()['props']
-    assert props['errors'] == {'itinerary': '請檢查輸入內容'}
+    assert set(props['errors']) == {'notifyPerLeg'}
+    assert isinstance(props['errors']['notifyPerLeg'], str)
 
 
 def test_patch_with_a_camel_case_key_is_rejected(client, app):
@@ -183,4 +223,56 @@ def test_status_explicit_null_is_rejected(client, app):
     with app.app_context():
         assert db.session.get(Itinerary, iid).is_active is True
     props = client.get(f'/itineraries/{iid}', headers=INERTIA_HEADERS).get_json()['props']
-    assert props['errors'] == {'status': 'Invalid is_active'}
+    assert props['errors'] == {'isActive': '追蹤狀態無效'}
+
+
+def test_domain_failure_on_a_page_lands_in_the_bag_and_redirects_to_the_fallback(app):
+    with app.test_request_context('/itineraries', method='POST'):
+        g.validation_redirect = '/itineraries/create'
+        response = handle_invalid_fields(
+            InvalidFieldsError([FieldIssue('flights.0.origin', 'IATA 代碼無效')])
+        )
+        bag = dict(session['errors'])
+
+    assert response.status_code == 302
+    assert response.headers['Location'] == '/itineraries/create'
+    assert bag == {'flights.0.origin': 'IATA 代碼無效'}
+
+
+def test_domain_failure_on_an_api_request_uses_the_422_envelope(app):
+    with app.test_request_context('/api/settings/fx-rates/refresh', method='POST'):
+        response, status = handle_invalid_fields(
+            InvalidFieldsError(
+                [
+                    FieldIssue('base_currency', '不支援的基準貨幣'),
+                    FieldIssue('cache_ttl', '快取有效時間必須是大於 0 的整數'),
+                ]
+            )
+        )
+        body = response.get_json()
+
+    assert status == 422
+    assert body['message'] == '驗證失敗'
+    assert body['data'] is None
+    # snake keys here; the provider camelizes them exactly once
+    assert body['errors'] == {
+        'baseCurrency': ['不支援的基準貨幣'],
+        'cacheTtl': ['快取有效時間必須是大於 0 的整數'],
+    }
+
+
+def test_domain_failure_logs_once_at_the_boundary(app, caplog):
+    error = InvalidFieldsError(
+        [FieldIssue('base_currency', '不支援的基準貨幣'), FieldIssue('cache_ttl', '格式不正確')]
+    )
+
+    with (
+        app.test_request_context('/settings', method='POST'),
+        caplog.at_level(logging.INFO, logger='src.validation'),
+    ):
+        handle_invalid_fields(error)
+
+    records = [record for record in caplog.records if record.name == 'src.validation']
+    assert len(records) == 1
+    assert records[0].levelno == logging.INFO
+    assert records[0].getMessage() == 'rejected page payload: fields=base_currency,cache_ttl'

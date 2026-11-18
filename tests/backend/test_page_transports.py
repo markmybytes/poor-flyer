@@ -18,20 +18,20 @@ def test_flash_share_returns_level_keyed_notices(client):
 
 def test_errors_bag_is_popped_on_read_and_camelized(client):
     with client.session_transaction() as sess:
-        sess['errors'] = {'notify_per_leg': 'Invalid notify_per_leg'}
+        sess['errors'] = {'notify_per_leg': '逐航段通知設定無效'}
 
-    assert _render_props(client)['errors'] == {'notifyPerLeg': 'Invalid notify_per_leg'}
+    assert _render_props(client)['errors'] == {'notifyPerLeg': '逐航段通知設定無效'}
     assert _render_props(client)['errors'] == {}
 
 
 def test_both_channels_populate_and_drain_in_one_render(client):
     with client.session_transaction() as sess:
         sess['_flashes'] = [('success', 'done')]
-        sess['errors'] = {'deadline': 'Deadline must be a valid date'}
+        sess['errors'] = {'deadline': '購票限期日期無效'}
 
     props = _render_props(client)
     assert props['flash'] == {'success': 'done'}
-    assert props['errors'] == {'deadline': 'Deadline must be a valid date'}
+    assert props['errors'] == {'deadline': '購票限期日期無效'}
 
     drained = _render_props(client)
     assert drained['flash'] == {}

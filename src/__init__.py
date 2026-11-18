@@ -15,8 +15,9 @@ from src.extensions.scheduler import create_cron_trigger
 from src.logging_config import configure_logging
 from src.routes.api import api_bp
 from src.routes.pages import pages_bp
+from src.services.errors import InvalidFieldsError
 from src.utils.transform import CamelCaseJSONProvider
-from src.validation import handle_validation_error
+from src.validation import handle_invalid_fields, handle_validation_error
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +131,7 @@ def create_app():
     app.before_request(_resolve_timezone)
 
     app.register_error_handler(ValidationError, handle_validation_error)
+    app.register_error_handler(InvalidFieldsError, handle_invalid_fields)
 
     app.register_blueprint(pages_bp)
     app.register_blueprint(api_bp)
