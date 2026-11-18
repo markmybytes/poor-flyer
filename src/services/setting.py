@@ -11,6 +11,7 @@ from sqlalchemy import select
 
 from src.extensions.cache import cache
 from src.extensions.database import Config, db
+from src.utils.transform import to_bool
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,36 @@ def get_all_masked(namespace: str) -> dict[str, str]:
     return data
 
 
+def get_page_settings() -> dict[str, dict[str, Any]]:
+    """Settings payloads for the page props, with flags and numbers typed.
+
+    Stored values are strings (legacy rows may hold 'true' or '587'); the page receives
+    booleans and ints so the frontend bindings do not re-parse tokens.
+    """
+    currency = get_all_masked('currency')
+    currency['base_currency'] = currency.get('base_currency') or 'HKD'
+    currency['cache_ttl'] = get_int('currency', 'cache_ttl', 86400)
+    currency['fxrates_api_key'] = currency.get('fxrates_api_key') or ''
+
+    itinerary = get_all_masked('itinerary')
+    itinerary['disable_departured_itineraries'] = get_bool(
+        'itinerary', 'disable_departured_itineraries', False
+    )
+
+    smtp = get_all_masked('smtp')
+    if 'port' in smtp:
+        smtp['port'] = get_int('smtp', 'port')
+    if 'require_auth' in smtp:
+        smtp['require_auth'] = get_bool('smtp', 'require_auth', True)
+
+    return {
+        'currency': currency,
+        'email': get_all_masked('email'),
+        'itinerary': itinerary,
+        'smtp': smtp,
+    }
+
+
 def update(data: Mapping[str, Any]) -> None:  # noqa: C901 - four independent sections, each ~5 branches
     """Apply a partial settings payload, raising ValueError on invalid values."""
     from src.services.fx_rates import SUPPORTED_CURRENCIES
@@ -122,7 +153,7 @@ def update(data: Mapping[str, Any]) -> None:  # noqa: C901 - four independent se
         existing = (get_all_masked('itinerary') or {}).copy()
         if 'disable_departured_itineraries' in itinerary_data:
             existing['disable_departured_itineraries'] = (
-                'true' if itinerary_data.get('disable_departured_itineraries', False) else 'false'
+                'true' if to_bool(itinerary_data.get('disable_departured_itineraries')) else 'false'
             )
         set_many('itinerary', existing)
 
@@ -141,9 +172,7 @@ def update(data: Mapping[str, Any]) -> None:  # noqa: C901 - four independent se
             except TypeError, ValueError:
                 raise ValueError('SMTP port must be an integer') from None
         if 'require_auth' in smtp_data:
-            existing['require_auth'] = (
-                'true' if smtp_data.get('require_auth', True) in [True, 'true'] else 'false'
-            )
+            existing['require_auth'] = 'true' if to_bool(smtp_data.get('require_auth')) else 'false'
         submitted_pwd = smtp_data.get('password')
         if submitted_pwd:
             existing['password'] = submitted_pwd
