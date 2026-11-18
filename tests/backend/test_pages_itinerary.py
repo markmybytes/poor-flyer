@@ -388,6 +388,28 @@ def test_itinerary_update_empty_deadline_clears(client, app):
         assert db.session.get(Itinerary, iid).deadline is None
 
 
+def test_itinerary_update_empty_payload_changes_nothing(client, app):
+    deadline = _future_departure()
+    with app.app_context():
+        it = _seed_itinerary(deadline=deadline, notify_per_leg=True)
+        iid = it.id
+
+    resp = client.patch(
+        f'/itineraries/{iid}',
+        data=json.dumps({}),
+        content_type='application/json',
+        headers=INERTIA_HEADERS,
+    )
+
+    assert resp.status_code in (302, 303)
+    with app.app_context():
+        entry = db.session.get(Itinerary, iid)
+        assert entry.deadline == deadline
+        assert entry.notify_per_leg is True
+    props = client.get(f'/itineraries/{iid}', headers=INERTIA_HEADERS).get_json()['props']
+    assert props['errors'] == {}
+
+
 def test_itinerary_update_absent_deadline_is_unchanged(client, app):
     deadline = _future_departure()
     with app.app_context():
@@ -661,15 +683,61 @@ def test_itinerary_delete_not_found_redirects(client, app):
 
 
 @pytest.mark.parametrize(('token', 'stored'), [('false', False), ('true', True)])
-def test_itinerary_create_submit_reads_form_encoded_is_active(client, app, token, stored):
+def test_itinerary_create_submit_reads_is_active_tokens(client, app, token, stored):
     resp = client.post(
         '/itineraries',
-        data={'trip_type': 'SINGLE', 'is_active': token},
+        data=json.dumps(
+            {
+                'trip_type': 'SINGLE',
+                'is_active': token,
+                'flights': [{'origin': 'HKG', 'destination': 'NRT', 'flight_date': '2025-12-01'}],
+            }
+        ),
+        content_type='application/json',
     )
 
     assert resp.status_code in (302, 303)
     with app.app_context():
         assert db.session.query(Itinerary).one().is_active is stored
+
+
+@pytest.mark.parametrize(
+    'payload',
+    [
+        {'trip_type': 'SINGLE'},
+        {'trip_type': 'SINGLE', 'flights': []},
+    ],
+)
+def test_itinerary_create_submit_requires_a_flight(client, app, payload):
+    resp = client.post(
+        '/itineraries',
+        data=json.dumps(payload),
+        content_type='application/json',
+        headers=INERTIA_HEADERS,
+    )
+
+    assert resp.status_code == 302
+    assert resp.headers['Location'] == '/itineraries/create'
+    with app.app_context():
+        assert db.session.query(Itinerary).count() == 0
+    data = client.get('/itineraries/create', headers=INERTIA_HEADERS).get_json()
+    assert data['props']['errors'] == {'itinerary': '請檢查輸入內容'}
+
+
+def test_itinerary_create_submit_rejects_form_encoded_legs(client, app):
+    # form encoding cannot express flights[]; the schema's min-1 rule rejects it
+    resp = client.post(
+        '/itineraries',
+        data={'trip_type': 'SINGLE', 'is_active': 'true'},
+        headers=INERTIA_HEADERS,
+    )
+
+    assert resp.status_code == 302
+    assert resp.headers['Location'] == '/itineraries/create'
+    with app.app_context():
+        assert db.session.query(Itinerary).count() == 0
+    data = client.get('/itineraries/create', headers=INERTIA_HEADERS).get_json()
+    assert data['props']['errors'] == {'itinerary': '請檢查輸入內容'}
 
 
 def test_itinerary_create_submit_invalid_notify_redirects_with_errors(client, app):

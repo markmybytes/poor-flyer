@@ -1,8 +1,9 @@
 import logging
 
-from flask import Blueprint, flash, redirect, request, session
+from flask import Blueprint, flash, g, redirect, session
 from flask_inertia import render_inertia
 
+from src.schemas.settings import SettingsPayload
 from src.services import setting
 from src.services.fx_rates import (
     SUPPORTED_CURRENCIES,
@@ -10,6 +11,7 @@ from src.services.fx_rates import (
     get_configured_base_currency,
     get_rates,
 )
+from src.validation import validated
 
 logger = logging.getLogger(__name__)
 
@@ -48,9 +50,10 @@ def index():
 
 
 @settings_bp.route('', methods=['POST'])
+@validated(SettingsPayload, error_key='settings', redirect_to='/settings/')
 def save():
     try:
-        setting.update(request.get_json(silent=True) or request.form.to_dict())
+        setting.update(g.validated.model_dump(exclude_unset=True))
         logger.info('settings updated from page form')
 
         flash('設定已儲存', 'success')
