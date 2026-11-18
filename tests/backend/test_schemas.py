@@ -175,12 +175,13 @@ def test_status_absent_keys_when_empty():
     assert ItineraryStatus.model_validate({}).model_fields_set == set()
 
 
-def test_status_unsupported_fields_copy_is_sorted():
+def test_status_unknown_keys_are_reported_per_field():
     with pytest.raises(ValidationError) as caught:
         ItineraryStatus.model_validate({'zeta': 1, 'alpha': 2, 'is_active': False})
-    error = caught.value.errors()[0]
-    assert error['msg'] == '不允許的欄位：alpha, zeta'
-    assert error['ctx'] == {'fields': 'alpha, zeta'}
+    errors = caught.value.errors()
+    assert [error['type'] for error in errors] == ['extra_forbidden', 'extra_forbidden']
+    assert sorted(error['loc'][0] for error in errors) == ['alpha', 'zeta']
+    assert all('ctx' not in error or 'fields' not in error['ctx'] for error in errors)
 
 
 @pytest.mark.parametrize(

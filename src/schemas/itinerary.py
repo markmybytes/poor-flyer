@@ -8,13 +8,13 @@ stay in `src.services.itinerary`.
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
-from datetime import date, datetime
+from datetime import date
 from enum import StrEnum
 from typing import Annotated, Any
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator, model_validator
-from pydantic_core import PydanticCustomError
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator
+
+from src.schemas.validators import iso_date, reject_none
 
 IATA_PATTERN = re.compile(r'^[A-Z]{3}$')
 
@@ -27,42 +27,12 @@ class TripType(StrEnum):
     MULTI_CITY = 'MULTI_CITY'
 
 
-def _iso_date(value: Any, copy: str) -> date:
-    """Lenient calendar-date parse shared by deadline and flight dates."""
-    try:
-        return datetime.strptime(str(value), '%Y-%m-%d').date()
-    except ValueError:
-        raise ValueError(copy) from None
-
-
-def _deadline(value: Any) -> date | None:
-    """Parse a page deadline; an empty value clears it."""
-    if value in (None, ''):
-        return None
-    return _iso_date(value, '購票限期日期無效')
-
-
-def _flight_date(value: Any) -> date:
-    return _iso_date(value, '航班日期無效')
-
-
-def _reject_none(copy: str) -> Callable[[Any], Any]:
-    """Reject an explicit null with this field's copy; absent keys never reach it."""
-
-    def validate(value: Any) -> Any:
-        if value is None:
-            raise ValueError(copy)
-        return value
-
-    return validate
-
-
 class FlightPayload(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
     origin: str
     destination: str
-    flight_date: Annotated[date, BeforeValidator(_flight_date)]
+    flight_date: Annotated[date, BeforeValidator(iso_date('航班日期無效'))]
 
     @field_validator('origin', 'destination', mode='before')
     @classmethod
@@ -77,9 +47,11 @@ class ItineraryCreate(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
     trip_type: TripType = TripType.SINGLE
-    deadline: Annotated[date | None, BeforeValidator(_deadline)] = None
-    is_active: Annotated[bool, BeforeValidator(_reject_none('追蹤狀態無效'))] = True
-    notify_per_leg: Annotated[bool, BeforeValidator(_reject_none('逐航段通知設定無效'))] = False
+    deadline: Annotated[
+        date | None, BeforeValidator(iso_date('購票限期日期無效', allow_empty=True))
+    ] = None
+    is_active: Annotated[bool, BeforeValidator(reject_none('追蹤狀態無效'))] = True
+    notify_per_leg: Annotated[bool, BeforeValidator(reject_none('逐航段通知設定無效'))] = False
     cabin_class: str | None = None
     max_stops: str | None = None
     airlines: list[str] | str | None = None
@@ -102,8 +74,10 @@ class ItinerarySettings(BaseModel):
 
     model_config = ConfigDict(extra='forbid')
 
-    deadline: Annotated[date | None, BeforeValidator(_deadline)] = None
-    notify_per_leg: Annotated[bool | None, BeforeValidator(_reject_none('逐航段通知設定無效'))] = (
+    deadline: Annotated[
+        date | None, BeforeValidator(iso_date('購票限期日期無效', allow_empty=True))
+    ] = None
+    notify_per_leg: Annotated[bool | None, BeforeValidator(reject_none('逐航段通知設定無效'))] = (
         None
     )
 
@@ -111,17 +85,5 @@ class ItinerarySettings(BaseModel):
 class ItineraryStatus(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
-    is_active: Annotated[bool | None, BeforeValidator(_reject_none('追蹤狀態無效'))] = None
-    archived: Annotated[bool | None, BeforeValidator(_reject_none('封存狀態無效'))] = None
-
-    @model_validator(mode='before')
-    @classmethod
-    def _reject_unknown(cls, data: Any) -> Any:
-        if isinstance(data, dict) and (unsupported := sorted(set(data) - set(cls.model_fields))):
-            # model-level error carries no loc; the bridge splits `fields` into one key each
-            raise PydanticCustomError(
-                'unsupported_field',
-                '不允許的欄位：{fields}',
-                {'fields': ', '.join(unsupported)},
-            )
-        return data
+    is_active: Annotated[bool | None, BeforeValidator(reject_none('追蹤狀態無效'))] = None
+    archived: Annotated[bool | None, BeforeValidator(reject_none('封存狀態無效'))] = None
