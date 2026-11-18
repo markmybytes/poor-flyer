@@ -216,3 +216,85 @@ def test_settings_numeric_copy_is_pinned(section, field, value, copy):
 def test_api_models_default_when_absent():
     assert settings_schemas.FxRefresh.model_validate({}).base_currency is None
     assert settings_schemas.TestEmail.model_validate({}).recipient == ''
+
+
+@pytest.mark.parametrize(
+    ('model', 'payload'),
+    [
+        (ItineraryCreate, {'flights': [LEG], 'notifyPerLeg': True}),
+        (ItineraryCreate, {'flights': [LEG | {'flightDate': '2026-12-01'}]}),
+        (ItineraryCreate, {'flights': [LEG], 'tripType': 'SINGLE'}),
+        (ItinerarySettings, {'notifyPerLeg': True}),
+        (ItineraryStatus, {'isActive': False}),
+        (settings_schemas.SettingsPayload, {'currency': {'baseCurrency': 'USD'}}),
+        (settings_schemas.SettingsPayload, {'language': 'zh'}),
+        (settings_schemas.FxRefresh, {'baseCurrency': 'USD'}),
+        (settings_schemas.TestEmail, {'to': 'someone@example.com'}),
+    ],
+)
+def test_unknown_keys_are_rejected(model, payload):
+    with pytest.raises(ValidationError):
+        model.model_validate(payload)
+
+
+def test_declared_keys_only_payloads_still_validate():
+    ItineraryCreate.model_validate(
+        {
+            'trip_type': 'ROUND_TRIP',
+            'deadline': '2026-12-01',
+            'is_active': True,
+            'notify_per_leg': True,
+            'cabin_class': 'business',
+            'max_stops': 'non_stop',
+            'airlines': ['CX'],
+            'flights': [LEG],
+        }
+    )
+    ItinerarySettings.model_validate({'deadline': '', 'notify_per_leg': False})
+    ItineraryStatus.model_validate({'is_active': False, 'archived': True})
+    settings_schemas.SettingsPayload.model_validate(
+        {
+            'currency': {'base_currency': 'USD', 'fxrates_api_key': 'k', 'cache_ttl': 60},
+            'email': {'recipients': 'a@example.com'},
+            'itinerary': {'disable_departured_itineraries': False},
+            'smtp': {
+                'host': 'mail.example.com',
+                'port': 587,
+                'user': 'u@example.com',
+                'sender_email': 's@example.com',
+                'require_auth': True,
+                'protocol': 'STARTTLS',
+                'password': 'secret',
+            },
+        }
+    )
+    settings_schemas.FxRefresh.model_validate({'base_currency': 'USD'})
+    settings_schemas.TestEmail.model_validate({'recipient': 'a@example.com'})
+
+
+@pytest.mark.parametrize(
+    ('model', 'payload', 'copy'),
+    [
+        (ItineraryCreate, {'flights': [LEG], 'is_active': None}, 'Invalid is_active'),
+        (ItineraryCreate, {'flights': [LEG], 'notify_per_leg': None}, 'Invalid notify_per_leg'),
+        (ItinerarySettings, {'notify_per_leg': None}, 'Invalid notify_per_leg'),
+        (ItineraryStatus, {'is_active': None}, 'Invalid is_active'),
+        (ItineraryStatus, {'archived': None}, 'Invalid archived'),
+    ],
+)
+def test_explicit_null_flags_are_rejected(model, payload, copy):
+    with pytest.raises(ValidationError) as caught:
+        model.model_validate(payload)
+    assert caught.value.errors()[0]['ctx']['error'].args[0] == copy
+
+
+@pytest.mark.parametrize(
+    ('model', 'payload'),
+    [
+        (ItineraryCreate, {'flights': [LEG]}),
+        (ItinerarySettings, {}),
+        (ItineraryStatus, {}),
+    ],
+)
+def test_absent_flags_mean_unset(model, payload):
+    assert model.model_validate(payload).model_fields_set - {'flights'} == set()
