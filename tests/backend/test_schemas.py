@@ -233,50 +233,52 @@ def test_status_bool_tokens(token, expected):
 )
 def test_settings_flags_use_pydantic_lax_vocabulary(token, expected):
     model = settings_schemas.SettingsPayload.model_validate(
-        {'disable_departured_itineraries': token, 'require_auth': token}
+        {'itinerary': {'disable_departured_itineraries': token}, 'smtp': {'require_auth': token}}
     )
-    assert model.disable_departured_itineraries is expected
-    assert model.require_auth is expected
+    assert model.itinerary.disable_departured_itineraries is expected
+    assert model.smtp.require_auth is expected
 
 
 @pytest.mark.parametrize('token', ['enable', 'ENABLED', 'maybe'])
 def test_settings_only_store_tokens_are_not_input_tokens(token):
     with pytest.raises(ValidationError) as caught:
-        settings_schemas.SettingsPayload.model_validate({'disable_departured_itineraries': token})
+        settings_schemas.SettingsPayload.model_validate(
+            {'itinerary': {'disable_departured_itineraries': token}}
+        )
     assert caught.value.errors()[0]['type'] == 'bool_parsing'
 
 
 @pytest.mark.parametrize('field', ['disable_departured_itineraries', 'require_auth'])
 def test_settings_explicit_null_flag_is_rejected(field):
+    section = 'itinerary' if field == 'disable_departured_itineraries' else 'smtp'
     with pytest.raises(ValidationError) as caught:
-        settings_schemas.SettingsPayload.model_validate({field: None})
+        settings_schemas.SettingsPayload.model_validate({section: {field: None}})
     error = caught.value.errors()[0]
-    assert error['loc'] == (field,)
+    assert error['loc'] == (section, field)
     assert error['ctx']['error'].args[0] == '格式不正確'
 
 
 def test_settings_payload_dump_keeps_only_submitted_fields():
     payload = settings_schemas.SettingsPayload.model_validate(
-        {'base_currency': 'USD', 'port': 587, 'recipients': 'a@example.com'}
+        {'currency': {'base_currency': 'USD'}, 'smtp': {'port': 587}}
     )
     assert payload.model_dump(exclude_unset=True) == {
-        'base_currency': 'USD',
-        'port': 587,
-        'recipients': 'a@example.com',
+        'currency': {'base_currency': 'USD'},
+        'smtp': {'port': 587},
     }
 
 
 @pytest.mark.parametrize(
-    ('field', 'value', 'copy'),
+    ('section', 'field', 'value', 'copy'),
     [
-        ('cache_ttl', 'abc', '快取有效時間必須是大於 0 的整數'),
-        ('cache_ttl', 0, '快取有效時間必須是大於 0 的整數'),
-        ('port', 'abc', 'SMTP 連接埠必須是整數'),
+        ('currency', 'cache_ttl', 'abc', '快取有效時間必須是大於 0 的整數'),
+        ('currency', 'cache_ttl', 0, '快取有效時間必須是大於 0 的整數'),
+        ('smtp', 'port', 'abc', 'SMTP 連接埠必須是整數'),
     ],
 )
-def test_settings_numeric_copy_is_pinned(field, value, copy):
+def test_settings_numeric_copy_is_pinned(section, field, value, copy):
     with pytest.raises(ValidationError) as caught:
-        settings_schemas.SettingsPayload.model_validate({field: value})
+        settings_schemas.SettingsPayload.model_validate({section: {field: value}})
     assert caught.value.errors()[0]['ctx']['error'].args[0] == copy
 
 
@@ -293,7 +295,7 @@ def test_api_models_default_when_absent():
         (ItineraryCreate, {'flights': [LEG], 'tripType': 'SINGLE'}),
         (ItinerarySettings, {'notifyPerLeg': True}),
         (ItineraryStatus, {'isActive': False}),
-        (settings_schemas.SettingsPayload, {'baseCurrency': 'USD'}),
+        (settings_schemas.SettingsPayload, {'currency': {'baseCurrency': 'USD'}}),
         (settings_schemas.SettingsPayload, {'language': 'zh'}),
         (settings_schemas.FxRefresh, {'baseCurrency': 'USD'}),
         (settings_schemas.TestEmail, {'to': 'someone@example.com'}),
@@ -321,18 +323,18 @@ def test_declared_keys_only_payloads_still_validate():
     ItineraryStatus.model_validate({'is_active': False, 'archived': True})
     settings_schemas.SettingsPayload.model_validate(
         {
-            'base_currency': 'USD',
-            'fxrates_api_key': 'k',
-            'cache_ttl': 60,
-            'recipients': 'a@example.com',
-            'disable_departured_itineraries': False,
-            'host': 'mail.example.com',
-            'port': 587,
-            'user': 'u@example.com',
-            'sender_email': 's@example.com',
-            'require_auth': True,
-            'protocol': 'STARTTLS',
-            'password': 'secret',
+            'currency': {'base_currency': 'USD', 'fxrates_api_key': 'k', 'cache_ttl': 60},
+            'email': {'recipients': 'a@example.com'},
+            'itinerary': {'disable_departured_itineraries': False},
+            'smtp': {
+                'host': 'mail.example.com',
+                'port': 587,
+                'user': 'u@example.com',
+                'sender_email': 's@example.com',
+                'require_auth': True,
+                'protocol': 'STARTTLS',
+                'password': 'secret',
+            },
         }
     )
     settings_schemas.FxRefresh.model_validate({'base_currency': 'USD'})

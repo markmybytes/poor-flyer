@@ -72,10 +72,18 @@ def test_deadline_rule_is_still_a_value_error():
 @pytest.mark.parametrize(
     ('payload', 'field', 'message'),
     [
-        ({'base_currency': 'XXX'}, 'base_currency', '不支援的基準貨幣'),
-        ({'cache_ttl': 'abc'}, 'cache_ttl', '快取有效時間必須是大於 0 的整數'),
-        ({'cache_ttl': 0}, 'cache_ttl', '快取有效時間必須是大於 0 的整數'),
-        ({'port': 'abc'}, 'port', 'SMTP 連接埠必須是整數'),
+        ({'currency': {'base_currency': 'XXX'}}, 'currency.base_currency', '不支援的基準貨幣'),
+        (
+            {'currency': {'cache_ttl': 'abc'}},
+            'currency.cache_ttl',
+            '快取有效時間必須是大於 0 的整數',
+        ),
+        (
+            {'currency': {'cache_ttl': 0}},
+            'currency.cache_ttl',
+            '快取有效時間必須是大於 0 的整數',
+        ),
+        ({'smtp': {'port': 'abc'}}, 'smtp.port', 'SMTP 連接埠必須是整數'),
     ],
 )
 def test_setting_rules_carry_their_field(payload, field, message):
@@ -92,17 +100,15 @@ def test_setting_reports_every_failing_field(app):
         with pytest.raises(InvalidFieldsError) as caught:
             setting.update(
                 {
-                    'base_currency': 'XXX',
-                    'cache_ttl': 0,
-                    'host': 'mail.example.com',
-                    'port': 'abc',
+                    'currency': {'base_currency': 'XXX', 'cache_ttl': 0},
+                    'smtp': {'host': 'mail.example.com', 'port': 'abc'},
                 }
             )
 
         assert _failures(caught.value) == {
-            ('base_currency', '不支援的基準貨幣'),
-            ('cache_ttl', '快取有效時間必須是大於 0 的整數'),
-            ('port', 'SMTP 連接埠必須是整數'),
+            ('currency.base_currency', '不支援的基準貨幣'),
+            ('currency.cache_ttl', '快取有效時間必須是大於 0 的整數'),
+            ('smtp.port', 'SMTP 連接埠必須是整數'),
         }
         rows = {(c.namespace, c.key): c.value for c in db.session.query(Config)}
         assert rows == {

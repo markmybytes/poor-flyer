@@ -141,7 +141,7 @@ describe('Settings/Index', () => {
     await flushPromises()
     expect(router.post).toHaveBeenCalledWith(
       '/settings',
-      expect.objectContaining({ disable_departured_itineraries: expect.any(Boolean) }),
+      expect.objectContaining({ itinerary: expect.any(Object) }),
       expect.any(Object),
     )
   })
@@ -155,20 +155,20 @@ describe('Settings/Index', () => {
     await wrapper.findAll('form')[1].trigger('submit')
     await flushPromises()
     expect(vi.mocked(router.post).mock.calls.at(-1)?.[1]).toEqual({
-      base_currency: 'HKD',
-      fxrates_api_key: '',
-      cache_ttl: 86400,
+      currency: { base_currency: 'HKD', fxrates_api_key: '', cache_ttl: 86400 },
     })
 
     await wrapper.findAll('form')[2].trigger('submit')
     await flushPromises()
     expect(vi.mocked(router.post).mock.calls.at(-1)?.[1]).toEqual({
-      host: '',
-      port: 587,
-      user: '',
-      sender_email: '',
-      require_auth: true,
-      protocol: 'STARTTLS',
+      smtp: {
+        host: '',
+        port: 587,
+        user: '',
+        sender_email: '',
+        require_auth: true,
+        protocol: 'STARTTLS',
+      },
     })
   })
 
@@ -186,7 +186,7 @@ describe('Settings/Index', () => {
 
   it('renders inline server errors for the section fields', () => {
     vi.mocked(usePage).mockReturnValue({
-      props: { errors: { baseCurrency: '不支援的基準貨幣' } },
+      props: { errors: { 'currency.baseCurrency': '不支援的基準貨幣' } },
     } as never)
     const wrapper = mount(SettingsIndexPage, {
       props: defaultProps,
@@ -197,9 +197,9 @@ describe('Settings/Index', () => {
     expect(wrapper.text().split('不支援的基準貨幣').length - 1).toBe(1)
   })
 
-  it('renders a flat schema error key inline', () => {
+  it('renders a dotted schema error key inline', () => {
     vi.mocked(usePage).mockReturnValue({
-      props: { errors: { cacheTtl: '快取有效時間必須是大於 0 的整數' } },
+      props: { errors: { 'currency.cacheTtl': '快取有效時間必須是大於 0 的整數' } },
     } as never)
     const wrapper = mount(SettingsIndexPage, {
       props: defaultProps,

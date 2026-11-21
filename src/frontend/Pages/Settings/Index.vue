@@ -78,44 +78,6 @@ function toastSaveError(): void {
 
 const submitOptions = { preserveScroll: true, onSuccess: reseedFromProps, onError: toastSaveError }
 
-function saveItinerary(): void {
-  itineraryForm
-    .transform((draft) => ({
-      disable_departured_itineraries: draft.disableDeparturedItineraries,
-    }))
-    .post('/settings', submitOptions)
-}
-
-function saveCurrency(): void {
-  currencyForm
-    .transform((draft) => ({
-      base_currency: draft.baseCurrency,
-      fxrates_api_key: draft.fxratesApiKey,
-      cache_ttl: draft.cacheTtl,
-    }))
-    .post('/settings', submitOptions)
-}
-
-function saveSmtp(): void {
-  smtpForm
-    .transform((draft) => ({
-      host: draft.host,
-      port: draft.port,
-      user: draft.user,
-      sender_email: draft.senderEmail,
-      require_auth: draft.requireAuth,
-      protocol: draft.protocol,
-      ...(draft.password && { password: draft.password }),
-    }))
-    .post('/settings', submitOptions)
-}
-
-function saveEmail(): void {
-  emailForm
-    .transform((draft) => ({ recipients: draft.recipients }))
-    .post('/settings', submitOptions)
-}
-
 function refreshFxRates() {
   ui.value.loading = 'refresh'
   fetch('/api/settings/fx-rates/refresh', {
@@ -180,7 +142,16 @@ function sendTestEmail() {
             </p>
           </div>
 
-          <form class="space-y-5 p-6" @submit.prevent="saveItinerary">
+          <form
+            class="space-y-5 p-6"
+            @submit.prevent="
+              itineraryForm
+                .transform((draft) => ({
+                  itinerary: { disable_departured_itineraries: draft.disableDeparturedItineraries },
+                }))
+                .post('/settings', submitOptions)
+            "
+          >
             <label
               class="label cursor-pointer justify-start gap-4 rounded-lg border border-base-300/70 bg-base-200/40 px-4 py-4"
             >
@@ -199,6 +170,8 @@ function sendTestEmail() {
                 </p>
               </div>
             </label>
+
+            <FieldError field="itinerary.disableDeparturedItineraries" />
 
             <div
               class="flex flex-col items-start gap-3 border-t border-base-300/70 pt-4 sm:flex-row sm:items-center"
@@ -229,7 +202,20 @@ function sendTestEmail() {
             </p>
           </div>
 
-          <form class="space-y-5 p-6" @submit.prevent="saveCurrency">
+          <form
+            class="space-y-5 p-6"
+            @submit.prevent="
+              currencyForm
+                .transform((draft) => ({
+                  currency: {
+                    base_currency: draft.baseCurrency,
+                    fxrates_api_key: draft.fxratesApiKey,
+                    cache_ttl: draft.cacheTtl,
+                  },
+                }))
+                .post('/settings', submitOptions)
+            "
+          >
             <fieldset class="fieldset">
               <legend class="fieldset-legend text-sm font-bold">基準貨幣 / 顯示貨幣</legend>
 
@@ -239,7 +225,7 @@ function sendTestEmail() {
                 </option>
               </select>
 
-              <FieldError field="baseCurrency" />
+              <FieldError field="currency.baseCurrency" />
             </fieldset>
 
             <fieldset class="fieldset">
@@ -254,7 +240,7 @@ function sendTestEmail() {
                 class="input-bordered input w-full"
               />
 
-              <FieldError field="fxratesApiKey" />
+              <FieldError field="currency.fxratesApiKey" />
 
               <p class="label text-xs text-base-content/55">
                 留空時系統仍會嘗試獲取匯率數據。若失敗，請到 FXRatesAPI 註冊以取得 API 金鑰。
@@ -271,7 +257,7 @@ function sendTestEmail() {
                 class="input-bordered input w-full"
               />
 
-              <FieldError field="cacheTtl" />
+              <FieldError field="currency.cacheTtl" />
 
               <p class="label text-xs text-base-content/55">
                 快取時間愈短，匯率數據愈貼近現實，但亦會增加 API 查詢次數。建議根據 FXRatesAPI
@@ -310,7 +296,24 @@ function sendTestEmail() {
             <p class="mt-0.5 text-sm font-medium text-base-content/60">設定寄件伺服器連線資料</p>
           </div>
 
-          <form class="space-y-5 p-6" @submit.prevent="saveSmtp">
+          <form
+            class="space-y-5 p-6"
+            @submit.prevent="
+              smtpForm
+                .transform((draft) => ({
+                  smtp: {
+                    host: draft.host,
+                    port: draft.port,
+                    user: draft.user,
+                    sender_email: draft.senderEmail,
+                    require_auth: draft.requireAuth,
+                    protocol: draft.protocol,
+                    ...(draft.password && { password: draft.password }),
+                  },
+                }))
+                .post('/settings', submitOptions)
+            "
+          >
             <div class="grid gap-4 md:grid-cols-3">
               <div class="md:col-span-2">
                 <fieldset class="fieldset">
@@ -323,7 +326,7 @@ function sendTestEmail() {
                     class="input-bordered input w-full"
                   />
 
-                  <FieldError field="host" />
+                  <FieldError field="smtp.host" />
                 </fieldset>
               </div>
 
@@ -338,7 +341,7 @@ function sendTestEmail() {
                     class="input-bordered input w-full"
                   />
 
-                  <FieldError field="port" />
+                  <FieldError field="smtp.port" />
                 </fieldset>
               </div>
             </div>
@@ -356,7 +359,7 @@ function sendTestEmail() {
                 class="input-bordered input w-full"
               />
 
-              <FieldError field="senderEmail" />
+              <FieldError field="smtp.senderEmail" />
 
               <p class="label text-xs text-base-content/55">
                 留空則預設使用登入的用戶名稱作為寄件者電郵
@@ -372,7 +375,7 @@ function sendTestEmail() {
                 <option value="SMTP_SSL">SSL / 無加密</option>
               </select>
 
-              <FieldError field="protocol" />
+              <FieldError field="smtp.protocol" />
             </fieldset>
 
             <label
@@ -389,7 +392,7 @@ function sendTestEmail() {
               </div>
             </label>
 
-            <FieldError field="requireAuth" />
+            <FieldError field="smtp.requireAuth" />
 
             <div
               :class="[
@@ -410,7 +413,7 @@ function sendTestEmail() {
                   class="input-bordered input w-full"
                 />
 
-                <FieldError field="user" />
+                <FieldError field="smtp.user" />
               </fieldset>
 
               <fieldset class="fieldset">
@@ -496,7 +499,14 @@ function sendTestEmail() {
             <p class="mt-0.5 text-sm font-medium text-base-content/60">接收系統通知的郵件地址</p>
           </div>
 
-          <form class="space-y-4 p-6" @submit.prevent="saveEmail">
+          <form
+            class="space-y-4 p-6"
+            @submit.prevent="
+              emailForm
+                .transform((draft) => ({ email: { recipients: draft.recipients } }))
+                .post('/settings', submitOptions)
+            "
+          >
             <fieldset class="fieldset">
               <legend class="fieldset-legend text-sm font-bold">電郵地址清單</legend>
 
@@ -507,7 +517,7 @@ function sendTestEmail() {
                 class="textarea-bordered textarea w-full"
               ></textarea>
 
-              <FieldError field="recipients" />
+              <FieldError field="email.recipients" />
 
               <p class="label text-xs text-base-content/55">每行填寫一個電郵地址</p>
             </fieldset>

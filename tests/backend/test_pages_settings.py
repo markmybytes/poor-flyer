@@ -89,7 +89,7 @@ def test_settings_index_settings_props_contain_currency_section(client, app):
 def test_settings_save_updates_and_redirects(client, app):
     resp = client.post(
         '/settings',
-        data=json.dumps({'base_currency': 'usd'}),
+        data=json.dumps({'currency': {'base_currency': 'usd'}}),
         content_type='application/json',
     )
 
@@ -107,7 +107,7 @@ def test_settings_save_untouched_password_is_not_clobbered(client, app):
     with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
         resp = client.post(
             '/settings',
-            data=json.dumps({'host': 'smtp.example.com'}),
+            data=json.dumps({'smtp': {'host': 'smtp.example.com'}}),
             content_type='application/json',
         )
 
@@ -123,7 +123,7 @@ def test_settings_save_retyped_password_overwrites(client, app):
     with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
         resp = client.post(
             '/settings',
-            data=json.dumps({'password': 'new-secret'}),
+            data=json.dumps({'smtp': {'password': 'new-secret'}}),
             content_type='application/json',
         )
 
@@ -135,7 +135,7 @@ def test_settings_save_retyped_password_overwrites(client, app):
 def test_settings_save_flashes_success_notice(client, app):
     resp = client.post(
         '/settings',
-        data=json.dumps({'base_currency': 'usd'}),
+        data=json.dumps({'currency': {'base_currency': 'usd'}}),
         content_type='application/json',
         headers=INERTIA_HEADERS,
     )
@@ -193,8 +193,8 @@ def test_settings_save_accepts_boolean_flags(client, app):
         '/settings',
         data=json.dumps(
             {
-                'disable_departured_itineraries': False,
-                'require_auth': False,
+                'itinerary': {'disable_departured_itineraries': False},
+                'smtp': {'require_auth': False},
             }
         ),
         content_type='application/json',
@@ -227,7 +227,7 @@ def test_settings_save_accepts_boolean_flags(client, app):
 def test_settings_save_accepts_native_flag_tokens(client, app, token, stored):
     resp = client.post(
         '/settings',
-        data=json.dumps({'disable_departured_itineraries': token}),
+        data=json.dumps({'itinerary': {'disable_departured_itineraries': token}}),
         content_type='application/json',
     )
 
@@ -237,19 +237,31 @@ def test_settings_save_accepts_native_flag_tokens(client, app, token, stored):
 
 
 @pytest.mark.parametrize(
-    ('field', 'token', 'bag_key'),
+    ('section', 'field', 'token', 'bag_key'),
     [
-        ('disable_departured_itineraries', 'enable', 'disableDeparturedItineraries'),
-        ('disable_departured_itineraries', None, 'disableDeparturedItineraries'),
-        ('require_auth', 'enabled', 'requireAuth'),
-        ('require_auth', None, 'requireAuth'),
+        (
+            'itinerary',
+            'disable_departured_itineraries',
+            'enable',
+            'itinerary.disableDeparturedItineraries',
+        ),
+        (
+            'itinerary',
+            'disable_departured_itineraries',
+            None,
+            'itinerary.disableDeparturedItineraries',
+        ),
+        ('smtp', 'require_auth', 'enabled', 'smtp.requireAuth'),
+        ('smtp', 'require_auth', None, 'smtp.requireAuth'),
     ],
 )
-def test_settings_save_rejects_store_tokens_and_explicit_null(client, app, field, token, bag_key):
+def test_settings_save_rejects_store_tokens_and_explicit_null(
+    client, app, section, field, token, bag_key
+):
     with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
         resp = client.post(
             '/settings',
-            data=json.dumps({field: token}),
+            data=json.dumps({section: {field: token}}),
             content_type='application/json',
             headers=INERTIA_HEADERS,
         )
@@ -265,7 +277,7 @@ def test_settings_save_invalid_currency_redirects_with_errors(client, app):
     with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
         resp = client.post(
             '/settings',
-            data=json.dumps({'base_currency': 'XXX'}),
+            data=json.dumps({'currency': {'base_currency': 'XXX'}}),
             content_type='application/json',
             headers=INERTIA_HEADERS,
         )
@@ -276,7 +288,7 @@ def test_settings_save_invalid_currency_redirects_with_errors(client, app):
     with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
         data = client.get('/settings/', headers=INERTIA_HEADERS).get_json()
     assert data['component'] == 'Settings/Index'
-    assert data['props']['errors'] == {'baseCurrency': '不支援的基準貨幣'}
+    assert data['props']['errors'] == {'currency.baseCurrency': '不支援的基準貨幣'}
 
 
 def test_settings_service_errors_map_every_field_at_once(client, app, mocker):
@@ -284,15 +296,15 @@ def test_settings_service_errors_map_every_field_at_once(client, app, mocker):
         'src.routes.pages.settings.setting.update',
         side_effect=InvalidFieldsError(
             [
-                FieldIssue('base_currency', '不支援的基準貨幣'),
-                FieldIssue('cache_ttl', '快取有效時間必須是大於 0 的整數'),
+                FieldIssue('currency.base_currency', '不支援的基準貨幣'),
+                FieldIssue('currency.cache_ttl', '快取有效時間必須是大於 0 的整數'),
             ]
         ),
     )
 
     resp = client.post(
         '/settings',
-        data=json.dumps({'base_currency': 'XXX'}),
+        data=json.dumps({'currency': {'base_currency': 'XXX'}}),
         content_type='application/json',
         headers=INERTIA_HEADERS,
     )
@@ -301,16 +313,16 @@ def test_settings_service_errors_map_every_field_at_once(client, app, mocker):
     with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
         props = client.get('/settings/', headers=INERTIA_HEADERS).get_json()['props']
     assert props['errors'] == {
-        'baseCurrency': '不支援的基準貨幣',
-        'cacheTtl': '快取有效時間必須是大於 0 的整數',
+        'currency.baseCurrency': '不支援的基準貨幣',
+        'currency.cacheTtl': '快取有效時間必須是大於 0 的整數',
     }
 
 
 @pytest.mark.parametrize(
     ('field', 'message', 'bag_key'),
     [
-        ('cache_ttl', '快取有效時間必須是大於 0 的整數', 'cacheTtl'),
-        ('port', 'SMTP 連接埠必須是整數', 'port'),
+        ('currency.cache_ttl', '快取有效時間必須是大於 0 的整數', 'currency.cacheTtl'),
+        ('smtp.port', 'SMTP 連接埠必須是整數', 'smtp.port'),
     ],
 )
 def test_settings_service_error_maps_to_its_field(client, app, mocker, field, message, bag_key):
@@ -321,7 +333,7 @@ def test_settings_service_error_maps_to_its_field(client, app, mocker, field, me
 
     resp = client.post(
         '/settings',
-        data=json.dumps({'port': '587'}),
+        data=json.dumps({'smtp': {'port': '587'}}),
         content_type='application/json',
         headers=INERTIA_HEADERS,
     )

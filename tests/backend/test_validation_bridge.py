@@ -34,7 +34,7 @@ def _seed_itinerary(app) -> str:
 def test_page_error_lands_in_the_session_bag_as_plain_strings(client, app):
     resp = client.post(
         '/settings',
-        data=json.dumps({'cache_ttl': 'abc'}),
+        data=json.dumps({'currency': {'cache_ttl': 'abc'}}),
         content_type='application/json',
         headers=INERTIA_HEADERS,
     )
@@ -43,8 +43,8 @@ def test_page_error_lands_in_the_session_bag_as_plain_strings(client, app):
     assert resp.headers['Location'] == '/settings/'
     with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
         props = client.get('/settings/', headers=INERTIA_HEADERS).get_json()['props']
-    assert props['errors'] == {'cacheTtl': '快取有效時間必須是大於 0 的整數'}
-    assert isinstance(props['errors']['cacheTtl'], str)
+    assert props['errors'] == {'currency.cacheTtl': '快取有效時間必須是大於 0 的整數'}
+    assert isinstance(props['errors']['currency.cacheTtl'], str)
 
 
 def test_page_error_redirects_to_the_same_origin_referrer(client, app):
@@ -244,8 +244,8 @@ def test_domain_failure_on_an_api_request_uses_the_422_envelope(app):
         response, status = handle_invalid_fields(
             InvalidFieldsError(
                 [
-                    FieldIssue('base_currency', '不支援的基準貨幣'),
-                    FieldIssue('cache_ttl', '快取有效時間必須是大於 0 的整數'),
+                    FieldIssue('currency.base_currency', '不支援的基準貨幣'),
+                    FieldIssue('currency.cache_ttl', '快取有效時間必須是大於 0 的整數'),
                 ]
             )
         )
@@ -256,14 +256,17 @@ def test_domain_failure_on_an_api_request_uses_the_422_envelope(app):
     assert body['data'] is None
     # snake keys here; the provider camelizes them exactly once
     assert body['errors'] == {
-        'baseCurrency': ['不支援的基準貨幣'],
-        'cacheTtl': ['快取有效時間必須是大於 0 的整數'],
+        'currency.baseCurrency': ['不支援的基準貨幣'],
+        'currency.cacheTtl': ['快取有效時間必須是大於 0 的整數'],
     }
 
 
 def test_domain_failure_logs_once_at_the_boundary(app, caplog):
     error = InvalidFieldsError(
-        [FieldIssue('base_currency', '不支援的基準貨幣'), FieldIssue('cache_ttl', '格式不正確')]
+        [
+            FieldIssue('currency.base_currency', '不支援的基準貨幣'),
+            FieldIssue('currency.cache_ttl', '格式不正確'),
+        ]
     )
 
     with (
@@ -275,4 +278,6 @@ def test_domain_failure_logs_once_at_the_boundary(app, caplog):
     records = [record for record in caplog.records if record.name == 'src.validation']
     assert len(records) == 1
     assert records[0].levelno == logging.INFO
-    assert records[0].getMessage() == 'rejected page payload: fields=base_currency,cache_ttl'
+    assert records[0].getMessage() == (
+        'rejected page payload: fields=currency.base_currency,currency.cache_ttl'
+    )
