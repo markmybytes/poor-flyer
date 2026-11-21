@@ -127,3 +127,60 @@ def test_create_schema_errors_collapse_to_the_itinerary_bag(client, app, payload
         assert db.session.query(Itinerary).count() == 0
     props = client.get('/itineraries/create', headers=INERTIA_HEADERS).get_json()['props']
     assert props['errors'] == {'itinerary': '請檢查輸入內容'}
+
+
+def test_create_with_a_camel_case_key_is_rejected(client, app):
+    resp = client.post(
+        '/itineraries',
+        data=json.dumps(
+            {
+                'trip_type': 'SINGLE',
+                'notifyPerLeg': True,
+                'flights': [{'origin': 'HKG', 'destination': 'NRT', 'flight_date': '2026-12-01'}],
+            }
+        ),
+        content_type='application/json',
+        headers=INERTIA_HEADERS,
+    )
+
+    assert resp.status_code == 302
+    assert resp.headers['Location'] == '/itineraries/create'
+    with app.app_context():
+        assert db.session.query(Itinerary).count() == 0
+    props = client.get('/itineraries/create', headers=INERTIA_HEADERS).get_json()['props']
+    assert props['errors'] == {'itinerary': '請檢查輸入內容'}
+
+
+def test_patch_with_a_camel_case_key_is_rejected(client, app):
+    iid = _seed_itinerary(app)
+
+    resp = client.patch(
+        f'/itineraries/{iid}',
+        data=json.dumps({'notifyPerLeg': True}),
+        content_type='application/json',
+        headers=INERTIA_HEADERS,
+    )
+
+    assert resp.status_code == 303
+    with app.app_context():
+        entry = db.session.get(Itinerary, iid)
+        assert entry.notify_per_leg is False
+    props = client.get(f'/itineraries/{iid}', headers=INERTIA_HEADERS).get_json()['props']
+    assert set(props['errors']) == {'notifyPerLeg'}
+
+
+def test_status_explicit_null_is_rejected(client, app):
+    iid = _seed_itinerary(app)
+
+    resp = client.patch(
+        f'/itineraries/{iid}/status',
+        data=json.dumps({'is_active': None}),
+        content_type='application/json',
+        headers=INERTIA_HEADERS,
+    )
+
+    assert resp.status_code == 303
+    with app.app_context():
+        assert db.session.get(Itinerary, iid).is_active is True
+    props = client.get(f'/itineraries/{iid}', headers=INERTIA_HEADERS).get_json()['props']
+    assert props['errors'] == {'status': 'Invalid is_active'}

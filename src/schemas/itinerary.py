@@ -62,7 +62,7 @@ OptionalArchived = Annotated[bool | None, BeforeValidator(_flag('archived'))]
 
 
 class FlightPayload(BaseModel):
-    model_config = ConfigDict(extra='ignore')
+    model_config = ConfigDict(extra='forbid')
 
     origin: str
     destination: str
@@ -78,7 +78,7 @@ class FlightPayload(BaseModel):
 
 
 class ItineraryCreate(BaseModel):
-    model_config = ConfigDict(extra='ignore')
+    model_config = ConfigDict(extra='forbid')
 
     trip_type: TripType = TripType.SINGLE
     deadline: Deadline = None
@@ -104,7 +104,7 @@ class ItineraryCreate(BaseModel):
 class ItinerarySettings(BaseModel):
     """PATCH payload: an absent key means unchanged, `''` clears the deadline."""
 
-    model_config = ConfigDict(extra='ignore')
+    model_config = ConfigDict(extra='forbid')
 
     deadline: Deadline = None
     notify_per_leg: Annotated[bool | None, BeforeValidator(_flag('notify_per_leg'))] = None

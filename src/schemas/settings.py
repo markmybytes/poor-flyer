@@ -34,7 +34,7 @@ def _port(value: Any) -> int:
 
 
 class CurrencySection(BaseModel):
-    model_config = ConfigDict(extra='ignore')
+    model_config = ConfigDict(extra='forbid')
 
     base_currency: str | None = None
     fxrates_api_key: str | None = None
@@ -42,19 +42,19 @@ class CurrencySection(BaseModel):
 
 
 class EmailSection(BaseModel):
-    model_config = ConfigDict(extra='ignore')
+    model_config = ConfigDict(extra='forbid')
 
     recipients: str | None = None
 
 
 class ItinerarySection(BaseModel):
-    model_config = ConfigDict(extra='ignore')
+    model_config = ConfigDict(extra='forbid')
 
     disable_departured_itineraries: Flag = None
 
 
 class SmtpSection(BaseModel):
-    model_config = ConfigDict(extra='ignore')
+    model_config = ConfigDict(extra='forbid')
 
     host: str | None = None
     port: Annotated[int, BeforeValidator(_port)] | None = None
@@ -68,7 +68,7 @@ class SmtpSection(BaseModel):
 class SettingsPayload(BaseModel):
     """One partial write: each section may be absent."""
 
-    model_config = ConfigDict(extra='ignore')
+    model_config = ConfigDict(extra='forbid')
 
     currency: CurrencySection | None = None
     email: EmailSection | None = None
@@ -77,12 +77,12 @@ class SettingsPayload(BaseModel):
 
 
 class FxRefresh(BaseModel):
-    model_config = ConfigDict(extra='ignore')
+    model_config = ConfigDict(extra='forbid')
 
     base_currency: str | None = None
 
 
 class TestEmail(BaseModel):
-    model_config = ConfigDict(extra='ignore')
+    model_config = ConfigDict(extra='forbid')
 
     recipient: str = ''
