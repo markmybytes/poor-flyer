@@ -51,21 +51,21 @@ export interface Settings {
   currency?: {
     baseCurrency?: string
     fxratesApiKey?: string
-    cacheTtl?: string | number
+    cacheTtl?: number
   }
   email?: {
     recipients?: string
   }
   itinerary?: {
-    disableDeparturedItineraries?: string
+    disableDeparturedItineraries?: boolean
   }
   smtp?: {
     host?: string
-    port?: string | number
+    port?: number
     user?: string
     password?: string
     senderEmail?: string
-    requireAuth?: string
+    requireAuth?: boolean
     protocol?: string
   }
 }

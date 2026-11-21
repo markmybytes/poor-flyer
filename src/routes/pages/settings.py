@@ -37,20 +37,10 @@ def index():
             'error': str(exc),
         }
 
-    currency_settings = setting.get_all_masked('currency')
-    currency_settings['base_currency'] = currency_settings.get('base_currency', base_currency)
-    currency_settings['cache_ttl'] = currency_settings.get('cache_ttl', '86400')
-    currency_settings['fxrates_api_key'] = currency_settings.get('fxrates_api_key', '')
-
     return render_inertia(
         'Settings/Index',
         props={
-            'settings': {
-                'currency': currency_settings,
-                'email': setting.get_all_masked('email'),
-                'itinerary': setting.get_all_masked('itinerary'),
-                'smtp': setting.get_all_masked('smtp'),
-            },
+            'settings': setting.get_page_settings(),
             'supportedCurrencies': SUPPORTED_CURRENCIES,
             'fxStatus': fx_status,
         },

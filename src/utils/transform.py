@@ -2,6 +2,7 @@ import collections.abc
 import logging
 from dataclasses import asdict, is_dataclass
 from datetime import UTC, date, datetime
+from typing import Any
 
 from flask.json.provider import DefaultJSONProvider
 from sqlalchemy import inspect
@@ -17,6 +18,13 @@ def to_camel(snake_str):
     """Converts snake_case to camelCase."""
     parts = snake_str.split('_')
     return parts[0] + ''.join(x.title() for x in parts[1:])
+
+
+def to_bool(value: Any) -> bool:
+    """Lenient store-side flag coercion; `parse_bool` is the strict input-side variant."""
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in ('1', 'enable', 'enabled', 'true', 'yes', 'y', 'on')
 
 
 def model_to_dict(model):

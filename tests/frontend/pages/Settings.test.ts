@@ -1,20 +1,20 @@
 import SettingsIndexPage from '@/Pages/Settings/Index.vue'
 import { flushPromises, mount } from '@vue/test-utils'
-import { router } from '@inertiajs/vue3'
+import { router, usePage } from '@inertiajs/vue3'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const defaultProps = {
   settings: {
-    currency: { baseCurrency: 'HKD', fxratesApiKey: '', cacheTtl: '86400' },
+    currency: { baseCurrency: 'HKD', fxratesApiKey: '', cacheTtl: 86400 },
     email: { recipients: '' },
-    itinerary: { disableDeparturedItineraries: 'true' },
+    itinerary: { disableDeparturedItineraries: true },
     search: {},
     smtp: {
       host: '',
-      port: '587',
+      port: 587,
       user: '',
       senderEmail: '',
-      requireAuth: 'true',
+      requireAuth: true,
       protocol: 'STARTTLS',
     },
   },
@@ -34,6 +34,7 @@ const globalStubs = {
 describe('Settings/Index', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(usePage).mockReturnValue({ props: {} } as never)
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       json: async () => ({ message: 'ok', data: {} }),
@@ -145,6 +146,32 @@ describe('Settings/Index', () => {
     )
   })
 
+  it('submits snake_case payloads even though the draft is camelCase', async () => {
+    const wrapper = mount(SettingsIndexPage, {
+      props: defaultProps,
+      global: { stubs: globalStubs },
+    })
+
+    await wrapper.findAll('form')[1].trigger('submit')
+    await flushPromises()
+    expect(vi.mocked(router.post).mock.calls.at(-1)?.[1]).toEqual({
+      currency: { base_currency: 'HKD', fxrates_api_key: '', cache_ttl: 86400 },
+    })
+
+    await wrapper.findAll('form')[2].trigger('submit')
+    await flushPromises()
+    expect(vi.mocked(router.post).mock.calls.at(-1)?.[1]).toEqual({
+      smtp: {
+        host: '',
+        port: 587,
+        user: '',
+        sender_email: '',
+        require_auth: true,
+        protocol: 'STARTTLS',
+      },
+    })
+  })
+
   it('leaves the success toast to the server flash router', async () => {
     const wrapper = mount(SettingsIndexPage, {
       props: defaultProps,
@@ -157,14 +184,17 @@ describe('Settings/Index', () => {
     expect(vi.mocked(useToast)().success).not.toHaveBeenCalled()
   })
 
-  it('shows toast error when save fails', async () => {
+  it('toasts the error bag copy when save fails', async () => {
+    vi.mocked(usePage).mockReturnValue({
+      props: { errors: { settings: 'Unsupported base currency' } },
+    } as never)
     const wrapper = mount(SettingsIndexPage, {
       props: defaultProps,
       global: { stubs: globalStubs },
     })
     await wrapper.findAll('form')[0].trigger('submit')
     await flushPromises()
-    lastSaveOptions().onError?.({ settings: 'Unsupported base currency' })
+    lastSaveOptions().onError?.({})
     const { useToast } = await import('vue-toast-notification')
     expect(vi.mocked(useToast)().error).toHaveBeenCalledWith('Unsupported base currency')
   })

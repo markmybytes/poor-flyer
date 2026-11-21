@@ -1,6 +1,8 @@
 import json
 from unittest.mock import patch
 
+import pytest
+
 from src.services import setting
 
 INERTIA_HEADERS = {'X-Inertia': 'true', 'X-Inertia-Version': ''}
@@ -142,6 +144,56 @@ def test_settings_save_flashes_success_notice(client, app):
         props = client.get('/settings/', headers=INERTIA_HEADERS).get_json()['props']
     assert props['flash'] == {'success': '設定已儲存'}
     assert props['errors'] == {}
+
+
+def test_settings_index_props_flags_and_numbers_are_typed(client, app):
+    with app.app_context():
+        setting.set_many('currency', {'cache_ttl': '120'})
+        setting.set_many('itinerary', {'disable_departured_itineraries': 'true'})
+        setting.set_many('smtp', {'port': '587', 'require_auth': 'true'})
+
+        with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
+            props = client.get('/settings/', headers=INERTIA_HEADERS).get_json()['props']
+
+    settings = props['settings']
+    assert settings['currency']['cacheTtl'] == 120
+    assert settings['itinerary']['disableDeparturedItineraries'] is True
+    assert settings['smtp']['port'] == 587
+    assert settings['smtp']['requireAuth'] is True
+
+
+def test_settings_save_accepts_boolean_flags(client, app):
+    resp = client.post(
+        '/settings',
+        data=json.dumps(
+            {
+                'itinerary': {'disable_departured_itineraries': False},
+                'smtp': {'require_auth': False},
+            }
+        ),
+        content_type='application/json',
+    )
+
+    assert resp.status_code == 302
+    with app.app_context():
+        assert setting.get('itinerary', 'disable_departured_itineraries') == 'false'
+        assert setting.get('smtp', 'require_auth') == 'false'
+
+
+@pytest.mark.parametrize(
+    ('token', 'stored'),
+    [('true', 'true'), ('1', 'true'), ('false', 'false'), ('0', 'false')],
+)
+def test_settings_save_tolerates_legacy_flag_tokens(client, app, token, stored):
+    resp = client.post(
+        '/settings',
+        data=json.dumps({'itinerary': {'disable_departured_itineraries': token}}),
+        content_type='application/json',
+    )
+
+    assert resp.status_code == 302
+    with app.app_context():
+        assert setting.get('itinerary', 'disable_departured_itineraries') == stored
 
 
 def test_settings_save_invalid_currency_redirects_with_errors(client, app):
