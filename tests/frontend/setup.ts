@@ -15,18 +15,41 @@ vi.mock('@inertiajs/vue3', async () => {
   // enough of useForm for page tests: a reactive draft whose post() lands on the mocked router
   function useForm(initial: Record<string, unknown>) {
     let transform = (data: Record<string, unknown>) => data
-    const form = reactive({ ...structuredClone(initial) }) as Record<string, unknown> & {
+    let defaults = structuredClone(initial)
+    const form = reactive({ ...structuredClone(initial), processing: false }) as Record<
+      string,
+      unknown
+    > & {
+      processing: boolean
+      defaults(values: Record<string, unknown>): unknown
+      reset(): unknown
       transform(callback: (data: Record<string, unknown>) => Record<string, unknown>): unknown
       post(url: string, options?: Record<string, unknown>): void
     }
 
+    form.defaults = (values) => {
+      // spread, not structuredClone: props objects arrive as Vue reactive proxies
+      defaults = { ...defaults, ...values }
+      return form
+    }
+    form.reset = () => {
+      Object.assign(form, structuredClone(defaults))
+      return form
+    }
     form.transform = (callback) => {
       transform = callback
       return form
     }
     form.post = (url, options) => {
-      const draft = Object.fromEntries(Object.keys(initial).map((key) => [key, form[key]]))
-      router.post(url, transform(draft), options)
+      const draft = Object.fromEntries(Object.keys(defaults).map((key) => [key, form[key]]))
+      form.processing = true
+      router.post(url, transform(draft), {
+        ...options,
+        onFinish: () => {
+          form.processing = false
+          ;(options?.onFinish as (() => void) | undefined)?.()
+        },
+      })
     }
     return form
   }

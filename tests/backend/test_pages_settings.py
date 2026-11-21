@@ -73,17 +73,43 @@ def test_settings_index_fx_status_base_currency_matches_config(client, app):
     assert props['fxStatus']['baseCurrency'] in ('HKD', 'USD')
 
 
-def test_settings_index_settings_props_contain_currency_section(client, app):
+def test_settings_index_ships_every_section_with_defaults(client, app):
     with app.app_context():
         with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
             with patch(
                 'src.routes.pages.settings.setting.get_all_masked',
-                return_value={'base_currency': 'JPY'},
+                side_effect=lambda _namespace: {},
             ):
                 resp = client.get('/settings/', headers=INERTIA_HEADERS)
-    props = resp.get_json()['props']
-    assert 'currency' in props['settings']
-    assert 'smtp' in props['settings']
+    assert resp.get_json()['props']['settings'] == {
+        'currency': {'baseCurrency': 'HKD', 'fxratesApiKey': '', 'cacheTtl': 86400},
+        'email': {'recipients': ''},
+        'itinerary': {'disableDeparturedItineraries': False},
+        'smtp': {
+            'host': '',
+            'port': 587,
+            'user': '',
+            'password': '',
+            'senderEmail': '',
+            'requireAuth': True,
+            'protocol': 'STARTTLS',
+        },
+    }
+
+
+def test_settings_index_fills_missing_keys_in_a_stored_section(client, app):
+    with app.app_context():
+        with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
+            with patch(
+                'src.routes.pages.settings.setting.get_all_masked',
+                side_effect=lambda namespace: (
+                    {'base_currency': 'JPY'} if namespace == 'currency' else {}
+                ),
+            ):
+                resp = client.get('/settings/', headers=INERTIA_HEADERS)
+    settings = resp.get_json()['props']['settings']
+    assert settings['currency'] == {'baseCurrency': 'JPY', 'fxratesApiKey': '', 'cacheTtl': 86400}
+    assert settings['email'] == {'recipients': ''}
 
 
 def test_settings_save_updates_and_redirects(client, app):
@@ -151,7 +177,7 @@ def test_settings_index_props_flags_and_numbers_are_typed(client, app):
     with app.app_context():
         setting.set_many('currency', {'cache_ttl': '120'})
         setting.set_many('itinerary', {'disable_departured_itineraries': 'true'})
-        setting.set_many('smtp', {'port': '587', 'require_auth': 'true'})
+        setting.set_many('smtp', {'port': '587', 'require_auth': 'true', 'password': 'real-secret'})
 
         with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
             props = client.get('/settings/', headers=INERTIA_HEADERS).get_json()['props']
@@ -161,6 +187,8 @@ def test_settings_index_props_flags_and_numbers_are_typed(client, app):
     assert settings['itinerary']['disableDeparturedItineraries'] is True
     assert settings['smtp']['port'] == 587
     assert settings['smtp']['requireAuth'] is True
+    # the stored password is write-only: the page never receives it, not even masked
+    assert settings['smtp']['password'] == ''
 
 
 def test_settings_index_still_reads_legacy_store_tokens(client, app):

@@ -92,15 +92,19 @@ def get_all_masked(namespace: str) -> dict[str, str]:
 
 
 def get_page_settings() -> dict[str, dict[str, Any]]:
-    """Settings payloads for the page props, with flags and numbers typed.
+    """Complete settings payloads for the page props, with flags and numbers typed.
 
     Stored values are strings (legacy rows may hold 'true' or '587'); the page receives
-    booleans and ints so the frontend bindings do not re-parse tokens.
+    every key with its default, booleans and ints, so the frontend bindings do not re-parse
+    tokens or invent fallbacks. The password is write-only: the page always sees ''.
     """
     currency = get_all_masked('currency')
     currency['base_currency'] = currency.get('base_currency') or 'HKD'
     currency['cache_ttl'] = get_int('currency', 'cache_ttl', 86400)
     currency['fxrates_api_key'] = currency.get('fxrates_api_key') or ''
+
+    email = get_all_masked('email')
+    email['recipients'] = email.get('recipients') or ''
 
     itinerary = get_all_masked('itinerary')
     itinerary['disable_departured_itineraries'] = get_bool(
@@ -108,14 +112,17 @@ def get_page_settings() -> dict[str, dict[str, Any]]:
     )
 
     smtp = get_all_masked('smtp')
-    if 'port' in smtp:
-        smtp['port'] = get_int('smtp', 'port')
-    if 'require_auth' in smtp:
-        smtp['require_auth'] = get_bool('smtp', 'require_auth', True)
+    smtp['host'] = smtp.get('host') or ''
+    smtp['port'] = get_int('smtp', 'port', 587)
+    smtp['user'] = smtp.get('user') or ''
+    smtp['password'] = ''
+    smtp['sender_email'] = smtp.get('sender_email') or ''
+    smtp['require_auth'] = get_bool('smtp', 'require_auth', True)
+    smtp['protocol'] = smtp.get('protocol') or 'STARTTLS'
 
     return {
         'currency': currency,
-        'email': get_all_masked('email'),
+        'email': email,
         'itinerary': itinerary,
         'smtp': smtp,
     }

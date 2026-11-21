@@ -20,37 +20,10 @@ const props = defineProps<{
 
 const toast = useToast()
 
-function settingsDraft(source: Settings) {
-  return {
-    currency: {
-      baseCurrency: source.currency?.baseCurrency ?? 'HKD',
-      fxratesApiKey: source.currency?.fxratesApiKey ?? '',
-      cacheTtl: source.currency?.cacheTtl ?? 86400,
-    },
-    email: {
-      recipients: source.email?.recipients ?? '',
-    },
-    itinerary: {
-      disableDeparturedItineraries: source.itinerary?.disableDeparturedItineraries ?? false,
-    },
-    smtp: {
-      host: source.smtp?.host ?? '',
-      port: source.smtp?.port ?? 587,
-      user: source.smtp?.user ?? '',
-      password: '',
-      senderEmail: source.smtp?.senderEmail ?? '',
-      requireAuth: source.smtp?.requireAuth ?? true,
-      protocol: source.smtp?.protocol ?? 'STARTTLS',
-    },
-  }
-}
-
-const initial = settingsDraft(props.settings)
-
-const itineraryForm = useForm(initial.itinerary)
-const currencyForm = useForm(initial.currency)
-const smtpForm = useForm(initial.smtp)
-const emailForm = useForm(initial.email)
+const itineraryForm = useForm({ ...props.settings.itinerary })
+const currencyForm = useForm({ ...props.settings.currency })
+const smtpForm = useForm({ ...props.settings.smtp, password: '' })
+const emailForm = useForm({ ...props.settings.email })
 
 const testEmail = ref({ address: '' })
 
@@ -60,23 +33,11 @@ const ui = ref({
   fxModalOpen: false,
 })
 
-// the redirect back after a save carries fresh props: re-seed every draft, password stays blank
-function reseedFromProps(): void {
-  const draft = settingsDraft(props.settings)
-  Object.assign(itineraryForm, draft.itinerary)
-  Object.assign(currencyForm, draft.currency)
-  Object.assign(smtpForm, draft.smtp)
-  Object.assign(emailForm, draft.email)
-  ui.value.lastSaved = new Date().toLocaleString('zh-HK')
-}
-
 // the page route redirects with the session errors bag; useForm.errors only fills from 422s
 function toastSaveError(): void {
   const errors = usePage().props.errors ?? {}
   toast.error(errors.settings ?? '儲存失敗')
 }
-
-const submitOptions = { preserveScroll: true, onSuccess: reseedFromProps, onError: toastSaveError }
 
 function refreshFxRates() {
   ui.value.loading = 'refresh'
@@ -149,7 +110,14 @@ function sendTestEmail() {
                 .transform((draft) => ({
                   itinerary: { disable_departured_itineraries: draft.disableDeparturedItineraries },
                 }))
-                .post('/settings', submitOptions)
+                .post('/settings', {
+                  preserveScroll: true,
+                  onSuccess: () => {
+                    itineraryForm.defaults(props.settings.itinerary).reset()
+                    ui.lastSaved = new Date().toLocaleString('zh-HK')
+                  },
+                  onError: toastSaveError,
+                })
             "
           >
             <label
@@ -213,7 +181,14 @@ function sendTestEmail() {
                     cache_ttl: draft.cacheTtl,
                   },
                 }))
-                .post('/settings', submitOptions)
+                .post('/settings', {
+                  preserveScroll: true,
+                  onSuccess: () => {
+                    currencyForm.defaults(props.settings.currency).reset()
+                    ui.lastSaved = new Date().toLocaleString('zh-HK')
+                  },
+                  onError: toastSaveError,
+                })
             "
           >
             <fieldset class="fieldset">
@@ -311,7 +286,14 @@ function sendTestEmail() {
                     ...(draft.password && { password: draft.password }),
                   },
                 }))
-                .post('/settings', submitOptions)
+                .post('/settings', {
+                  preserveScroll: true,
+                  onSuccess: () => {
+                    smtpForm.defaults(props.settings.smtp).reset()
+                    ui.lastSaved = new Date().toLocaleString('zh-HK')
+                  },
+                  onError: toastSaveError,
+                })
             "
           >
             <div class="grid gap-4 md:grid-cols-3">
@@ -422,7 +404,7 @@ function sendTestEmail() {
                 <input
                   v-model="smtpForm.password"
                   type="password"
-                  :placeholder="props.settings.smtp?.password ? '留空表示不作更改' : '請輸入密碼'"
+                  placeholder="請輸入密碼"
                   :disabled="!smtpForm.requireAuth"
                   class="input-bordered input w-full"
                 />
@@ -504,7 +486,14 @@ function sendTestEmail() {
             @submit.prevent="
               emailForm
                 .transform((draft) => ({ email: { recipients: draft.recipients } }))
-                .post('/settings', submitOptions)
+                .post('/settings', {
+                  preserveScroll: true,
+                  onSuccess: () => {
+                    emailForm.defaults(props.settings.email).reset()
+                    ui.lastSaved = new Date().toLocaleString('zh-HK')
+                  },
+                  onError: toastSaveError,
+                })
             "
           >
             <fieldset class="fieldset">

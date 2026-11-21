@@ -8,11 +8,11 @@ const defaultProps = {
     currency: { baseCurrency: 'HKD', fxratesApiKey: '', cacheTtl: 86400 },
     email: { recipients: '' },
     itinerary: { disableDeparturedItineraries: true },
-    search: {},
     smtp: {
       host: '',
       port: 587,
       user: '',
+      password: '',
       senderEmail: '',
       requireAuth: true,
       protocol: 'STARTTLS',
@@ -45,6 +45,7 @@ describe('Settings/Index', () => {
     return vi.mocked(router.post).mock.calls.at(-1)?.[2] as {
       onSuccess?: () => void
       onError?: (errors: Record<string, string>) => void
+      onFinish?: () => void
     }
   }
 
@@ -170,6 +171,67 @@ describe('Settings/Index', () => {
         protocol: 'STARTTLS',
       },
     })
+  })
+
+  it('marks only the submitted section as loading', async () => {
+    const wrapper = mount(SettingsIndexPage, {
+      props: defaultProps,
+      global: { stubs: globalStubs },
+    })
+
+    await wrapper.findAll('form')[1].trigger('submit')
+
+    const submitButtons = wrapper.findAll('form button[type="submit"]')
+    expect(submitButtons[1].text()).toContain('儲存中...')
+    expect(submitButtons[1].attributes('disabled')).toBeDefined()
+    expect(wrapper.text().split('儲存中...').length - 1).toBe(1)
+    expect(submitButtons[0].attributes('disabled')).toBeUndefined()
+    expect(submitButtons[2].attributes('disabled')).toBeUndefined()
+    expect(submitButtons[3].attributes('disabled')).toBeUndefined()
+  })
+
+  it('clears the section loading state when the visit finishes', async () => {
+    const wrapper = mount(SettingsIndexPage, {
+      props: defaultProps,
+      global: { stubs: globalStubs },
+    })
+
+    await wrapper.findAll('form')[1].trigger('submit')
+    lastSaveOptions().onFinish?.()
+    await flushPromises()
+
+    const submitButtons = wrapper.findAll('form button[type="submit"]')
+    expect(submitButtons[1].text()).not.toContain('儲存中...')
+    expect(submitButtons[1].attributes('disabled')).toBeUndefined()
+  })
+
+  it('keeps unsaved edits in other sections after a save succeeds', async () => {
+    const wrapper = mount(SettingsIndexPage, {
+      props: defaultProps,
+      global: { stubs: globalStubs },
+    })
+    const recipients = wrapper.findAll('form')[3].find('textarea')
+    await recipients.setValue('unsaved@example.com')
+
+    await wrapper.findAll('form')[1].trigger('submit')
+    lastSaveOptions().onSuccess?.()
+    await flushPromises()
+
+    expect((wrapper.findAll('form')[3].find('textarea').element as HTMLTextAreaElement).value).toBe(
+      'unsaved@example.com',
+    )
+  })
+
+  it('shows the last-saved time after a section save succeeds', async () => {
+    const wrapper = mount(SettingsIndexPage, {
+      props: defaultProps,
+      global: { stubs: globalStubs },
+    })
+    await wrapper.findAll('form')[1].trigger('submit')
+    lastSaveOptions().onSuccess?.()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('✓ 最後儲存於')
   })
 
   it('leaves the success toast to the server flash router', async () => {
