@@ -11,6 +11,7 @@ from sqlalchemy.orm import selectinload
 
 from src.extensions.database import FareSnapshot, Flight, Itinerary, db
 from src.schemas.itinerary import ItineraryCreate, ItinerarySettings, ItineraryStatus
+from src.services.errors import InvalidFieldsError
 from src.services.fx_rates import (
     FXRatesError,
     convert_amount,
@@ -130,12 +131,7 @@ def create() -> ResponseReturnValue:
 
 
 @itineraries_bp.route('', methods=['POST'])
-@validated(
-    ItineraryCreate,
-    error_key='itinerary',
-    error_copy='請檢查輸入內容',
-    redirect_to='/itineraries/create',
-)
+@validated(ItineraryCreate, redirect_to='/itineraries/create')
 def create_submit() -> ResponseReturnValue:
     payload: ItineraryCreate = g.validated
     try:
@@ -144,16 +140,14 @@ def create_submit() -> ResponseReturnValue:
             today=datetime.now(g.tz).date(),
         )
         db.session.commit()
-        logger.info('created itinerary from page form: id=%s', itinerary.id)
-
-        flash('已成功建立票價追蹤', 'success')
-        return redirect('/')
-    except (KeyError, TypeError, ValueError) as exc:
+    except Exception:
         db.session.rollback()
-        logger.info('invalid itinerary submission: error=%s', exc)
+        raise
 
-        session['errors'] = {'itinerary': '請檢查輸入內容'}
-        return redirect('/itineraries/create')
+    logger.info('created itinerary from page form: id=%s', itinerary.id)
+
+    flash('已成功建立票價追蹤', 'success')
+    return redirect('/')
 
 
 @itineraries_bp.route('/<itinerary_id>')
@@ -204,8 +198,8 @@ def update_itinerary(itinerary_id: str) -> ResponseReturnValue:
                 itinerary.flights[0].flight_date if itinerary.flights else None,
                 today=datetime.now(g.tz).date(),
             )
-        except ValueError as exc:
-            errors['deadline'] = str(exc)
+        except InvalidFieldsError as exc:
+            errors['deadline'] = exc.errors[0].message
         else:
             itinerary.deadline = payload.deadline
 
@@ -227,7 +221,7 @@ def update_itinerary(itinerary_id: str) -> ResponseReturnValue:
 
 
 @itineraries_bp.route('/<itinerary_id>/status', methods=['PATCH'])
-@validated(ItineraryStatus, error_key='status', redirect_to='/itineraries/{itinerary_id}')
+@validated(ItineraryStatus, redirect_to='/itineraries/{itinerary_id}')
 def update_status(itinerary_id: str) -> ResponseReturnValue:
     itinerary = db.session.execute(
         select(Itinerary).where(Itinerary.id == itinerary_id)

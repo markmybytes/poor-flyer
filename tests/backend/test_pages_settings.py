@@ -4,6 +4,7 @@ from unittest.mock import patch
 import pytest
 
 from src.services import setting
+from src.services.errors import FieldIssue, InvalidFieldsError
 
 INERTIA_HEADERS = {'X-Inertia': 'true', 'X-Inertia-Version': ''}
 
@@ -162,6 +163,31 @@ def test_settings_index_props_flags_and_numbers_are_typed(client, app):
     assert settings['smtp']['requireAuth'] is True
 
 
+def test_settings_index_still_reads_legacy_store_tokens(client, app):
+    # store-side normalization keeps rows written before the schema took over
+    with app.app_context():
+        setting.set_many('itinerary', {'disable_departured_itineraries': 'yes'})
+        setting.set_many('smtp', {'require_auth': 'on'})
+
+        with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
+            props = client.get('/settings/', headers=INERTIA_HEADERS).get_json()['props']
+
+    assert props['settings']['itinerary']['disableDeparturedItineraries'] is True
+    assert props['settings']['smtp']['requireAuth'] is True
+
+
+def test_settings_index_retired_enable_tokens_read_false(client, app):
+    with app.app_context():
+        setting.set_many('itinerary', {'disable_departured_itineraries': 'enable'})
+        setting.set_many('smtp', {'require_auth': 'enabled'})
+
+        with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
+            props = client.get('/settings/', headers=INERTIA_HEADERS).get_json()['props']
+
+    assert props['settings']['itinerary']['disableDeparturedItineraries'] is False
+    assert props['settings']['smtp']['requireAuth'] is False
+
+
 def test_settings_save_accepts_boolean_flags(client, app):
     resp = client.post(
         '/settings',
@@ -182,9 +208,23 @@ def test_settings_save_accepts_boolean_flags(client, app):
 
 @pytest.mark.parametrize(
     ('token', 'stored'),
-    [('true', 'true'), ('1', 'true'), ('false', 'false'), ('0', 'false')],
+    [
+        ('true', 'true'),
+        ('TRUE', 'true'),
+        ('1', 'true'),
+        ('yes', 'true'),
+        ('y', 'true'),
+        ('t', 'true'),
+        ('on', 'true'),
+        ('false', 'false'),
+        ('0', 'false'),
+        ('no', 'false'),
+        ('n', 'false'),
+        ('f', 'false'),
+        ('off', 'false'),
+    ],
 )
-def test_settings_save_tolerates_legacy_flag_tokens(client, app, token, stored):
+def test_settings_save_accepts_native_flag_tokens(client, app, token, stored):
     resp = client.post(
         '/settings',
         data=json.dumps({'itinerary': {'disable_departured_itineraries': token}}),
@@ -194,6 +234,43 @@ def test_settings_save_tolerates_legacy_flag_tokens(client, app, token, stored):
     assert resp.status_code == 302
     with app.app_context():
         assert setting.get('itinerary', 'disable_departured_itineraries') == stored
+
+
+@pytest.mark.parametrize(
+    ('section', 'field', 'token', 'bag_key'),
+    [
+        (
+            'itinerary',
+            'disable_departured_itineraries',
+            'enable',
+            'itinerary.disableDeparturedItineraries',
+        ),
+        (
+            'itinerary',
+            'disable_departured_itineraries',
+            None,
+            'itinerary.disableDeparturedItineraries',
+        ),
+        ('smtp', 'require_auth', 'enabled', 'smtp.requireAuth'),
+        ('smtp', 'require_auth', None, 'smtp.requireAuth'),
+    ],
+)
+def test_settings_save_rejects_store_tokens_and_explicit_null(
+    client, app, section, field, token, bag_key
+):
+    with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
+        resp = client.post(
+            '/settings',
+            data=json.dumps({section: {field: token}}),
+            content_type='application/json',
+            headers=INERTIA_HEADERS,
+        )
+
+    assert resp.status_code == 302
+    assert resp.headers['Location'] == '/settings/'
+    with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
+        props = client.get('/settings/', headers=INERTIA_HEADERS).get_json()['props']
+    assert props['errors'] == {bag_key: '格式不正確'}
 
 
 def test_settings_save_invalid_currency_redirects_with_errors(client, app):
@@ -211,4 +288,58 @@ def test_settings_save_invalid_currency_redirects_with_errors(client, app):
     with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
         data = client.get('/settings/', headers=INERTIA_HEADERS).get_json()
     assert data['component'] == 'Settings/Index'
-    assert data['props']['errors']['settings'] == 'Unsupported base currency'
+    assert data['props']['errors'] == {'baseCurrency': '不支援的基準貨幣'}
+
+
+def test_settings_service_errors_map_every_field_at_once(client, app, mocker):
+    mocker.patch(
+        'src.routes.pages.settings.setting.update',
+        side_effect=InvalidFieldsError(
+            [
+                FieldIssue('base_currency', '不支援的基準貨幣'),
+                FieldIssue('cache_ttl', '快取有效時間必須是大於 0 的整數'),
+            ]
+        ),
+    )
+
+    resp = client.post(
+        '/settings',
+        data=json.dumps({'currency': {'base_currency': 'XXX'}}),
+        content_type='application/json',
+        headers=INERTIA_HEADERS,
+    )
+
+    assert resp.status_code == 302
+    with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
+        props = client.get('/settings/', headers=INERTIA_HEADERS).get_json()['props']
+    assert props['errors'] == {
+        'baseCurrency': '不支援的基準貨幣',
+        'cacheTtl': '快取有效時間必須是大於 0 的整數',
+    }
+
+
+@pytest.mark.parametrize(
+    ('field', 'message', 'bag_key'),
+    [
+        ('cache_ttl', '快取有效時間必須是大於 0 的整數', 'cacheTtl'),
+        ('port', 'SMTP 連接埠必須是整數', 'port'),
+    ],
+)
+def test_settings_service_error_maps_to_its_field(client, app, mocker, field, message, bag_key):
+    mocker.patch(
+        'src.routes.pages.settings.setting.update',
+        side_effect=InvalidFieldsError([FieldIssue(field=field, message=message)]),
+    )
+
+    resp = client.post(
+        '/settings',
+        data=json.dumps({'smtp': {'port': '587'}}),
+        content_type='application/json',
+        headers=INERTIA_HEADERS,
+    )
+
+    assert resp.status_code == 302
+    assert resp.headers['Location'] == '/settings/'
+    with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
+        props = client.get('/settings/', headers=INERTIA_HEADERS).get_json()['props']
+    assert props['errors'] == {bag_key: message}

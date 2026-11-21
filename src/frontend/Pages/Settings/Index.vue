@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AppLayout from '@/Layouts/AppLayout.vue'
+import FieldError from '@/Components/FieldError.vue'
 import type { Settings } from '@/types'
 import { formatLocalDateTime } from '@/utils/timezone'
 import { router, useForm, usePage } from '@inertiajs/vue3'
@@ -241,6 +242,8 @@ function sendTestEmail() {
                   {{ code }}
                 </option>
               </select>
+
+              <FieldError field="baseCurrency" />
             </fieldset>
 
             <fieldset class="fieldset">
@@ -254,6 +257,8 @@ function sendTestEmail() {
                 type="text"
                 class="input-bordered input w-full"
               />
+
+              <FieldError field="fxratesApiKey" />
 
               <p class="label text-xs text-base-content/55">
                 留空時系統仍會嘗試獲取匯率數據。若失敗，請到 FXRatesAPI 註冊以取得 API 金鑰。
@@ -269,6 +274,8 @@ function sendTestEmail() {
                 min="1"
                 class="input-bordered input w-full"
               />
+
+              <FieldError field="cacheTtl" />
 
               <p class="label text-xs text-base-content/55">
                 快取時間愈短，匯率數據愈貼近現實，但亦會增加 API 查詢次數。建議根據 FXRatesAPI
@@ -319,6 +326,8 @@ function sendTestEmail() {
                     placeholder="mail.example.com"
                     class="input-bordered input w-full"
                   />
+
+                  <FieldError field="host" />
                 </fieldset>
               </div>
 
@@ -332,6 +341,8 @@ function sendTestEmail() {
                     placeholder="587"
                     class="input-bordered input w-full"
                   />
+
+                  <FieldError field="port" />
                 </fieldset>
               </div>
             </div>
@@ -349,6 +360,8 @@ function sendTestEmail() {
                 class="input-bordered input w-full"
               />
 
+              <FieldError field="senderEmail" />
+
               <p class="label text-xs text-base-content/55">
                 留空則預設使用登入的用戶名稱作為寄件者電郵
               </p>
@@ -362,6 +375,8 @@ function sendTestEmail() {
 
                 <option value="SMTP_SSL">SSL / 無加密</option>
               </select>
+
+              <FieldError field="protocol" />
             </fieldset>
 
             <label
@@ -377,6 +392,8 @@ function sendTestEmail() {
                 </p>
               </div>
             </label>
+
+            <FieldError field="requireAuth" />
 
             <div
               :class="[
@@ -396,6 +413,8 @@ function sendTestEmail() {
                   :disabled="!smtpForm.requireAuth"
                   class="input-bordered input w-full"
                 />
+
+                <FieldError field="user" />
               </fieldset>
 
               <fieldset class="fieldset">
@@ -491,6 +510,8 @@ function sendTestEmail() {
                 rows="4"
                 class="textarea-bordered textarea w-full"
               ></textarea>
+
+              <FieldError field="recipients" />
 
               <p class="label text-xs text-base-content/55">每行填寫一個電郵地址</p>
             </fieldset>

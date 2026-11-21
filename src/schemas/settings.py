@@ -1,8 +1,8 @@
 """Pydantic models for settings write payloads.
 
-Flags use `utils.transform.to_bool` (the lenient store vocabulary: real booleans and
-legacy string tokens). Numeric copies match the service's checks so the page's error
-bag keeps its current wording.
+Flags use pydantic's native bool vocabulary and reject an explicit null; legacy stored
+values are only normalized store-side, by `utils.transform.to_bool`. Numeric copies match
+the service's checks so the page's error bag keeps its current wording.
 """
 
 from __future__ import annotations
@@ -11,18 +11,24 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict
 
-from src.utils.transform import to_bool
 
-Flag = Annotated[bool | None, BeforeValidator(to_bool)]
+def _reject_none(value: Any) -> Any:
+    """Reject an explicit null; absent keys never reach the validator."""
+    if value is None:
+        raise ValueError('格式不正確')
+    return value
+
+
+Flag = Annotated[bool | None, BeforeValidator(_reject_none)]
 
 
 def _cache_ttl(value: Any) -> int:
     try:
         ttl = int(value)
     except TypeError, ValueError:
-        raise ValueError('Cache TTL must be an integer greater than 0') from None
+        raise ValueError('快取有效時間必須是大於 0 的整數') from None
     if ttl <= 0:
-        raise ValueError('Cache TTL must be an integer greater than 0')
+        raise ValueError('快取有效時間必須是大於 0 的整數')
     return ttl
 
 
@@ -30,7 +36,7 @@ def _port(value: Any) -> int:
     try:
         return int(value)
     except TypeError, ValueError:
-        raise ValueError('SMTP port must be an integer') from None
+        raise ValueError('SMTP 連接埠必須是整數') from None
 
 
 class CurrencySection(BaseModel):

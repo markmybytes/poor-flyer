@@ -11,6 +11,7 @@ from sqlalchemy import select
 
 from src.extensions.cache import cache
 from src.extensions.database import Config, db
+from src.services.errors import FieldIssue, InvalidFieldsError
 from src.utils.transform import to_bool
 
 logger = logging.getLogger(__name__)
@@ -48,7 +49,7 @@ def get_bool(namespace: str, key: str, default: bool | None = None) -> bool | No
     val = get(namespace, key)
     if val is None:
         return default
-    return val.lower() in ('1', 'enable', 'enabled', 'true', 'yes', 'y', 'on')
+    return to_bool(val)
 
 
 def set(namespace: str, key: str, value: str) -> None:
@@ -120,24 +121,45 @@ def get_page_settings() -> dict[str, dict[str, Any]]:
     }
 
 
-def update(data: Mapping[str, Any]) -> None:  # noqa: C901 - four independent sections, each ~5 branches
-    """Apply a partial settings payload, raising ValueError on invalid values."""
+def update(data: Mapping[str, Any]) -> None:  # noqa: C901, PLR0915 - flat sections, no nesting to extract
+    """Apply a partial settings payload, raising InvalidFieldsError with every invalid value."""
     from src.services.fx_rates import SUPPORTED_CURRENCIES
 
-    if 'currency' in data and (currency_data := data['currency'] or {}):
+    currency_data = data.get('currency') or {}
+    smtp_data = data.get('smtp') or {}
+
+    # validate every section before the first write: a bad value never leaves half a payload
+    base: str | None = None
+    ttl: int | None = None
+    port: int | None = None
+    errors: list[FieldIssue] = []
+    if 'base_currency' in currency_data:
+        base = (currency_data.get('base_currency') or 'HKD').strip().upper()
+        if base not in SUPPORTED_CURRENCIES:
+            errors.append(FieldIssue('base_currency', '不支援的基準貨幣'))
+    if 'cache_ttl' in currency_data:
+        try:
+            ttl = int(currency_data.get('cache_ttl'))
+        except TypeError, ValueError:
+            ttl = None
+        if ttl is None or ttl <= 0:
+            errors.append(FieldIssue('cache_ttl', '快取有效時間必須是大於 0 的整數'))
+    if 'port' in smtp_data:
+        try:
+            port = int(smtp_data.get('port'))
+        except TypeError, ValueError:
+            port = None
+        if port is None:
+            errors.append(FieldIssue('port', 'SMTP 連接埠必須是整數'))
+
+    if errors:
+        raise InvalidFieldsError(errors)
+
+    if currency_data:
         existing = (get_all_masked('currency') or {}).copy()
-        if 'base_currency' in currency_data:
-            base = (currency_data.get('base_currency') or 'HKD').strip().upper()
-            if base not in SUPPORTED_CURRENCIES:
-                raise ValueError('Unsupported base currency')
+        if base is not None:
             existing['base_currency'] = base
-        if 'cache_ttl' in currency_data:
-            try:
-                ttl = int(currency_data.get('cache_ttl'))
-            except TypeError, ValueError:
-                raise ValueError('Cache TTL must be an integer greater than 0') from None
-            if ttl <= 0:
-                raise ValueError('Cache TTL must be an integer greater than 0')
+        if ttl is not None:
             existing['cache_ttl'] = str(ttl)
         if 'fxrates_api_key' in currency_data:
             existing['fxrates_api_key'] = (currency_data.get('fxrates_api_key') or '').strip()
@@ -157,7 +179,7 @@ def update(data: Mapping[str, Any]) -> None:  # noqa: C901 - four independent se
             )
         set_many('itinerary', existing)
 
-    if 'smtp' in data and (smtp_data := data['smtp'] or {}):
+    if smtp_data:
         # password excluded from the merge base: the masked '***' placeholder
         # must never overwrite a stored password; only a re-typed value does
         existing = {
@@ -166,11 +188,8 @@ def update(data: Mapping[str, Any]) -> None:  # noqa: C901 - four independent se
         for field in ['host', 'user', 'sender_email', 'protocol']:
             if field in smtp_data:
                 existing[field] = smtp_data.get(field, '')
-        if 'port' in smtp_data:
-            try:
-                existing['port'] = str(int(smtp_data.get('port')))
-            except TypeError, ValueError:
-                raise ValueError('SMTP port must be an integer') from None
+        if port is not None:
+            existing['port'] = str(port)
         if 'require_auth' in smtp_data:
             existing['require_auth'] = 'true' if to_bool(smtp_data.get('require_auth')) else 'false'
         submitted_pwd = smtp_data.get('password')

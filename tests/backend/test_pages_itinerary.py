@@ -7,6 +7,7 @@ from fli.models.airline import AIRLINE_NAMES
 
 from src.extensions.database import FareSnapshot, Flight, Itinerary, db
 from src.routes.pages.itinerary import _serialize_itinerary
+from src.utils.transform import to_camel
 
 INERTIA_HEADERS = {'X-Inertia': 'true', 'X-Inertia-Version': ''}
 
@@ -279,7 +280,7 @@ def test_itinerary_create_submit_invalid_payload_redirects_with_errors(client, a
 
     data = client.get('/itineraries/create', headers=INERTIA_HEADERS).get_json()
     assert data['component'] == 'Itineraries/Create'
-    assert data['props']['errors']['itinerary'] == '請檢查輸入內容'
+    assert data['props']['errors']['cabinClass'] == '艙等無效'
     assert 'airlines' in data['props']
 
 
@@ -303,7 +304,113 @@ def test_itinerary_create_submit_past_deadline_redirects_with_errors(client, app
         assert db.session.query(Itinerary).count() == 0
 
     data = client.get('/itineraries/create', headers=INERTIA_HEADERS).get_json()
-    assert data['props']['errors'] == {'itinerary': '請檢查輸入內容'}
+    assert data['props']['errors'] == {'deadline': '購票限期不能早於今天'}
+
+
+def test_itinerary_create_submit_reports_every_failing_field(client, app):
+    resp = client.post(
+        '/itineraries',
+        data=json.dumps(
+            {
+                'trip_type': 'SINGLE',
+                'flights': [
+                    {'origin': 'HK', 'destination': 'NRT', 'flight_date': '2025-12-01'},
+                    {'origin': 'HKG', 'destination': 'NRT', 'flight_date': '2025-02-30'},
+                ],
+            }
+        ),
+        content_type='application/json',
+        headers=INERTIA_HEADERS,
+    )
+
+    assert resp.status_code == 302
+    with app.app_context():
+        assert db.session.query(Itinerary).count() == 0
+    errors = client.get('/itineraries/create', headers=INERTIA_HEADERS).get_json()['props'][
+        'errors'
+    ]
+    assert errors == {
+        'flights.0.origin': 'IATA 代碼無效',
+        'flights.1.flightDate': '航班日期無效',
+    }
+
+
+def test_itinerary_create_submit_reports_every_service_failure_at_once(client, app):
+    resp = client.post(
+        '/itineraries',
+        data=json.dumps(
+            {
+                'trip_type': 'SINGLE',
+                'deadline': (date.today() - timedelta(days=1)).isoformat(),
+                'cabin_class': 'SUITE',
+                'max_stops': 'FIVE_STOPS',
+                'flights': [{'origin': 'HKG', 'destination': 'NRT', 'flight_date': '2025-12-01'}],
+            }
+        ),
+        content_type='application/json',
+        headers=INERTIA_HEADERS,
+    )
+
+    assert resp.status_code == 302
+    with app.app_context():
+        assert db.session.query(Itinerary).count() == 0
+    errors = client.get('/itineraries/create', headers=INERTIA_HEADERS).get_json()['props'][
+        'errors'
+    ]
+    assert errors == {
+        'deadline': '購票限期不能早於今天',
+        'cabinClass': '艙等無效',
+        'maxStops': '轉機次數無效',
+    }
+
+
+@pytest.mark.parametrize(
+    ('payload', 'field', 'message'),
+    [
+        (
+            {
+                'trip_type': 'SINGLE',
+                'cabin_class': 'SUITE',
+                'flights': [{'origin': 'HKG', 'destination': 'NRT', 'flight_date': '2025-12-01'}],
+            },
+            'cabinClass',
+            '艙等無效',
+        ),
+        (
+            {
+                'trip_type': 'SINGLE',
+                'max_stops': 'FIVE_STOPS',
+                'flights': [{'origin': 'HKG', 'destination': 'NRT', 'flight_date': '2025-12-01'}],
+            },
+            'maxStops',
+            '轉機次數無效',
+        ),
+        (
+            {
+                'trip_type': 'SINGLE',
+                'deadline': (date.today() - timedelta(days=1)).isoformat(),
+                'flights': [{'origin': 'HKG', 'destination': 'NRT', 'flight_date': '2025-12-01'}],
+            },
+            'deadline',
+            '購票限期不能早於今天',
+        ),
+    ],
+)
+def test_itinerary_create_service_error_maps_to_its_field(client, app, payload, field, message):
+    resp = client.post(
+        '/itineraries',
+        data=json.dumps(payload),
+        content_type='application/json',
+        headers=INERTIA_HEADERS,
+    )
+
+    assert resp.status_code == 302
+    with app.app_context():
+        assert db.session.query(Itinerary).count() == 0
+    errors = client.get('/itineraries/create', headers=INERTIA_HEADERS).get_json()['props'][
+        'errors'
+    ]
+    assert errors == {field: message}
 
 
 def test_itinerary_show_renders_detail_component(client, app):
@@ -463,7 +570,7 @@ def test_itinerary_update_past_deadline_redirects_with_detail_props(client, app)
     assert resp.headers['Location'].endswith(f'/itineraries/{iid}')
     data = client.get(f'/itineraries/{iid}', headers=INERTIA_HEADERS).get_json()
     assert data['component'] == 'Itineraries/Detail'
-    assert data['props']['errors'] == {'deadline': 'Deadline must not be in the past'}
+    assert data['props']['errors'] == {'deadline': '購票限期不能早於今天'}
     assert data['props']['itinerary']['id'] == iid
     assert 'baseCurrency' in data['props']
     with app.app_context():
@@ -485,7 +592,7 @@ def test_itinerary_update_deadline_after_departure_redirects_with_errors(client,
 
     assert resp.status_code == 303
     data = client.get(f'/itineraries/{iid}', headers=INERTIA_HEADERS).get_json()
-    assert data['props']['errors'] == {'deadline': 'Deadline must not be after the first departure'}
+    assert data['props']['errors'] == {'deadline': '購票限期不能晚於首程出發日期'}
 
 
 @pytest.mark.parametrize('offset', [0, 30])
@@ -521,7 +628,7 @@ def test_itinerary_update_invalid_deadline_format_redirects_with_errors(client, 
 
     assert resp.status_code == 303
     data = client.get(f'/itineraries/{iid}', headers=INERTIA_HEADERS).get_json()
-    assert data['props']['errors'] == {'deadline': 'Deadline must be a valid date'}
+    assert data['props']['errors'] == {'deadline': '購票限期日期無效'}
 
 
 @pytest.mark.parametrize(
@@ -567,7 +674,7 @@ def test_itinerary_update_invalid_notify_per_leg_redirects_with_errors(client, a
 
     assert resp.status_code == 303
     data = client.get(f'/itineraries/{iid}', headers=INERTIA_HEADERS).get_json()
-    assert data['props']['errors'] == {'notifyPerLeg': 'Invalid notify_per_leg'}
+    assert data['props']['errors'] == {'notifyPerLeg': '格式不正確'}
     with app.app_context():
         assert db.session.get(Itinerary, iid).notify_per_leg is True
 
@@ -627,7 +734,7 @@ def test_page_errors_are_consumed_on_first_render(client, app):
     first = client.get(f'/itineraries/{iid}', headers=INERTIA_HEADERS).get_json()
     second = client.get(f'/itineraries/{iid}', headers=INERTIA_HEADERS).get_json()
 
-    assert first['props']['errors'] == {'deadline': 'Deadline must be a valid date'}
+    assert first['props']['errors'] == {'deadline': '購票限期日期無效'}
     assert second['props']['errors'] == {}
 
 
@@ -721,7 +828,7 @@ def test_itinerary_create_submit_requires_a_flight(client, app, payload):
     with app.app_context():
         assert db.session.query(Itinerary).count() == 0
     data = client.get('/itineraries/create', headers=INERTIA_HEADERS).get_json()
-    assert data['props']['errors'] == {'itinerary': '請檢查輸入內容'}
+    assert set(data['props']['errors']) == {'flights'}
 
 
 def test_itinerary_create_submit_rejects_form_encoded_legs(client, app):
@@ -737,7 +844,7 @@ def test_itinerary_create_submit_rejects_form_encoded_legs(client, app):
     with app.app_context():
         assert db.session.query(Itinerary).count() == 0
     data = client.get('/itineraries/create', headers=INERTIA_HEADERS).get_json()
-    assert data['props']['errors'] == {'itinerary': '請檢查輸入內容'}
+    assert set(data['props']['errors']) == {'flights'}
 
 
 def test_itinerary_create_submit_invalid_notify_redirects_with_errors(client, app):
@@ -756,7 +863,7 @@ def test_itinerary_create_submit_invalid_notify_redirects_with_errors(client, ap
 
     assert resp.status_code == 302
     data = client.get('/itineraries/create', headers=INERTIA_HEADERS).get_json()
-    assert data['props']['errors'] == {'itinerary': '請檢查輸入內容'}
+    assert data['props']['errors'] == {'notifyPerLeg': '格式不正確'}
     with app.app_context():
         assert db.session.query(Itinerary).count() == 0
 
@@ -783,7 +890,7 @@ def test_itinerary_create_submit_deadline_after_departure_redirects_with_errors(
         assert db.session.query(Itinerary).count() == 0
 
     data = client.get('/itineraries/create', headers=INERTIA_HEADERS).get_json()
-    assert data['props']['errors'] == {'itinerary': '請檢查輸入內容'}
+    assert data['props']['errors'] == {'deadline': '購票限期不能晚於首程出發日期'}
 
 
 @pytest.mark.parametrize('offset', [0, 30])
@@ -827,7 +934,7 @@ def test_itinerary_create_submit_invalid_deadline_format_redirects_with_errors(c
         assert db.session.query(Itinerary).count() == 0
 
     data = client.get('/itineraries/create', headers=INERTIA_HEADERS).get_json()
-    assert data['props']['errors'] == {'itinerary': '請檢查輸入內容'}
+    assert data['props']['errors'] == {'deadline': '購票限期日期無效'}
 
 
 def _patch_status(client, itinerary_id, payload, **headers):
@@ -965,7 +1072,8 @@ def test_status_rejects_unsupported_fields(client, app, payload):
         assert unchanged.max_stops == 'NON_STOP'
         assert unchanged.airlines == ['CX']
     props = client.get(f'/itineraries/{iid}', headers=INERTIA_HEADERS).get_json()['props']
-    assert props['errors']['status'].startswith('Unsupported field: ')
+    unsupported = {to_camel(field): field for field in set(payload) - {'is_active', 'archived'}}
+    assert props['errors'] == {key: f'不允許的欄位：{field}' for key, field in unsupported.items()}
 
 
 @pytest.mark.parametrize(
@@ -995,7 +1103,7 @@ def test_status_invalid_token_reports_error_and_keeps_state(client, app):
     with app.app_context():
         assert db.session.get(Itinerary, iid).is_active is True
     props = client.get(f'/itineraries/{iid}', headers=INERTIA_HEADERS).get_json()['props']
-    assert props['errors'] == {'status': 'Invalid is_active'}
+    assert props['errors'] == {'isActive': '格式不正確'}
 
 
 def test_status_archive_keeps_existing_deadline(client, app):

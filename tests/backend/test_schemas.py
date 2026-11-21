@@ -15,29 +15,46 @@ def _create(**overrides):
 
 @pytest.mark.parametrize(
     ('token', 'expected'),
-    [(True, True), ('true', True), ('1', True), (False, False), ('false', False), ('0', False)],
+    [
+        (True, True),
+        ('true', True),
+        ('TRUE', True),
+        ('t', True),
+        ('1', True),
+        (1, True),
+        ('yes', True),
+        ('y', True),
+        ('on', True),
+        (False, False),
+        ('false', False),
+        ('F', False),
+        ('0', False),
+        (0, False),
+        ('no', False),
+        ('n', False),
+        ('off', False),
+    ],
 )
-def test_create_bool_tokens(token, expected):
+def test_create_bool_tokens_use_pydantic_lax_vocabulary(token, expected):
     model = _create(is_active=token, notify_per_leg=token)
     assert model.is_active is expected
     assert model.notify_per_leg is expected
 
 
 @pytest.mark.parametrize(
-    ('field', 'copy'),
-    [('is_active', 'Invalid is_active'), ('notify_per_leg', 'Invalid notify_per_leg')],
+    ('model', 'payload'),
+    [
+        (ItineraryCreate, {'flights': [LEG], 'is_active': 'maybe'}),
+        (ItineraryCreate, {'flights': [LEG], 'notify_per_leg': 'maybe'}),
+        (ItinerarySettings, {'notify_per_leg': 'maybe'}),
+        (ItineraryStatus, {'is_active': 'maybe'}),
+        (ItineraryStatus, {'archived': 'maybe'}),
+    ],
 )
-def test_create_bool_copy_is_pinned(field, copy):
+def test_invalid_bool_tokens_fail_bool_parsing(model, payload):
     with pytest.raises(ValidationError) as caught:
-        _create(**{field: 'maybe'})
-    assert caught.value.errors()[0]['ctx']['error'].args[0] == copy
-
-
-@pytest.mark.parametrize('token', ['on', 'off', 'yes', 'no', 't', 'f', 'enable'])
-def test_create_bool_tokens_stay_strict(token):
-    # pydantic's lax bool would accept these; parse_bool's vocabulary must not
-    with pytest.raises(ValidationError):
-        _create(is_active=token)
+        model.model_validate(payload)
+    assert caught.value.errors()[0]['type'] == 'bool_parsing'
 
 
 @pytest.mark.parametrize('code', ['hkg', 'HKG', ' Hkg '])
@@ -96,7 +113,7 @@ def test_flight_date_rejects_garbage(value):
         ItineraryCreate.model_validate(
             {'flights': [{'origin': 'HKG', 'destination': 'NRT', 'flight_date': value}]}
         )
-    assert caught.value.errors()[0]['ctx']['error'].args[0] == 'Invalid flight_date'
+    assert caught.value.errors()[0]['ctx']['error'].args[0] == '航班日期無效'
 
 
 def test_deadline_accepts_lenient_calendar_dates():
@@ -126,7 +143,7 @@ def test_create_empty_deadline_clears(value):
 def test_create_invalid_deadline_copy_is_pinned():
     with pytest.raises(ValidationError) as caught:
         _create(deadline='2026-13-45')
-    assert caught.value.errors()[0]['ctx']['error'].args[0] == 'Deadline must be a valid date'
+    assert caught.value.errors()[0]['ctx']['error'].args[0] == '購票限期日期無效'
 
 
 @pytest.mark.parametrize('payload', [{'trip_type': 'SINGLE'}, {'flights': []}])
@@ -147,11 +164,11 @@ def test_settings_patch_empty_deadline_is_present_and_none():
     assert model.deadline is None
 
 
-def test_settings_patch_notify_token_and_copy():
+def test_settings_patch_notify_null_copy_is_pinned():
     assert ItinerarySettings.model_validate({'notify_per_leg': '0'}).notify_per_leg is False
     with pytest.raises(ValidationError) as caught:
-        ItinerarySettings.model_validate({'notify_per_leg': 'none'})
-    assert caught.value.errors()[0]['ctx']['error'].args[0] == 'Invalid notify_per_leg'
+        ItinerarySettings.model_validate({'notify_per_leg': None})
+    assert caught.value.errors()[0]['ctx']['error'].args[0] == '逐航段通知設定無效'
 
 
 def test_status_absent_keys_when_empty():
@@ -161,12 +178,29 @@ def test_status_absent_keys_when_empty():
 def test_status_unsupported_fields_copy_is_sorted():
     with pytest.raises(ValidationError) as caught:
         ItineraryStatus.model_validate({'zeta': 1, 'alpha': 2, 'is_active': False})
-    assert caught.value.errors()[0]['ctx']['error'].args[0] == 'Unsupported field: alpha, zeta'
+    error = caught.value.errors()[0]
+    assert error['msg'] == '不允許的欄位：alpha, zeta'
+    assert error['ctx'] == {'fields': 'alpha, zeta'}
 
 
 @pytest.mark.parametrize(
     ('token', 'expected'),
-    [(True, True), ('true', True), ('1', True), (False, False), ('false', False), ('0', False)],
+    [
+        (True, True),
+        ('true', True),
+        ('t', True),
+        ('1', True),
+        ('yes', True),
+        ('y', True),
+        ('on', True),
+        (False, False),
+        ('false', False),
+        ('f', False),
+        ('0', False),
+        ('no', False),
+        ('n', False),
+        ('off', False),
+    ],
 )
 def test_status_bool_tokens(token, expected):
     model = ItineraryStatus.model_validate({'archived': token, 'is_active': token})
@@ -174,22 +208,53 @@ def test_status_bool_tokens(token, expected):
     assert model.is_active is expected
 
 
-def test_status_invalid_bool_copy_is_pinned():
-    with pytest.raises(ValidationError) as caught:
-        ItineraryStatus.model_validate({'is_active': 'maybe'})
-    assert caught.value.errors()[0]['ctx']['error'].args[0] == 'Invalid is_active'
-
-
 @pytest.mark.parametrize(
     ('token', 'expected'),
-    [('true', True), ('1', True), ('enable', True), ('yes', True), ('false', False), ('0', False)],
+    [
+        (True, True),
+        ('true', True),
+        ('TRUE', True),
+        ('t', True),
+        ('1', True),
+        (1, True),
+        ('yes', True),
+        ('y', True),
+        ('on', True),
+        (False, False),
+        ('false', False),
+        ('F', False),
+        ('0', False),
+        (0, False),
+        ('no', False),
+        ('n', False),
+        ('off', False),
+    ],
 )
-def test_settings_flags_use_the_lenient_store_vocabulary(token, expected):
+def test_settings_flags_use_pydantic_lax_vocabulary(token, expected):
     model = settings_schemas.SettingsPayload.model_validate(
         {'itinerary': {'disable_departured_itineraries': token}, 'smtp': {'require_auth': token}}
     )
     assert model.itinerary.disable_departured_itineraries is expected
     assert model.smtp.require_auth is expected
+
+
+@pytest.mark.parametrize('token', ['enable', 'ENABLED', 'maybe'])
+def test_settings_only_store_tokens_are_not_input_tokens(token):
+    with pytest.raises(ValidationError) as caught:
+        settings_schemas.SettingsPayload.model_validate(
+            {'itinerary': {'disable_departured_itineraries': token}}
+        )
+    assert caught.value.errors()[0]['type'] == 'bool_parsing'
+
+
+@pytest.mark.parametrize('field', ['disable_departured_itineraries', 'require_auth'])
+def test_settings_explicit_null_flag_is_rejected(field):
+    section = 'itinerary' if field == 'disable_departured_itineraries' else 'smtp'
+    with pytest.raises(ValidationError) as caught:
+        settings_schemas.SettingsPayload.model_validate({section: {field: None}})
+    error = caught.value.errors()[0]
+    assert error['loc'] == (section, field)
+    assert error['ctx']['error'].args[0] == '格式不正確'
 
 
 def test_settings_payload_dump_keeps_only_submitted_keys():
@@ -202,9 +267,9 @@ def test_settings_payload_dump_keeps_only_submitted_keys():
 @pytest.mark.parametrize(
     ('section', 'field', 'value', 'copy'),
     [
-        ('currency', 'cache_ttl', 'abc', 'Cache TTL must be an integer greater than 0'),
-        ('currency', 'cache_ttl', 0, 'Cache TTL must be an integer greater than 0'),
-        ('smtp', 'port', 'abc', 'SMTP port must be an integer'),
+        ('currency', 'cache_ttl', 'abc', '快取有效時間必須是大於 0 的整數'),
+        ('currency', 'cache_ttl', 0, '快取有效時間必須是大於 0 的整數'),
+        ('smtp', 'port', 'abc', 'SMTP 連接埠必須是整數'),
     ],
 )
 def test_settings_numeric_copy_is_pinned(section, field, value, copy):
@@ -275,11 +340,11 @@ def test_declared_keys_only_payloads_still_validate():
 @pytest.mark.parametrize(
     ('model', 'payload', 'copy'),
     [
-        (ItineraryCreate, {'flights': [LEG], 'is_active': None}, 'Invalid is_active'),
-        (ItineraryCreate, {'flights': [LEG], 'notify_per_leg': None}, 'Invalid notify_per_leg'),
-        (ItinerarySettings, {'notify_per_leg': None}, 'Invalid notify_per_leg'),
-        (ItineraryStatus, {'is_active': None}, 'Invalid is_active'),
-        (ItineraryStatus, {'archived': None}, 'Invalid archived'),
+        (ItineraryCreate, {'flights': [LEG], 'is_active': None}, '追蹤狀態無效'),
+        (ItineraryCreate, {'flights': [LEG], 'notify_per_leg': None}, '逐航段通知設定無效'),
+        (ItinerarySettings, {'notify_per_leg': None}, '逐航段通知設定無效'),
+        (ItineraryStatus, {'is_active': None}, '追蹤狀態無效'),
+        (ItineraryStatus, {'archived': None}, '封存狀態無效'),
     ],
 )
 def test_explicit_null_flags_are_rejected(model, payload, copy):

@@ -1,6 +1,6 @@
 import logging
 
-from flask import Blueprint, flash, g, redirect, session
+from flask import Blueprint, flash, g, redirect
 from flask_inertia import render_inertia
 
 from src.schemas.settings import SettingsPayload
@@ -50,14 +50,10 @@ def index():
 
 
 @settings_bp.route('', methods=['POST'])
-@validated(SettingsPayload, error_key='settings', redirect_to='/settings/')
+@validated(SettingsPayload, redirect_to='/settings/')
 def save():
-    try:
-        setting.update(g.validated.model_dump(exclude_unset=True))
-        logger.info('settings updated from page form')
+    setting.update(g.validated.model_dump(exclude_unset=True))
+    logger.info('settings updated from page form')
 
-        flash('設定已儲存', 'success')
-        return redirect('/settings/')
-    except ValueError as exc:
-        session['errors'] = {'settings': str(exc)}
-        return redirect('/settings/')
+    flash('設定已儲存', 'success')
+    return redirect('/settings/')
