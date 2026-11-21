@@ -6,6 +6,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from flask import Flask, current_app, g, get_flashed_messages, request, session
+from pydantic import ValidationError
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from src.cli import dev, run_scheduler
@@ -15,6 +16,7 @@ from src.logging_config import configure_logging
 from src.routes.api import api_bp
 from src.routes.pages import pages_bp
 from src.utils.transform import CamelCaseJSONProvider
+from src.validation import handle_validation_error
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +128,8 @@ def create_app():
     inertia.share('errors', lambda: session.pop('errors', None) or {})
 
     app.before_request(_resolve_timezone)
+
+    app.register_error_handler(ValidationError, handle_validation_error)
 
     app.register_blueprint(pages_bp)
     app.register_blueprint(api_bp)

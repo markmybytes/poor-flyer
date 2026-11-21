@@ -1,24 +1,27 @@
 import logging
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, g, jsonify, render_template
 from flask.typing import ResponseReturnValue
 
+from src.schemas.settings import FxRefresh, TestEmail
 from src.services.fx_rates import (
     FXRatesError,
     get_configured_base_currency,
     get_rates,
 )
 from src.utils.email import get_smtp_config, send_html_email
+from src.validation import validated
 
 logger = logging.getLogger(__name__)
 settings_bp = Blueprint('settings', __name__, url_prefix='/settings')
 
 
 @settings_bp.route('/fx-rates/refresh', methods=['POST'])
+@validated(FxRefresh)
 def refresh_fx_rates() -> ResponseReturnValue:
     try:
-        payload = request.get_json(silent=True) or {}
-        base = (payload.get('base_currency') or get_configured_base_currency()).strip().upper()
+        payload: FxRefresh = g.validated
+        base = (payload.base_currency or get_configured_base_currency()).strip().upper()
         rates = get_rates(base, force_refresh=True)
         return jsonify(
             {
@@ -39,10 +42,10 @@ def refresh_fx_rates() -> ResponseReturnValue:
 
 
 @settings_bp.route('/test-email', methods=['POST'])
+@validated(TestEmail)
 def test_email() -> ResponseReturnValue:
     try:
-        data = request.get_json(silent=True) or request.form.to_dict()
-        recipient = data.get('recipient', '').strip()
+        recipient = g.validated.recipient.strip()
         if not recipient:
             return jsonify({'message': 'Recipient email address is required', 'data': None}), 400
 

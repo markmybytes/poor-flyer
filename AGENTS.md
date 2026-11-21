@@ -25,6 +25,8 @@ Flask 3 + Vue 3 (Inertia SPA) flight-price tracker. Scrapes airline fares daily 
 - `src/routes/{pages,api}` — Inertia page views own reads and mutations; `api/` is the exception surface for isolated interactions: inline state toggles and background actions
 - `src/services/` — domain logic and scheduler jobs
 - `src/utils/` — pure helpers (no Flask globals, no I/O)
+- `src/schemas/` — pydantic models for write payloads (shape, types, pure cross-field rules)
+- `src/validation.py` — `@validated(Model)` bridge: parses/validates the body onto `g.validated`, plus the one `ValidationError` handler that dispatches page/API transports
 - `src/extensions/` — Flask extension singletons + `init_extensions(app)`; SQLAlchemy `Base` / `db` in `database.py`
 - `src/logging_config.py` — `configure_logging(app)`: the one root file handler, log trimming, correlation ids
 - `src/frontend/` — Vue SPA (`Pages/`, `Components/`, `Layouts/`)
