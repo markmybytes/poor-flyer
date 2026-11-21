@@ -9,8 +9,7 @@ from __future__ import annotations
 
 import re
 from datetime import date
-from enum import StrEnum
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator
 
@@ -24,14 +23,6 @@ _IataCode = Annotated[
 ]
 
 
-class TripType(StrEnum):
-    """The create form's three trip types (`Pages/Itineraries/Create.vue`)."""
-
-    SINGLE = 'SINGLE'
-    ROUND_TRIP = 'ROUND_TRIP'
-    MULTI_CITY = 'MULTI_CITY'
-
-
 class FlightPayload(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
@@ -43,7 +34,7 @@ class FlightPayload(BaseModel):
 class ItineraryCreate(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
-    trip_type: TripType = TripType.SINGLE
+    trip_type: Literal['SINGLE', 'ROUND_TRIP', 'MULTI_CITY'] = 'SINGLE'
     deadline: Annotated[
         date | None, BeforeValidator(iso_date('購票限期日期無效', allow_empty=True))
     ] = None
