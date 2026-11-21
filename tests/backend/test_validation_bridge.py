@@ -4,6 +4,8 @@ import json
 from datetime import UTC, datetime
 from unittest.mock import patch
 
+import pytest
+
 from src.extensions.database import Itinerary, db
 
 INERTIA_HEADERS = {'X-Inertia': 'true', 'X-Inertia-Version': ''}
@@ -79,3 +81,49 @@ def test_api_passes_validation_through_to_the_service(client):
 
     assert resp.status_code == 200
     assert resp.get_json()['data']['baseCurrency'] == 'HKD'
+
+
+@pytest.mark.parametrize(
+    'referer',
+    ['http://localhost//evil.example', 'http://localhost/\\evil.example'],
+)
+def test_referrer_that_browsers_normalize_off_origin_falls_back(client, app, referer):
+    iid = _seed_itinerary(app)
+
+    resp = client.patch(
+        f'/itineraries/{iid}/status',
+        data={'is_active': 'maybe'},
+        headers={**INERTIA_HEADERS, 'Referer': referer},
+    )
+
+    assert resp.status_code == 303
+    assert resp.headers['Location'].endswith(f'/itineraries/{iid}')
+
+
+@pytest.mark.parametrize(
+    'payload',
+    [
+        {
+            'trip_type': 'SINGLE',
+            'flights': [{'origin': 'HK', 'destination': 'NRT', 'flight_date': '2026-12-01'}],
+        },
+        {
+            'trip_type': 'BIZARRE',
+            'flights': [{'origin': 'HKG', 'destination': 'NRT', 'flight_date': '2026-12-01'}],
+        },
+    ],
+)
+def test_create_schema_errors_collapse_to_the_itinerary_bag(client, app, payload):
+    resp = client.post(
+        '/itineraries',
+        data=json.dumps(payload),
+        content_type='application/json',
+        headers=INERTIA_HEADERS,
+    )
+
+    assert resp.status_code == 302
+    assert resp.headers['Location'] == '/itineraries/create'
+    with app.app_context():
+        assert db.session.query(Itinerary).count() == 0
+    props = client.get('/itineraries/create', headers=INERTIA_HEADERS).get_json()['props']
+    assert props['errors'] == {'itinerary': '請檢查輸入內容'}
