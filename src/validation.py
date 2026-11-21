@@ -68,19 +68,10 @@ def validated(
 
 
 def _flatten(error: ValidationError) -> dict[str, list[str]]:
-    """Map pydantic errors to full dotted field keys, keeping every message.
-
-    An unknown-key error is model-level (`loc == ()`), so the schema reports the
-    offending names in `ctx['fields']`; split them back into per-field keys.
-    """
+    """Map pydantic errors to full dotted field keys, keeping every message."""
     fields: dict[str, list[str]] = {}
     for item in error.errors():
         ctx = item.get('ctx') or {}
-        if item['type'] == 'unsupported_field':
-            for field in str(ctx['fields']).split(', '):
-                fields.setdefault(field, []).append(f'不允許的欄位：{field}')
-            continue
-
         fields.setdefault(
             '.'.join(
                 str(part)

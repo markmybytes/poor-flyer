@@ -1072,8 +1072,8 @@ def test_status_rejects_unsupported_fields(client, app, payload):
         assert unchanged.max_stops == 'NON_STOP'
         assert unchanged.airlines == ['CX']
     props = client.get(f'/itineraries/{iid}', headers=INERTIA_HEADERS).get_json()['props']
-    unsupported = {to_camel(field): field for field in set(payload) - {'is_active', 'archived'}}
-    assert props['errors'] == {key: f'不允許的欄位：{field}' for key, field in unsupported.items()}
+    unsupported = {to_camel(field) for field in set(payload) - {'is_active', 'archived'}}
+    assert props['errors'] == dict.fromkeys(unsupported, '不允許的欄位')
 
 
 @pytest.mark.parametrize(

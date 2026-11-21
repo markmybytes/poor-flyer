@@ -11,15 +11,7 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict
 
-
-def _reject_none(value: Any) -> Any:
-    """Reject an explicit null; absent keys never reach the validator."""
-    if value is None:
-        raise ValueError('格式不正確')
-    return value
-
-
-Flag = Annotated[bool | None, BeforeValidator(_reject_none)]
+from src.schemas.validators import reject_none
 
 
 def _cache_ttl(value: Any) -> int:
@@ -56,7 +48,9 @@ class EmailSection(BaseModel):
 class ItinerarySection(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
-    disable_departured_itineraries: Flag = None
+    disable_departured_itineraries: Annotated[
+        bool | None, BeforeValidator(reject_none('格式不正確'))
+    ] = None
 
 
 class SmtpSection(BaseModel):
@@ -66,7 +60,7 @@ class SmtpSection(BaseModel):
     port: Annotated[int, BeforeValidator(_port)] | None = None
     user: str | None = None
     sender_email: str | None = None
-    require_auth: Flag = None
+    require_auth: Annotated[bool | None, BeforeValidator(reject_none('格式不正確'))] = None
     protocol: str | None = None
     password: str | None = None
 
