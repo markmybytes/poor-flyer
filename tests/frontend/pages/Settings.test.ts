@@ -222,7 +222,7 @@ describe('Settings/Index', () => {
     )
   })
 
-  it('shows the last-saved time after a section save succeeds', async () => {
+  it('shows a tick only in the section that was saved', async () => {
     const wrapper = mount(SettingsIndexPage, {
       props: defaultProps,
       global: { stubs: globalStubs },
@@ -231,7 +231,26 @@ describe('Settings/Index', () => {
     lastSaveOptions().onSuccess?.()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('✓ 最後儲存於')
+    const forms = wrapper.findAll('form')
+    expect(forms[1].text()).toContain('✓')
+    expect(forms[0].text()).not.toContain('✓')
+    expect(forms[2].text()).not.toContain('✓')
+    expect(forms[3].text()).not.toContain('✓')
+  })
+
+  it('clears the tick when the section is edited again', async () => {
+    const wrapper = mount(SettingsIndexPage, {
+      props: defaultProps,
+      global: { stubs: globalStubs },
+    })
+    const form = wrapper.findAll('form')[1]
+    await form.trigger('submit')
+    lastSaveOptions().onSuccess?.()
+    await flushPromises()
+    expect(form.text()).toContain('✓')
+
+    await form.find('input').trigger('input')
+    expect(form.text()).not.toContain('✓')
   })
 
   it('leaves the success toast to the server flash router', async () => {

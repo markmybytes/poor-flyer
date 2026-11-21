@@ -29,7 +29,10 @@ const testEmail = ref({ address: '' })
 
 const ui = ref({
   loading: null as 'refresh' | 'test-email' | null,
-  lastSaved: null as string | null,
+  saved: { itinerary: false, currency: false, smtp: false, email: false } as Record<
+    'itinerary' | 'currency' | 'smtp' | 'email',
+    boolean
+  >,
   fxModalOpen: false,
 })
 
@@ -105,6 +108,7 @@ function sendTestEmail() {
 
           <form
             class="space-y-5 p-6"
+            @input="ui.saved.itinerary = false"
             @submit.prevent="
               itineraryForm
                 .transform((draft) => ({
@@ -114,7 +118,7 @@ function sendTestEmail() {
                   preserveScroll: true,
                   onSuccess: () => {
                     itineraryForm.defaults(props.settings.itinerary).reset()
-                    ui.lastSaved = new Date().toLocaleString('zh-HK')
+                    ui.saved.itinerary = true
                   },
                   onError: toastSaveError,
                 })
@@ -152,9 +156,7 @@ function sendTestEmail() {
                 {{ itineraryForm.processing ? '儲存中...' : '儲存設定' }}
               </button>
 
-              <p v-if="ui.lastSaved" class="text-xs font-medium text-success">
-                ✓ 最後儲存於 {{ ui.lastSaved }}
-              </p>
+              <span v-if="ui.saved.itinerary" class="text-success" title="已儲存">✓</span>
             </div>
           </form>
         </div>
@@ -172,6 +174,7 @@ function sendTestEmail() {
 
           <form
             class="space-y-5 p-6"
+            @input="ui.saved.currency = false"
             @submit.prevent="
               currencyForm
                 .transform((draft) => ({
@@ -185,7 +188,7 @@ function sendTestEmail() {
                   preserveScroll: true,
                   onSuccess: () => {
                     currencyForm.defaults(props.settings.currency).reset()
-                    ui.lastSaved = new Date().toLocaleString('zh-HK')
+                    ui.saved.currency = true
                   },
                   onError: toastSaveError,
                 })
@@ -255,9 +258,7 @@ function sendTestEmail() {
                 檢視匯率
               </button>
 
-              <p v-if="ui.lastSaved" class="text-xs font-medium text-success">
-                ✓ 最後儲存於 {{ ui.lastSaved }}
-              </p>
+              <span v-if="ui.saved.currency" class="text-success" title="已儲存">✓</span>
             </div>
           </form>
         </div>
@@ -273,6 +274,7 @@ function sendTestEmail() {
 
           <form
             class="space-y-5 p-6"
+            @input="ui.saved.smtp = false"
             @submit.prevent="
               smtpForm
                 .transform((draft) => ({
@@ -290,7 +292,7 @@ function sendTestEmail() {
                   preserveScroll: true,
                   onSuccess: () => {
                     smtpForm.defaults(props.settings.smtp).reset()
-                    ui.lastSaved = new Date().toLocaleString('zh-HK')
+                    ui.saved.smtp = true
                   },
                   onError: toastSaveError,
                 })
@@ -419,9 +421,7 @@ function sendTestEmail() {
                 {{ smtpForm.processing ? '儲存中...' : '儲存設定' }}
               </button>
 
-              <p v-if="ui.lastSaved" class="text-xs font-medium text-success">
-                ✓ 最後儲存於 {{ ui.lastSaved }}
-              </p>
+              <span v-if="ui.saved.smtp" class="text-success" title="已儲存">✓</span>
             </div>
           </form>
         </div>
@@ -483,6 +483,7 @@ function sendTestEmail() {
 
           <form
             class="space-y-4 p-6"
+            @input="ui.saved.email = false"
             @submit.prevent="
               emailForm
                 .transform((draft) => ({ email: { recipients: draft.recipients } }))
@@ -490,7 +491,7 @@ function sendTestEmail() {
                   preserveScroll: true,
                   onSuccess: () => {
                     emailForm.defaults(props.settings.email).reset()
-                    ui.lastSaved = new Date().toLocaleString('zh-HK')
+                    ui.saved.email = true
                   },
                   onError: toastSaveError,
                 })
@@ -515,6 +516,8 @@ function sendTestEmail() {
               <span v-if="emailForm.processing" class="loading loading-sm loading-spinner"></span>
               {{ emailForm.processing ? '儲存中...' : '儲存設定' }}
             </button>
+
+            <span v-if="ui.saved.email" class="text-success" title="已儲存">✓</span>
           </form>
         </div>
       </div>
