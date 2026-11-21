@@ -34,7 +34,7 @@ def _seed_itinerary(app) -> str:
 def test_page_error_lands_in_the_session_bag_as_plain_strings(client, app):
     resp = client.post(
         '/settings',
-        data=json.dumps({'currency': {'cache_ttl': 'abc'}}),
+        data=json.dumps({'cache_ttl': 'abc'}),
         content_type='application/json',
         headers=INERTIA_HEADERS,
     )
@@ -43,8 +43,8 @@ def test_page_error_lands_in_the_session_bag_as_plain_strings(client, app):
     assert resp.headers['Location'] == '/settings/'
     with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
         props = client.get('/settings/', headers=INERTIA_HEADERS).get_json()['props']
-    assert props['errors'] == {'currency.cacheTtl': '快取有效時間必須是大於 0 的整數'}
-    assert isinstance(props['errors']['currency.cacheTtl'], str)
+    assert props['errors'] == {'cacheTtl': '快取有效時間必須是大於 0 的整數'}
+    assert isinstance(props['errors']['cacheTtl'], str)
 
 
 def test_page_error_redirects_to_the_same_origin_referrer(client, app):

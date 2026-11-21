@@ -81,7 +81,7 @@ const submitOptions = { preserveScroll: true, onSuccess: reseedFromProps, onErro
 function saveItinerary(): void {
   itineraryForm
     .transform((draft) => ({
-      itinerary: { disable_departured_itineraries: draft.disableDeparturedItineraries },
+      disable_departured_itineraries: draft.disableDeparturedItineraries,
     }))
     .post('/settings', submitOptions)
 }
@@ -89,11 +89,9 @@ function saveItinerary(): void {
 function saveCurrency(): void {
   currencyForm
     .transform((draft) => ({
-      currency: {
-        base_currency: draft.baseCurrency,
-        fxrates_api_key: draft.fxratesApiKey,
-        cache_ttl: draft.cacheTtl,
-      },
+      base_currency: draft.baseCurrency,
+      fxrates_api_key: draft.fxratesApiKey,
+      cache_ttl: draft.cacheTtl,
     }))
     .post('/settings', submitOptions)
 }
@@ -101,22 +99,20 @@ function saveCurrency(): void {
 function saveSmtp(): void {
   smtpForm
     .transform((draft) => ({
-      smtp: {
-        host: draft.host,
-        port: draft.port,
-        user: draft.user,
-        sender_email: draft.senderEmail,
-        require_auth: draft.requireAuth,
-        protocol: draft.protocol,
-        ...(draft.password && { password: draft.password }),
-      },
+      host: draft.host,
+      port: draft.port,
+      user: draft.user,
+      sender_email: draft.senderEmail,
+      require_auth: draft.requireAuth,
+      protocol: draft.protocol,
+      ...(draft.password && { password: draft.password }),
     }))
     .post('/settings', submitOptions)
 }
 
 function saveEmail(): void {
   emailForm
-    .transform((draft) => ({ email: { recipients: draft.recipients } }))
+    .transform((draft) => ({ recipients: draft.recipients }))
     .post('/settings', submitOptions)
 }
 

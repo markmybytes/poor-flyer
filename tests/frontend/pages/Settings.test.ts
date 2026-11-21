@@ -141,7 +141,7 @@ describe('Settings/Index', () => {
     await flushPromises()
     expect(router.post).toHaveBeenCalledWith(
       '/settings',
-      expect.objectContaining({ itinerary: expect.any(Object) }),
+      expect.objectContaining({ disable_departured_itineraries: expect.any(Boolean) }),
       expect.any(Object),
     )
   })
@@ -155,20 +155,20 @@ describe('Settings/Index', () => {
     await wrapper.findAll('form')[1].trigger('submit')
     await flushPromises()
     expect(vi.mocked(router.post).mock.calls.at(-1)?.[1]).toEqual({
-      currency: { base_currency: 'HKD', fxrates_api_key: '', cache_ttl: 86400 },
+      base_currency: 'HKD',
+      fxrates_api_key: '',
+      cache_ttl: 86400,
     })
 
     await wrapper.findAll('form')[2].trigger('submit')
     await flushPromises()
     expect(vi.mocked(router.post).mock.calls.at(-1)?.[1]).toEqual({
-      smtp: {
-        host: '',
-        port: 587,
-        user: '',
-        sender_email: '',
-        require_auth: true,
-        protocol: 'STARTTLS',
-      },
+      host: '',
+      port: 587,
+      user: '',
+      sender_email: '',
+      require_auth: true,
+      protocol: 'STARTTLS',
     })
   })
 
@@ -195,6 +195,18 @@ describe('Settings/Index', () => {
     expect(wrapper.text()).toContain('不支援的基準貨幣')
     // exactly one field shows it: the base-currency select in the currency section
     expect(wrapper.text().split('不支援的基準貨幣').length - 1).toBe(1)
+  })
+
+  it('renders a flat schema error key inline', () => {
+    vi.mocked(usePage).mockReturnValue({
+      props: { errors: { cacheTtl: '快取有效時間必須是大於 0 的整數' } },
+    } as never)
+    const wrapper = mount(SettingsIndexPage, {
+      props: defaultProps,
+      global: { stubs: globalStubs },
+    })
+    expect(wrapper.text()).toContain('快取有效時間必須是大於 0 的整數')
+    expect(wrapper.text().split('快取有效時間必須是大於 0 的整數').length - 1).toBe(1)
   })
 
   it('toasts the error bag copy when save fails', async () => {

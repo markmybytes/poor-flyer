@@ -89,7 +89,7 @@ def test_settings_index_settings_props_contain_currency_section(client, app):
 def test_settings_save_updates_and_redirects(client, app):
     resp = client.post(
         '/settings',
-        data=json.dumps({'currency': {'base_currency': 'usd'}}),
+        data=json.dumps({'base_currency': 'usd'}),
         content_type='application/json',
     )
 
@@ -107,7 +107,7 @@ def test_settings_save_untouched_password_is_not_clobbered(client, app):
     with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
         resp = client.post(
             '/settings',
-            data=json.dumps({'smtp': {'host': 'smtp.example.com'}}),
+            data=json.dumps({'host': 'smtp.example.com'}),
             content_type='application/json',
         )
 
@@ -123,7 +123,7 @@ def test_settings_save_retyped_password_overwrites(client, app):
     with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
         resp = client.post(
             '/settings',
-            data=json.dumps({'smtp': {'password': 'new-secret'}}),
+            data=json.dumps({'password': 'new-secret'}),
             content_type='application/json',
         )
 
@@ -135,7 +135,7 @@ def test_settings_save_retyped_password_overwrites(client, app):
 def test_settings_save_flashes_success_notice(client, app):
     resp = client.post(
         '/settings',
-        data=json.dumps({'currency': {'base_currency': 'usd'}}),
+        data=json.dumps({'base_currency': 'usd'}),
         content_type='application/json',
         headers=INERTIA_HEADERS,
     )
@@ -193,8 +193,8 @@ def test_settings_save_accepts_boolean_flags(client, app):
         '/settings',
         data=json.dumps(
             {
-                'itinerary': {'disable_departured_itineraries': False},
-                'smtp': {'require_auth': False},
+                'disable_departured_itineraries': False,
+                'require_auth': False,
             }
         ),
         content_type='application/json',
@@ -227,7 +227,7 @@ def test_settings_save_accepts_boolean_flags(client, app):
 def test_settings_save_accepts_native_flag_tokens(client, app, token, stored):
     resp = client.post(
         '/settings',
-        data=json.dumps({'itinerary': {'disable_departured_itineraries': token}}),
+        data=json.dumps({'disable_departured_itineraries': token}),
         content_type='application/json',
     )
 
@@ -237,31 +237,19 @@ def test_settings_save_accepts_native_flag_tokens(client, app, token, stored):
 
 
 @pytest.mark.parametrize(
-    ('section', 'field', 'token', 'bag_key'),
+    ('field', 'token', 'bag_key'),
     [
-        (
-            'itinerary',
-            'disable_departured_itineraries',
-            'enable',
-            'itinerary.disableDeparturedItineraries',
-        ),
-        (
-            'itinerary',
-            'disable_departured_itineraries',
-            None,
-            'itinerary.disableDeparturedItineraries',
-        ),
-        ('smtp', 'require_auth', 'enabled', 'smtp.requireAuth'),
-        ('smtp', 'require_auth', None, 'smtp.requireAuth'),
+        ('disable_departured_itineraries', 'enable', 'disableDeparturedItineraries'),
+        ('disable_departured_itineraries', None, 'disableDeparturedItineraries'),
+        ('require_auth', 'enabled', 'requireAuth'),
+        ('require_auth', None, 'requireAuth'),
     ],
 )
-def test_settings_save_rejects_store_tokens_and_explicit_null(
-    client, app, section, field, token, bag_key
-):
+def test_settings_save_rejects_store_tokens_and_explicit_null(client, app, field, token, bag_key):
     with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
         resp = client.post(
             '/settings',
-            data=json.dumps({section: {field: token}}),
+            data=json.dumps({field: token}),
             content_type='application/json',
             headers=INERTIA_HEADERS,
         )
@@ -277,7 +265,7 @@ def test_settings_save_invalid_currency_redirects_with_errors(client, app):
     with patch('src.routes.pages.settings.get_rates', return_value=_MOCK_RATES):
         resp = client.post(
             '/settings',
-            data=json.dumps({'currency': {'base_currency': 'XXX'}}),
+            data=json.dumps({'base_currency': 'XXX'}),
             content_type='application/json',
             headers=INERTIA_HEADERS,
         )
@@ -304,7 +292,7 @@ def test_settings_service_errors_map_every_field_at_once(client, app, mocker):
 
     resp = client.post(
         '/settings',
-        data=json.dumps({'currency': {'base_currency': 'XXX'}}),
+        data=json.dumps({'base_currency': 'XXX'}),
         content_type='application/json',
         headers=INERTIA_HEADERS,
     )
@@ -333,7 +321,7 @@ def test_settings_service_error_maps_to_its_field(client, app, mocker, field, me
 
     resp = client.post(
         '/settings',
-        data=json.dumps({'smtp': {'port': '587'}}),
+        data=json.dumps({'port': '587'}),
         content_type='application/json',
         headers=INERTIA_HEADERS,
     )

@@ -16,6 +16,16 @@ from src.utils.transform import to_bool
 
 logger = logging.getLogger(__name__)
 
+_CURRENCY_FIELDS = ('base_currency', 'fxrates_api_key', 'cache_ttl')
+_EMAIL_FIELDS = ('recipients',)
+_ITINERARY_FIELDS = ('disable_departured_itineraries',)
+_SMTP_FIELDS = ('host', 'port', 'user', 'sender_email', 'require_auth', 'protocol', 'password')
+
+
+def _section(data: Mapping[str, Any], fields: tuple[str, ...]) -> dict[str, Any]:
+    """Pick one store section's fields out of the flat payload, keeping only submitted ones."""
+    return {field: data[field] for field in fields if field in data}
+
 
 @cache.memoize()
 def _fetch(namespace: str, key: str) -> str | None:
@@ -121,36 +131,35 @@ def get_page_settings() -> dict[str, dict[str, Any]]:
     }
 
 
-def update(data: Mapping[str, Any]) -> None:  # noqa: C901, PLR0915 - flat sections, no nesting to extract
-    """Apply a partial settings payload, raising InvalidFieldsError with every invalid value."""
+def update(data: Mapping[str, Any]) -> None:  # noqa: C901, PLR0915 - one check per section
+    """Apply a flat partial payload; raise InvalidFieldsError with every invalid value."""
     from src.services.fx_rates import SUPPORTED_CURRENCIES
-
-    currency_data = data.get('currency') or {}
-    smtp_data = data.get('smtp') or {}
 
     # validate every section before the first write: a bad value never leaves half a payload
     base: str | None = None
     ttl: int | None = None
     port: int | None = None
     errors: list[FieldIssue] = []
-    if 'base_currency' in currency_data:
-        base = (currency_data.get('base_currency') or 'HKD').strip().upper()
-        if base not in SUPPORTED_CURRENCIES:
-            errors.append(FieldIssue('base_currency', '不支援的基準貨幣'))
-    if 'cache_ttl' in currency_data:
-        try:
-            ttl = int(currency_data.get('cache_ttl'))
-        except TypeError, ValueError:
-            ttl = None
-        if ttl is None or ttl <= 0:
-            errors.append(FieldIssue('cache_ttl', '快取有效時間必須是大於 0 的整數'))
-    if 'port' in smtp_data:
-        try:
-            port = int(smtp_data.get('port'))
-        except TypeError, ValueError:
-            port = None
-        if port is None:
-            errors.append(FieldIssue('port', 'SMTP 連接埠必須是整數'))
+    if currency_data := _section(data, _CURRENCY_FIELDS):
+        if 'base_currency' in currency_data:
+            base = (currency_data.get('base_currency') or 'HKD').strip().upper()
+            if base not in SUPPORTED_CURRENCIES:
+                errors.append(FieldIssue('base_currency', '不支援的基準貨幣'))
+        if 'cache_ttl' in currency_data:
+            try:
+                ttl = int(currency_data.get('cache_ttl'))
+            except TypeError, ValueError:
+                ttl = None
+            if ttl is None or ttl <= 0:
+                errors.append(FieldIssue('cache_ttl', '快取有效時間必須是大於 0 的整數'))
+    if smtp_data := _section(data, _SMTP_FIELDS):
+        if 'port' in smtp_data:
+            try:
+                port = int(smtp_data.get('port'))
+            except TypeError, ValueError:
+                port = None
+            if port is None:
+                errors.append(FieldIssue('port', 'SMTP 連接埠必須是整數'))
 
     if errors:
         raise InvalidFieldsError(errors)
@@ -165,18 +174,16 @@ def update(data: Mapping[str, Any]) -> None:  # noqa: C901, PLR0915 - flat secti
             existing['fxrates_api_key'] = (currency_data.get('fxrates_api_key') or '').strip()
         set_many('currency', existing)
 
-    if 'email' in data and (email_data := data['email'] or {}):
+    if email_data := _section(data, _EMAIL_FIELDS):
         existing = (get_all_masked('email') or {}).copy()
-        if 'recipients' in email_data:
-            existing['recipients'] = email_data.get('recipients', '')
+        existing['recipients'] = email_data.get('recipients', '')
         set_many('email', existing)
 
-    if 'itinerary' in data and (itinerary_data := data['itinerary'] or {}):
+    if itinerary_data := _section(data, _ITINERARY_FIELDS):
         existing = (get_all_masked('itinerary') or {}).copy()
-        if 'disable_departured_itineraries' in itinerary_data:
-            existing['disable_departured_itineraries'] = (
-                'true' if to_bool(itinerary_data.get('disable_departured_itineraries')) else 'false'
-            )
+        existing['disable_departured_itineraries'] = (
+            'true' if to_bool(itinerary_data.get('disable_departured_itineraries')) else 'false'
+        )
         set_many('itinerary', existing)
 
     if smtp_data:

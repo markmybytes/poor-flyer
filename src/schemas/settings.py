@@ -14,7 +14,9 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict
 from src.schemas.validators import integer, reject_none
 
 
-class CurrencySection(BaseModel):
+class SettingsPayload(BaseModel):
+    """One flat partial write; `model_fields_set` keeps an absent field absent."""
+
     model_config = ConfigDict(extra='forbid')
 
     base_currency: str | None = None
@@ -23,25 +25,10 @@ class CurrencySection(BaseModel):
         Annotated[int, BeforeValidator(integer('快取有效時間必須是大於 0 的整數', minimum=1))]
         | None
     ) = None
-
-
-class EmailSection(BaseModel):
-    model_config = ConfigDict(extra='forbid')
-
     recipients: str | None = None
-
-
-class ItinerarySection(BaseModel):
-    model_config = ConfigDict(extra='forbid')
-
     disable_departured_itineraries: Annotated[
         bool | None, BeforeValidator(reject_none('格式不正確'))
     ] = None
-
-
-class SmtpSection(BaseModel):
-    model_config = ConfigDict(extra='forbid')
-
     host: str | None = None
     port: Annotated[int, BeforeValidator(integer('SMTP 連接埠必須是整數'))] | None = None
     user: str | None = None
@@ -49,17 +36,6 @@ class SmtpSection(BaseModel):
     require_auth: Annotated[bool | None, BeforeValidator(reject_none('格式不正確'))] = None
     protocol: str | None = None
     password: str | None = None
-
-
-class SettingsPayload(BaseModel):
-    """One partial write: each section may be absent."""
-
-    model_config = ConfigDict(extra='forbid')
-
-    currency: CurrencySection | None = None
-    email: EmailSection | None = None
-    itinerary: ItinerarySection | None = None
-    smtp: SmtpSection | None = None
 
 
 class FxRefresh(BaseModel):
