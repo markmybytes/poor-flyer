@@ -1,8 +1,14 @@
 import logging
 from datetime import UTC, date, datetime
 
+import pytest
+from hypothesis import given
+from hypothesis import strategies as st
+
 from src.extensions.database import FareSnapshot, Flight, FloatingDateTime, Itinerary, db
-from src.utils.transform import CamelCaseJSONProvider, camelize, model_to_dict, to_camel
+from src.utils.transform import CamelCaseJSONProvider, camelize, model_to_dict, to_bool, to_camel
+
+TRUTHY_TOKENS = ('1', 't', 'true', 'y', 'yes', 'on')
 
 
 def test_to_camel_single_word():
@@ -23,6 +29,44 @@ def test_to_camel_already_camel():
 
 def test_to_camel_leading_underscore():
     assert to_camel('_private') == 'Private'
+
+
+@pytest.mark.parametrize(
+    ('value', 'expected'),
+    [
+        (True, True),
+        (False, False),
+        ('true', True),
+        ('TRUE', True),
+        (' 1 ', True),
+        ('on', True),
+        ('yes', True),
+        ('y', True),
+        ('t', True),
+        ('false', False),
+        ('0', False),
+        ('off', False),
+        ('no', False),
+        ('n', False),
+        ('f', False),
+        ('', False),
+        (None, False),
+        (1, True),
+        (0, False),
+        ('maybe', False),
+        ('enable', False),
+        ('enabled', False),
+        ('ENABLE', False),
+    ],
+)
+def test_to_bool_table(value, expected):
+    assert to_bool(value) is expected
+
+
+@given(st.text())
+def test_to_bool_is_case_insensitive_and_total(text):
+    assert to_bool(text) is (text.strip().lower() in TRUTHY_TOKENS)
+    assert to_bool(text) == to_bool(text.upper())
 
 
 def test_camelize_flat_dict():

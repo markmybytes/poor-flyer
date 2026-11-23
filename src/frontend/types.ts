@@ -48,24 +48,24 @@ export interface Itinerary {
 }
 
 export interface Settings {
-  currency?: {
-    baseCurrency?: string
-    fxratesApiKey?: string
-    cacheTtl?: string | number
+  currency: {
+    baseCurrency: string
+    fxratesApiKey: string
+    cacheTtl: number
   }
-  email?: {
-    recipients?: string
+  email: {
+    recipients: string
   }
-  itinerary?: {
-    disableDeparturedItineraries?: string
+  itinerary: {
+    disableDeparturedItineraries: boolean
   }
-  smtp?: {
-    host?: string
-    port?: string | number
-    user?: string
-    password?: string
-    senderEmail?: string
-    requireAuth?: string
-    protocol?: string
+  smtp: {
+    host: string
+    port: number
+    user: string
+    password: string
+    senderEmail: string
+    requireAuth: boolean
+    protocol: string
   }
 }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import AppLayout from '@/Layouts/AppLayout.vue'
 import ItineraryCard from '@/Components/ItineraryCard.vue'
+import AppLayout from '@/Layouts/AppLayout.vue'
 import type { Itinerary } from '@/types'
 import { fmtItineraryName } from '@/utils'
 import { Link, router } from '@inertiajs/vue3'
@@ -132,7 +132,7 @@ function runRestore() {
         </button>
       </div>
 
-      <Link href="/props.itineraries/create" class="btn shadow-sm btn-primary">新增監察項目</Link>
+      <Link href="/itineraries/create" class="btn shadow-sm btn-primary">新增監察項目</Link>
     </div>
 
     <div
@@ -179,7 +179,7 @@ function runRestore() {
           }}
         </p>
 
-        <Link href="/props.itineraries/create" class="btn shadow-sm btn-lg btn-primary">
+        <Link href="/itineraries/create" class="btn shadow-sm btn-lg btn-primary">
           {{ ui.archivedView ? '建立新的追蹤' : '建立你的第一個追蹤' }}
         </Link>
       </div>

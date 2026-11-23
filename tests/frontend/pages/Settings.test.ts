@@ -1,20 +1,20 @@
 import SettingsIndexPage from '@/Pages/Settings/Index.vue'
 import { flushPromises, mount } from '@vue/test-utils'
-import { router } from '@inertiajs/vue3'
+import { router, usePage } from '@inertiajs/vue3'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const defaultProps = {
   settings: {
-    currency: { baseCurrency: 'HKD', fxratesApiKey: '', cacheTtl: '86400' },
+    currency: { baseCurrency: 'HKD', fxratesApiKey: '', cacheTtl: 86400 },
     email: { recipients: '' },
-    itinerary: { disableDeparturedItineraries: 'true' },
-    search: {},
+    itinerary: { disableDeparturedItineraries: true },
     smtp: {
       host: '',
-      port: '587',
+      port: 587,
       user: '',
+      password: '',
       senderEmail: '',
-      requireAuth: 'true',
+      requireAuth: true,
       protocol: 'STARTTLS',
     },
   },
@@ -34,6 +34,7 @@ const globalStubs = {
 describe('Settings/Index', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(usePage).mockReturnValue({ props: {} } as never)
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       json: async () => ({ message: 'ok', data: {} }),
@@ -44,6 +45,7 @@ describe('Settings/Index', () => {
     return vi.mocked(router.post).mock.calls.at(-1)?.[2] as {
       onSuccess?: () => void
       onError?: (errors: Record<string, string>) => void
+      onFinish?: () => void
     }
   }
 
@@ -145,6 +147,112 @@ describe('Settings/Index', () => {
     )
   })
 
+  it('submits snake_case payloads even though the draft is camelCase', async () => {
+    const wrapper = mount(SettingsIndexPage, {
+      props: defaultProps,
+      global: { stubs: globalStubs },
+    })
+
+    await wrapper.findAll('form')[1].trigger('submit')
+    await flushPromises()
+    expect(vi.mocked(router.post).mock.calls.at(-1)?.[1]).toEqual({
+      currency: { base_currency: 'HKD', fxrates_api_key: '', cache_ttl: 86400 },
+    })
+
+    await wrapper.findAll('form')[2].trigger('submit')
+    await flushPromises()
+    expect(vi.mocked(router.post).mock.calls.at(-1)?.[1]).toEqual({
+      smtp: {
+        host: '',
+        port: 587,
+        user: '',
+        sender_email: '',
+        require_auth: true,
+        protocol: 'STARTTLS',
+      },
+    })
+  })
+
+  it('marks only the submitted section as loading', async () => {
+    const wrapper = mount(SettingsIndexPage, {
+      props: defaultProps,
+      global: { stubs: globalStubs },
+    })
+
+    await wrapper.findAll('form')[1].trigger('submit')
+
+    const submitButtons = wrapper.findAll('form button[type="submit"]')
+    expect(submitButtons[1].text()).toContain('儲存中...')
+    expect(submitButtons[1].attributes('disabled')).toBeDefined()
+    expect(wrapper.text().split('儲存中...').length - 1).toBe(1)
+    expect(submitButtons[0].attributes('disabled')).toBeUndefined()
+    expect(submitButtons[2].attributes('disabled')).toBeUndefined()
+    expect(submitButtons[3].attributes('disabled')).toBeUndefined()
+  })
+
+  it('clears the section loading state when the visit finishes', async () => {
+    const wrapper = mount(SettingsIndexPage, {
+      props: defaultProps,
+      global: { stubs: globalStubs },
+    })
+
+    await wrapper.findAll('form')[1].trigger('submit')
+    lastSaveOptions().onFinish?.()
+    await flushPromises()
+
+    const submitButtons = wrapper.findAll('form button[type="submit"]')
+    expect(submitButtons[1].text()).not.toContain('儲存中...')
+    expect(submitButtons[1].attributes('disabled')).toBeUndefined()
+  })
+
+  it('keeps unsaved edits in other sections after a save succeeds', async () => {
+    const wrapper = mount(SettingsIndexPage, {
+      props: defaultProps,
+      global: { stubs: globalStubs },
+    })
+    const recipients = wrapper.findAll('form')[3].find('textarea')
+    await recipients.setValue('unsaved@example.com')
+
+    await wrapper.findAll('form')[1].trigger('submit')
+    lastSaveOptions().onSuccess?.()
+    await flushPromises()
+
+    expect((wrapper.findAll('form')[3].find('textarea').element as HTMLTextAreaElement).value).toBe(
+      'unsaved@example.com',
+    )
+  })
+
+  it('shows a tick only in the section that was saved', async () => {
+    const wrapper = mount(SettingsIndexPage, {
+      props: defaultProps,
+      global: { stubs: globalStubs },
+    })
+    await wrapper.findAll('form')[1].trigger('submit')
+    lastSaveOptions().onSuccess?.()
+    await flushPromises()
+
+    const forms = wrapper.findAll('form')
+    expect(forms[1].text()).toContain('✓')
+    expect(forms[0].text()).not.toContain('✓')
+    expect(forms[2].text()).not.toContain('✓')
+    expect(forms[3].text()).not.toContain('✓')
+  })
+
+  it('clears the tick when the section is edited again', async () => {
+    const wrapper = mount(SettingsIndexPage, {
+      props: defaultProps,
+      global: { stubs: globalStubs },
+    })
+    const form = wrapper.findAll('form')[1]
+    await form.trigger('submit')
+    lastSaveOptions().onSuccess?.()
+    await flushPromises()
+    expect(form.text()).toContain('✓')
+
+    await form.find('input').trigger('input')
+    expect(form.text()).not.toContain('✓')
+  })
+
   it('leaves the success toast to the server flash router', async () => {
     const wrapper = mount(SettingsIndexPage, {
       props: defaultProps,
@@ -157,14 +265,42 @@ describe('Settings/Index', () => {
     expect(vi.mocked(useToast)().success).not.toHaveBeenCalled()
   })
 
-  it('shows toast error when save fails', async () => {
+  it('renders inline server errors for the section fields', () => {
+    vi.mocked(usePage).mockReturnValue({
+      props: { errors: { 'currency.baseCurrency': '不支援的基準貨幣' } },
+    } as never)
+    const wrapper = mount(SettingsIndexPage, {
+      props: defaultProps,
+      global: { stubs: globalStubs },
+    })
+    expect(wrapper.text()).toContain('不支援的基準貨幣')
+    // exactly one field shows it: the base-currency select in the currency section
+    expect(wrapper.text().split('不支援的基準貨幣').length - 1).toBe(1)
+  })
+
+  it('renders a dotted schema error key inline', () => {
+    vi.mocked(usePage).mockReturnValue({
+      props: { errors: { 'currency.cacheTtl': '快取有效時間必須是大於 0 的整數' } },
+    } as never)
+    const wrapper = mount(SettingsIndexPage, {
+      props: defaultProps,
+      global: { stubs: globalStubs },
+    })
+    expect(wrapper.text()).toContain('快取有效時間必須是大於 0 的整數')
+    expect(wrapper.text().split('快取有效時間必須是大於 0 的整數').length - 1).toBe(1)
+  })
+
+  it('toasts the error bag copy when save fails', async () => {
+    vi.mocked(usePage).mockReturnValue({
+      props: { errors: { settings: 'Unsupported base currency' } },
+    } as never)
     const wrapper = mount(SettingsIndexPage, {
       props: defaultProps,
       global: { stubs: globalStubs },
     })
     await wrapper.findAll('form')[0].trigger('submit')
     await flushPromises()
-    lastSaveOptions().onError?.({ settings: 'Unsupported base currency' })
+    lastSaveOptions().onError?.({})
     const { useToast } = await import('vue-toast-notification')
     expect(vi.mocked(useToast)().error).toHaveBeenCalledWith('Unsupported base currency')
   })

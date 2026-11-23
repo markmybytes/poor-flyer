@@ -1,8 +1,9 @@
 import logging
 
-from flask import Blueprint, flash, redirect, request, session
+from flask import Blueprint, flash, g, redirect
 from flask_inertia import render_inertia
 
+from src.schemas.settings import SettingsPayload
 from src.services import setting
 from src.services.fx_rates import (
     SUPPORTED_CURRENCIES,
@@ -10,6 +11,7 @@ from src.services.fx_rates import (
     get_configured_base_currency,
     get_rates,
 )
+from src.validation import validated
 
 logger = logging.getLogger(__name__)
 
@@ -37,20 +39,10 @@ def index():
             'error': str(exc),
         }
 
-    currency_settings = setting.get_all_masked('currency')
-    currency_settings['base_currency'] = currency_settings.get('base_currency', base_currency)
-    currency_settings['cache_ttl'] = currency_settings.get('cache_ttl', '86400')
-    currency_settings['fxrates_api_key'] = currency_settings.get('fxrates_api_key', '')
-
     return render_inertia(
         'Settings/Index',
         props={
-            'settings': {
-                'currency': currency_settings,
-                'email': setting.get_all_masked('email'),
-                'itinerary': setting.get_all_masked('itinerary'),
-                'smtp': setting.get_all_masked('smtp'),
-            },
+            'settings': setting.get_page_settings(),
             'supportedCurrencies': SUPPORTED_CURRENCIES,
             'fxStatus': fx_status,
         },
@@ -58,13 +50,10 @@ def index():
 
 
 @settings_bp.route('', methods=['POST'])
+@validated(SettingsPayload, redirect_to='/settings/')
 def save():
-    try:
-        setting.update(request.get_json(silent=True) or request.form.to_dict())
-        logger.info('settings updated from page form')
+    setting.update(g.validated.model_dump(exclude_unset=True))
+    logger.info('settings updated from page form')
 
-        flash('設定已儲存', 'success')
-        return redirect('/settings/')
-    except ValueError as exc:
-        session['errors'] = {'settings': str(exc)}
-        return redirect('/settings/')
+    flash('設定已儲存', 'success')
+    return redirect('/settings/')

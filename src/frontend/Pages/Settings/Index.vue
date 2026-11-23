@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import AppLayout from '@/Layouts/AppLayout.vue'
+import FieldError from '@/Components/FieldError.vue'
 import type { Settings } from '@/types'
 import { formatLocalDateTime } from '@/utils/timezone'
-import { router } from '@inertiajs/vue3'
+import { router, useForm, usePage } from '@inertiajs/vue3'
 import { ref } from 'vue'
 import { useToast } from 'vue-toast-notification'
 
@@ -19,80 +20,26 @@ const props = defineProps<{
 
 const toast = useToast()
 
-function settingsFrom(source: Settings) {
-  return {
-    currency: {
-      base_currency: source.currency?.baseCurrency ?? 'HKD',
-      fxrates_api_key: source.currency?.fxratesApiKey ?? '',
-      cache_ttl: Number(source.currency?.cacheTtl ?? 86400),
-    },
-    email: {
-      recipients: source.email?.recipients ?? '',
-    },
-    itinerary: {
-      disable_departured_itineraries: source.itinerary?.disableDeparturedItineraries === 'true',
-    },
-    smtp: {
-      host: source.smtp?.host ?? '',
-      port: Number(source.smtp?.port ?? 587),
-      user: source.smtp?.user ?? '',
-      password: '',
-      sender_email: source.smtp?.senderEmail ?? '',
-      require_auth: source.smtp?.requireAuth !== 'false',
-      protocol: source.smtp?.protocol ?? 'STARTTLS',
-    },
-  }
-}
-
-const form = ref(settingsFrom(props.settings))
+const itineraryForm = useForm({ ...props.settings.itinerary })
+const currencyForm = useForm({ ...props.settings.currency })
+const smtpForm = useForm({ ...props.settings.smtp, password: '' })
+const emailForm = useForm({ ...props.settings.email })
 
 const testEmail = ref({ address: '' })
 
 const ui = ref({
-  loading: null as 'itinerary' | 'currency' | 'smtp' | 'email' | 'refresh' | 'test-email' | null,
-  lastSaved: null as string | null,
+  loading: null as 'refresh' | 'test-email' | null,
+  saved: { itinerary: false, currency: false, smtp: false, email: false } as Record<
+    'itinerary' | 'currency' | 'smtp' | 'email',
+    boolean
+  >,
   fxModalOpen: false,
 })
 
-function saveSettings(sec: 'email' | 'currency' | 'smtp' | 'itinerary') {
-  ui.value.loading = sec
-  const payloads = {
-    smtp: {
-      host: form.value.smtp.host,
-      port: form.value.smtp.port,
-      user: form.value.smtp.user,
-      sender_email: form.value.smtp.sender_email,
-      require_auth: form.value.smtp.require_auth,
-      protocol: form.value.smtp.protocol,
-      ...(form.value.smtp.password && { password: form.value.smtp.password }),
-    },
-    email: { recipients: form.value.email.recipients },
-    currency: {
-      base_currency: form.value.currency.base_currency,
-      fxrates_api_key: form.value.currency.fxrates_api_key,
-      cache_ttl: form.value.currency.cache_ttl,
-    },
-    itinerary: {
-      disable_departured_itineraries: form.value.itinerary.disable_departured_itineraries,
-    },
-  }
-
-  router.post(
-    '/settings',
-    { [sec]: payloads[sec] },
-    {
-      preserveScroll: true,
-      onSuccess: () => {
-        // Inertia applies the new page props before firing onSuccess, so this is the saved state
-        form.value = settingsFrom(props.settings)
-        ui.value.lastSaved = new Date().toLocaleString('zh-HK')
-      },
-      onError: (errors) => toast.error(errors.settings ?? '儲存失敗'),
-      onFinish: () => {
-        ui.value.loading = null
-      },
-    },
-  )
+// the page route redirects with the session errors bag; useForm.errors only fills from 422s
+function toastSaveError(): void {
+  const errors = usePage().props.errors ?? {}
+  toast.error(errors.settings ?? '儲存失敗')
 }
 
 function refreshFxRates() {
@@ -100,7 +47,7 @@ function refreshFxRates() {
   fetch('/api/settings/fx-rates/refresh', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ base_currency: form.value.currency.base_currency }),
+    body: JSON.stringify({ base_currency: currencyForm.baseCurrency }),
   })
     .then((res) => {
       if (!res.ok) throw new Error()
@@ -159,12 +106,29 @@ function sendTestEmail() {
             </p>
           </div>
 
-          <form class="space-y-5 p-6" @submit.prevent="saveSettings('itinerary')">
+          <form
+            class="space-y-5 p-6"
+            @input="ui.saved.itinerary = false"
+            @submit.prevent="
+              itineraryForm
+                .transform((draft) => ({
+                  itinerary: { disable_departured_itineraries: draft.disableDeparturedItineraries },
+                }))
+                .post('/settings', {
+                  preserveScroll: true,
+                  onSuccess: () => {
+                    itineraryForm.defaults(props.settings.itinerary).reset()
+                    ui.saved.itinerary = true
+                  },
+                  onError: toastSaveError,
+                })
+            "
+          >
             <label
               class="label cursor-pointer justify-start gap-4 rounded-lg border border-base-300/70 bg-base-200/40 px-4 py-4"
             >
               <input
-                v-model="form.itinerary.disable_departured_itineraries"
+                v-model="itineraryForm.disableDeparturedItineraries"
                 type="checkbox"
                 class="toggle toggle-primary"
               />
@@ -179,20 +143,20 @@ function sendTestEmail() {
               </div>
             </label>
 
+            <FieldError field="itinerary.disableDeparturedItineraries" />
+
             <div
               class="flex flex-col items-start gap-3 border-t border-base-300/70 pt-4 sm:flex-row sm:items-center"
             >
-              <button type="submit" :disabled="ui.loading === 'itinerary'" class="btn btn-primary">
+              <button type="submit" :disabled="itineraryForm.processing" class="btn btn-primary">
                 <span
-                  v-if="ui.loading === 'itinerary'"
+                  v-if="itineraryForm.processing"
                   class="loading loading-sm loading-spinner"
                 ></span>
-                {{ ui.loading === 'itinerary' ? '儲存中...' : '儲存設定' }}
+                {{ itineraryForm.processing ? '儲存中...' : '儲存設定' }}
               </button>
 
-              <p v-if="ui.lastSaved" class="text-xs font-medium text-success">
-                ✓ 最後儲存於 {{ ui.lastSaved }}
-              </p>
+              <span v-if="ui.saved.itinerary" class="text-success" title="已儲存">✓</span>
             </div>
           </form>
         </div>
@@ -208,15 +172,38 @@ function sendTestEmail() {
             </p>
           </div>
 
-          <form class="space-y-5 p-6" @submit.prevent="saveSettings('currency')">
+          <form
+            class="space-y-5 p-6"
+            @input="ui.saved.currency = false"
+            @submit.prevent="
+              currencyForm
+                .transform((draft) => ({
+                  currency: {
+                    base_currency: draft.baseCurrency,
+                    fxrates_api_key: draft.fxratesApiKey,
+                    cache_ttl: draft.cacheTtl,
+                  },
+                }))
+                .post('/settings', {
+                  preserveScroll: true,
+                  onSuccess: () => {
+                    currencyForm.defaults(props.settings.currency).reset()
+                    ui.saved.currency = true
+                  },
+                  onError: toastSaveError,
+                })
+            "
+          >
             <fieldset class="fieldset">
               <legend class="fieldset-legend text-sm font-bold">基準貨幣 / 顯示貨幣</legend>
 
-              <select v-model="form.currency.base_currency" class="select-bordered select w-full">
+              <select v-model="currencyForm.baseCurrency" class="select-bordered select w-full">
                 <option v-for="code in props.supportedCurrencies" :key="code" :value="code">
                   {{ code }}
                 </option>
               </select>
+
+              <FieldError field="currency.baseCurrency" />
             </fieldset>
 
             <fieldset class="fieldset">
@@ -226,10 +213,12 @@ function sendTestEmail() {
               </legend>
 
               <input
-                v-model="form.currency.fxrates_api_key"
+                v-model="currencyForm.fxratesApiKey"
                 type="text"
                 class="input-bordered input w-full"
               />
+
+              <FieldError field="currency.fxratesApiKey" />
 
               <p class="label text-xs text-base-content/55">
                 留空時系統仍會嘗試獲取匯率數據。若失敗，請到 FXRatesAPI 註冊以取得 API 金鑰。
@@ -240,11 +229,13 @@ function sendTestEmail() {
               <legend class="fieldset-legend text-sm font-bold">快取有效時間 (TTL；秒)</legend>
 
               <input
-                v-model.number="form.currency.cache_ttl"
+                v-model.number="currencyForm.cacheTtl"
                 type="number"
                 min="1"
                 class="input-bordered input w-full"
               />
+
+              <FieldError field="currency.cacheTtl" />
 
               <p class="label text-xs text-base-content/55">
                 快取時間愈短，匯率數據愈貼近現實，但亦會增加 API 查詢次數。建議根據 FXRatesAPI
@@ -255,21 +246,19 @@ function sendTestEmail() {
             <div
               class="flex flex-col items-start gap-3 border-t border-base-300/70 pt-4 sm:flex-row sm:items-center"
             >
-              <button type="submit" :disabled="ui.loading === 'currency'" class="btn btn-primary">
+              <button type="submit" :disabled="currencyForm.processing" class="btn btn-primary">
                 <span
-                  v-if="ui.loading === 'currency'"
+                  v-if="currencyForm.processing"
                   class="loading loading-sm loading-spinner"
                 ></span>
-                {{ ui.loading === 'currency' ? '儲存中...' : '儲存設定' }}
+                {{ currencyForm.processing ? '儲存中...' : '儲存設定' }}
               </button>
 
               <button type="button" class="btn btn-outline" @click="ui.fxModalOpen = true">
                 檢視匯率
               </button>
 
-              <p v-if="ui.lastSaved" class="text-xs font-medium text-success">
-                ✓ 最後儲存於 {{ ui.lastSaved }}
-              </p>
+              <span v-if="ui.saved.currency" class="text-success" title="已儲存">✓</span>
             </div>
           </form>
         </div>
@@ -283,18 +272,45 @@ function sendTestEmail() {
             <p class="mt-0.5 text-sm font-medium text-base-content/60">設定寄件伺服器連線資料</p>
           </div>
 
-          <form class="space-y-5 p-6" @submit.prevent="saveSettings('smtp')">
+          <form
+            class="space-y-5 p-6"
+            @input="ui.saved.smtp = false"
+            @submit.prevent="
+              smtpForm
+                .transform((draft) => ({
+                  smtp: {
+                    host: draft.host,
+                    port: draft.port,
+                    user: draft.user,
+                    sender_email: draft.senderEmail,
+                    require_auth: draft.requireAuth,
+                    protocol: draft.protocol,
+                    ...(draft.password && { password: draft.password }),
+                  },
+                }))
+                .post('/settings', {
+                  preserveScroll: true,
+                  onSuccess: () => {
+                    smtpForm.defaults(props.settings.smtp).reset()
+                    ui.saved.smtp = true
+                  },
+                  onError: toastSaveError,
+                })
+            "
+          >
             <div class="grid gap-4 md:grid-cols-3">
               <div class="md:col-span-2">
                 <fieldset class="fieldset">
                   <legend class="fieldset-legend text-sm font-bold">伺服器主機 (Host)</legend>
 
                   <input
-                    v-model="form.smtp.host"
+                    v-model="smtpForm.host"
                     type="text"
                     placeholder="mail.example.com"
                     class="input-bordered input w-full"
                   />
+
+                  <FieldError field="smtp.host" />
                 </fieldset>
               </div>
 
@@ -303,11 +319,13 @@ function sendTestEmail() {
                   <legend class="fieldset-legend text-sm font-bold">連接埠 (Port)</legend>
 
                   <input
-                    v-model.number="form.smtp.port"
+                    v-model.number="smtpForm.port"
                     type="number"
                     placeholder="587"
                     class="input-bordered input w-full"
                   />
+
+                  <FieldError field="smtp.port" />
                 </fieldset>
               </div>
             </div>
@@ -319,11 +337,13 @@ function sendTestEmail() {
               </legend>
 
               <input
-                v-model="form.smtp.sender_email"
+                v-model="smtpForm.senderEmail"
                 type="email"
                 placeholder="noreply@example.com"
                 class="input-bordered input w-full"
               />
+
+              <FieldError field="smtp.senderEmail" />
 
               <p class="label text-xs text-base-content/55">
                 留空則預設使用登入的用戶名稱作為寄件者電郵
@@ -333,21 +353,19 @@ function sendTestEmail() {
             <fieldset class="fieldset">
               <legend class="fieldset-legend text-sm font-bold">SMTP 加密協定</legend>
 
-              <select v-model="form.smtp.protocol" class="select-bordered select w-full">
+              <select v-model="smtpForm.protocol" class="select-bordered select w-full">
                 <option value="STARTTLS">STARTTLS</option>
 
                 <option value="SMTP_SSL">SSL / 無加密</option>
               </select>
+
+              <FieldError field="smtp.protocol" />
             </fieldset>
 
             <label
               class="label cursor-pointer justify-start gap-4 rounded-lg border border-base-300/70 bg-base-200/40 px-4 py-4"
             >
-              <input
-                v-model="form.smtp.require_auth"
-                type="checkbox"
-                class="toggle toggle-primary"
-              />
+              <input v-model="smtpForm.requireAuth" type="checkbox" class="toggle toggle-primary" />
 
               <div>
                 <p class="text-sm font-bold text-base-content">需要 SMTP 驗證</p>
@@ -358,10 +376,12 @@ function sendTestEmail() {
               </div>
             </label>
 
+            <FieldError field="smtp.requireAuth" />
+
             <div
               :class="[
                 'space-y-5 rounded-lg border border-base-300/70 p-4 transition-all',
-                form.smtp.require_auth
+                smtpForm.requireAuth
                   ? 'bg-base-200/40 opacity-100'
                   : 'pointer-events-none bg-base-200/25 opacity-60',
               ]"
@@ -370,22 +390,24 @@ function sendTestEmail() {
                 <legend class="fieldset-legend text-sm font-bold">用戶名稱</legend>
 
                 <input
-                  v-model="form.smtp.user"
+                  v-model="smtpForm.user"
                   type="email"
                   placeholder="user@example.com"
-                  :disabled="!form.smtp.require_auth"
+                  :disabled="!smtpForm.requireAuth"
                   class="input-bordered input w-full"
                 />
+
+                <FieldError field="smtp.user" />
               </fieldset>
 
               <fieldset class="fieldset">
                 <legend class="fieldset-legend text-sm font-bold">密碼</legend>
 
                 <input
-                  v-model="form.smtp.password"
+                  v-model="smtpForm.password"
                   type="password"
-                  :placeholder="props.settings.smtp?.password ? '留空表示不作更改' : '請輸入密碼'"
-                  :disabled="!form.smtp.require_auth"
+                  placeholder="請輸入密碼"
+                  :disabled="!smtpForm.requireAuth"
                   class="input-bordered input w-full"
                 />
               </fieldset>
@@ -394,17 +416,12 @@ function sendTestEmail() {
             <div
               class="flex flex-col items-start gap-3 border-t border-base-300/70 pt-4 sm:flex-row sm:items-center"
             >
-              <button type="submit" :disabled="ui.loading === 'smtp'" class="btn btn-primary">
-                <span
-                  v-if="ui.loading === 'smtp'"
-                  class="loading loading-sm loading-spinner"
-                ></span>
-                {{ ui.loading === 'smtp' ? '儲存中...' : '儲存設定' }}
+              <button type="submit" :disabled="smtpForm.processing" class="btn btn-primary">
+                <span v-if="smtpForm.processing" class="loading loading-sm loading-spinner"></span>
+                {{ smtpForm.processing ? '儲存中...' : '儲存設定' }}
               </button>
 
-              <p v-if="ui.lastSaved" class="text-xs font-medium text-success">
-                ✓ 最後儲存於 {{ ui.lastSaved }}
-              </p>
+              <span v-if="ui.saved.smtp" class="text-success" title="已儲存">✓</span>
             </div>
           </form>
         </div>
@@ -464,29 +481,43 @@ function sendTestEmail() {
             <p class="mt-0.5 text-sm font-medium text-base-content/60">接收系統通知的郵件地址</p>
           </div>
 
-          <form class="space-y-4 p-6">
+          <form
+            class="space-y-4 p-6"
+            @input="ui.saved.email = false"
+            @submit.prevent="
+              emailForm
+                .transform((draft) => ({ email: { recipients: draft.recipients } }))
+                .post('/settings', {
+                  preserveScroll: true,
+                  onSuccess: () => {
+                    emailForm.defaults(props.settings.email).reset()
+                    ui.saved.email = true
+                  },
+                  onError: toastSaveError,
+                })
+            "
+          >
             <fieldset class="fieldset">
               <legend class="fieldset-legend text-sm font-bold">電郵地址清單</legend>
 
               <textarea
-                v-model="form.email.recipients"
+                v-model="emailForm.recipients"
                 placeholder="user@example.com&#10;admin@example.com"
                 rows="4"
                 class="textarea-bordered textarea w-full"
               ></textarea>
 
+              <FieldError field="email.recipients" />
+
               <p class="label text-xs text-base-content/55">每行填寫一個電郵地址</p>
             </fieldset>
 
-            <button
-              type="submit"
-              :disabled="ui.loading === 'email'"
-              class="btn w-full btn-primary"
-              @click.prevent="saveSettings('email')"
-            >
-              <span v-if="ui.loading === 'email'" class="loading loading-sm loading-spinner"></span>
-              {{ ui.loading === 'email' ? '儲存中...' : '儲存設定' }}
+            <button type="submit" :disabled="emailForm.processing" class="btn w-full btn-primary">
+              <span v-if="emailForm.processing" class="loading loading-sm loading-spinner"></span>
+              {{ emailForm.processing ? '儲存中...' : '儲存設定' }}
             </button>
+
+            <span v-if="ui.saved.email" class="text-success" title="已儲存">✓</span>
           </form>
         </div>
       </div>

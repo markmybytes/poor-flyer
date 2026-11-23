@@ -1,12 +1,12 @@
 from hypothesis import given
 from hypothesis import strategies as st
 
+from src.services.fli_search import resolve_filters
 from src.utils.filters import (
     CabinClass,
     MaxStops,
     SearchFilters,
     parse_airlines,
-    resolve_filters,
 )
 
 CABINS = st.sampled_from(list(CabinClass))

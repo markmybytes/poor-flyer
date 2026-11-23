@@ -1,8 +1,6 @@
 import logging
 from dataclasses import asdict
 from datetime import UTC, date, datetime
-from typing import Any
-from urllib.parse import urlsplit
 
 from flask import Blueprint, flash, g, redirect, request, session
 from flask.typing import ResponseReturnValue
@@ -12,39 +10,21 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from src.extensions.database import FareSnapshot, Flight, Itinerary, db
+from src.schemas.itinerary import ItineraryCreate, ItinerarySettings, ItineraryStatus
+from src.schemas.validators import date_cmp
 from src.services.fx_rates import (
     FXRatesError,
     convert_amount,
     get_configured_base_currency,
 )
-from src.services.itinerary import (
-    create_itinerary,
-    get_combined_totals,
-    validate_deadline,
-)
-from src.utils.filters import parse_bool
+from src.services.itinerary import create_itinerary, get_combined_totals
 from src.utils.rule37 import compute_37_best, compute_price_stats
 from src.utils.transform import model_to_dict
+from src.validation import back_url, validated
 
 logger = logging.getLogger(__name__)
 
 itineraries_bp = Blueprint('itineraries', __name__, url_prefix='/itineraries')
-
-_STATUS_FIELDS = frozenset({'is_active', 'archived'})
-
-
-def _safe_back_url(fallback: str) -> str:
-    """Land the flash on the page that sent the toggle, never on another origin."""
-    referrer = request.referrer
-    if not referrer:
-        return fallback
-
-    parts = urlsplit(referrer)
-    if parts.scheme not in ('', 'http', 'https') or parts.netloc not in ('', request.host):
-        return fallback
-    if not parts.path.startswith('/') or parts.path.startswith('//'):
-        return fallback
-    return f'{parts.path}?{parts.query}' if parts.query else parts.path
 
 
 def _serialize_snapshot(snapshot: FareSnapshot, currency: str) -> dict:
@@ -89,16 +69,6 @@ def _serialize_itinerary(
         'statistics': stats_dict,
         'rule37_analysis': r37_dict,
     }
-
-
-def _parse_deadline(raw: Any) -> date | None:
-    """Parse a page deadline; an empty value clears it."""
-    if not raw:
-        return None
-    try:
-        return datetime.strptime(str(raw), '%Y-%m-%d').date()
-    except ValueError:
-        raise ValueError('Deadline must be a valid date') from None
 
 
 @itineraries_bp.route('/')
@@ -157,23 +127,23 @@ def create() -> ResponseReturnValue:
 
 
 @itineraries_bp.route('', methods=['POST'])
+@validated(ItineraryCreate, redirect_to='/itineraries/create')
 def create_submit() -> ResponseReturnValue:
+    payload: ItineraryCreate = g.validated
     try:
         itinerary = create_itinerary(
-            request.get_json(silent=True) or request.form.to_dict(),
+            payload.model_dump(mode='json', exclude_unset=True),
             today=datetime.now(g.tz).date(),
         )
         db.session.commit()
-        logger.info('created itinerary from page form: id=%s', itinerary.id)
-
-        flash('已成功建立票價追蹤', 'success')
-        return redirect('/')
-    except (KeyError, TypeError, ValueError) as exc:
+    except Exception:
         db.session.rollback()
-        logger.info('invalid itinerary submission: error=%s', exc)
+        raise
 
-        session['errors'] = {'itinerary': '請檢查輸入內容'}
-        return redirect('/itineraries/create')
+    logger.info('created itinerary from page form: id=%s', itinerary.id)
+
+    flash('已成功建立票價追蹤', 'success')
+    return redirect('/')
 
 
 @itineraries_bp.route('/<itinerary_id>')
@@ -204,6 +174,7 @@ def show(itinerary_id: str) -> ResponseReturnValue:
 
 
 @itineraries_bp.route('/<itinerary_id>', methods=['PATCH'])
+@validated(ItinerarySettings, redirect_to='/itineraries/{itinerary_id}')
 def update_itinerary(itinerary_id: str) -> ResponseReturnValue:
     itinerary = db.session.execute(
         select(Itinerary).where(Itinerary.id == itinerary_id)
@@ -213,27 +184,35 @@ def update_itinerary(itinerary_id: str) -> ResponseReturnValue:
         logger.debug('itinerary not found for update: id=%s', itinerary_id)
         return redirect('/itineraries/')
 
-    data = request.get_json(silent=True) or request.form.to_dict()
+    payload: ItinerarySettings = g.validated
     errors: dict[str, str] = {}
 
-    if 'deadline' in data:
-        try:
-            deadline = _parse_deadline(data['deadline'])
-            validate_deadline(
-                deadline,
-                itinerary.flights[0].flight_date if itinerary.flights else None,
-                today=datetime.now(g.tz).date(),
-            )
-        except ValueError as exc:
-            errors['deadline'] = str(exc)
+    if 'deadline' in payload.model_fields_set:
+        if payload.deadline is None:
+            itinerary.deadline = None
         else:
-            itinerary.deadline = deadline
+            first_departure = itinerary.flights[0].flight_date if itinerary.flights else None
+            try:
+                date_cmp(
+                    payload.deadline,
+                    datetime.now(g.tz).date(),
+                    op='ge',
+                    copy='購票限期不能早於今天',
+                )
+                if first_departure is not None:
+                    date_cmp(
+                        payload.deadline,
+                        first_departure,
+                        op='le',
+                        copy='購票限期不能晚於首程出發日期',
+                    )
+            except ValueError as exc:
+                errors['deadline'] = str(exc)
+            else:
+                itinerary.deadline = payload.deadline
 
-    if 'notify_per_leg' in data:
-        try:
-            itinerary.notify_per_leg = parse_bool(data['notify_per_leg'], 'notify_per_leg')
-        except ValueError as exc:
-            errors['notify_per_leg'] = str(exc)
+    if 'notify_per_leg' in payload.model_fields_set:
+        itinerary.notify_per_leg = payload.notify_per_leg
 
     if errors:
         db.session.rollback()
@@ -250,6 +229,7 @@ def update_itinerary(itinerary_id: str) -> ResponseReturnValue:
 
 
 @itineraries_bp.route('/<itinerary_id>/status', methods=['PATCH'])
+@validated(ItineraryStatus, redirect_to='/itineraries/{itinerary_id}')
 def update_status(itinerary_id: str) -> ResponseReturnValue:
     itinerary = db.session.execute(
         select(Itinerary).where(Itinerary.id == itinerary_id)
@@ -259,37 +239,27 @@ def update_status(itinerary_id: str) -> ResponseReturnValue:
         logger.debug('itinerary not found for status update: id=%s', itinerary_id)
         return redirect('/itineraries/')
 
-    data = request.get_json(silent=True) or request.form.to_dict()
-    target = _safe_back_url(f'/itineraries/{itinerary_id}')
+    payload: ItineraryStatus = g.validated
+    target = back_url(f'/itineraries/{itinerary_id}')
 
-    if unsupported := sorted(set(data) - _STATUS_FIELDS):
-        logger.info(
-            'rejected itinerary status update: id=%s fields=%s',
-            itinerary_id,
-            ','.join(unsupported),
-        )
-        session['errors'] = {'status': f'Unsupported field: {", ".join(unsupported)}'}
-        return redirect(target)
+    if 'is_active' in payload.model_fields_set:
+        itinerary.is_active = payload.is_active
 
     archived = None
-    try:
-        if 'is_active' in data:
-            itinerary.is_active = parse_bool(data['is_active'], 'is_active')
-        if 'archived' in data:
-            archived = parse_bool(data['archived'], 'archived')
-            if archived:
-                if itinerary.archived_at is None:
-                    itinerary.archived_at = datetime.now(UTC)
-            else:
-                itinerary.archived_at = None
-    except ValueError as exc:
-        db.session.rollback()
-        logger.info('invalid itinerary status update: id=%s error=%s', itinerary_id, exc)
-        session['errors'] = {'status': str(exc)}
-        return redirect(target)
+    if 'archived' in payload.model_fields_set:
+        archived = payload.archived
+        if archived:
+            if itinerary.archived_at is None:
+                itinerary.archived_at = datetime.now(UTC)
+        else:
+            itinerary.archived_at = None
 
     db.session.commit()
-    logger.info('updated itinerary status: id=%s fields=%s', itinerary_id, ','.join(sorted(data)))
+    logger.info(
+        'updated itinerary status: id=%s fields=%s',
+        itinerary_id,
+        ','.join(sorted(payload.model_fields_set)),
+    )
 
     if archived is True:
         flash('已封存', 'success')

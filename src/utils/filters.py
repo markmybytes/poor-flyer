@@ -1,11 +1,10 @@
-"""Pure search-filter enums and per-itinerary/default merge logic."""
+"""Pure search-filter enums and normalization helpers."""
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any
 
 
 class CabinClass(StrEnum):
@@ -40,39 +39,3 @@ def parse_airlines(value: Sequence[str] | str | None) -> tuple[str, ...]:
         if code and code not in codes:
             codes.append(code)
     return tuple(codes)
-
-
-def parse_bool(value: Any, label: str) -> bool:
-    """Coerce a flag from a real bool or the tokens true/false/1/0 (case-insensitive).
-
-    Absent-like form tokens ('none', '') are not valid here: a field that treats an
-    empty submission as False decides that before calling, so this stays strict.
-    Anything else raises ValueError.
-    """
-    if isinstance(value, bool):
-        return value
-    token = str(value).strip().lower()
-    if token in ('true', '1'):
-        return True
-    if token in ('false', '0'):
-        return False
-    raise ValueError(f'Invalid {label}')
-
-
-def resolve_filters(
-    cabin_class: str | None = None,
-    max_stops: str | None = None,
-    airlines: Sequence[str] | str | None = None,
-) -> SearchFilters:
-    """Apply per-itinerary values over hard-coded fallbacks.
-
-    Omitted values (None) fall back to the constants below — there are no
-    user-facing global defaults (they were removed as UX cruft). An empty
-    airlines list is an explicit no-include-list restriction. Invalid
-    non-empty enum values raise ValueError.
-    """
-    return SearchFilters(
-        cabin_class=CabinClass((cabin_class or CabinClass.ECONOMY).upper()),
-        max_stops=MaxStops((max_stops or MaxStops.ANY).upper()),
-        airlines=parse_airlines(airlines),
-    )

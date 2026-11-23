@@ -5,8 +5,8 @@ import pytest
 from fli.models import Airline
 
 from src.services import fli_search
-from src.services.fli_search import FlightQuery, ScrapeResult, scrape_prices
-from src.utils.filters import CabinClass, MaxStops, SearchFilters, resolve_filters
+from src.services.fli_search import FlightQuery, ScrapeResult, resolve_filters, scrape_prices
+from src.utils.filters import CabinClass, MaxStops, SearchFilters
 
 DEPARTURE = datetime(2025, 12, 1, 9, 0, tzinfo=UTC)
 ARRIVAL = datetime(2025, 12, 1, 12, 0, tzinfo=UTC)

@@ -38,6 +38,7 @@ A higher rule wins a conflict. Ask when a requirement is ambiguous.
 | API (JSON) views                             | `src/routes/api/`            |
 | Services, domain logic                       | `src/services/`              |
 | Pure helpers (no Flask globals, no I/O)      | `src/utils/`                 |
+| Write-payload schemas (pydantic)             | `src/schemas/`               |
 | Extension singletons, `init_extensions(app)` | `src/extensions/`            |
 | SQLAlchemy models, shared `Base` / `db`      | `src/extensions/database.py` |
 | Pages                                        | `src/frontend/Pages/`        |

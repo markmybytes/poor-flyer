@@ -10,6 +10,7 @@ import { computed, ref } from 'vue'
 import { useToast } from 'vue-toast-notification'
 
 import DeadlineDatePicker from '@/Components/DeadlineDatePicker.vue'
+import FieldError from '@/Components/FieldError.vue'
 import { calculateDaysRemaining } from '@/utils/timezone'
 import { Icon } from '@iconify/vue'
 
@@ -71,11 +72,9 @@ function submitSettings(): void {
       },
       onError: () => {
         const errors = usePage().props.errors ?? {}
-        ui.value.settingsError = errors.deadline
-          ? '購票限期無效，請重新選擇'
-          : errors.notifyPerLeg
-            ? '通知設定無效'
-            : '更新失敗，請稍後再試'
+        if (!errors.deadline && !errors.notifyPerLeg) {
+          ui.value.settingsError = '更新失敗，請稍後再試'
+        }
       },
       onFinish: () => {
         ui.value.loading = null
@@ -582,6 +581,8 @@ function runAction(action: Action): void {
             }"
             :disabled="ui.loading === 'update_settings'"
           />
+
+          <FieldError field="deadline" />
         </fieldset>
 
         <label
@@ -602,6 +603,8 @@ function runAction(action: Action): void {
             </span>
           </div>
         </label>
+
+        <FieldError field="notifyPerLeg" />
 
         <p v-if="ui.settingsError" class="mt-2 text-xs font-bold text-error">
           {{ ui.settingsError }}

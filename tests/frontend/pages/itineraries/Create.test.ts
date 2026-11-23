@@ -1,6 +1,6 @@
 import CreatePage from '@/Pages/Itineraries/Create.vue'
 import { flushPromises, mount } from '@vue/test-utils'
-import { router } from '@inertiajs/vue3'
+import { router, usePage } from '@inertiajs/vue3'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const globalStubs = {
@@ -22,6 +22,7 @@ describe('Itineraries/Create', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(usePage).mockReturnValue({ props: {} } as never)
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       json: async () => ({ data: [] }),
@@ -206,5 +207,23 @@ describe('Itineraries/Create', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
     expect(lastRequestBody().notify_per_leg).toBe(true)
+  })
+
+  it.each([
+    ['tripType', '請選擇旅程類型'],
+    ['flights.0.origin', '出發地機場代碼無效'],
+    ['flights.0.destination', '目的地機場代碼無效'],
+    ['flights.0.flightDate', '出發日期無效'],
+  ])('renders the server message for %s inline and only once', (key, message) => {
+    vi.mocked(usePage).mockReturnValue({
+      props: { errors: { [key]: message } },
+    } as never)
+    const wrapper = mount(CreatePage, {
+      props: { airlines: [{ code: 'CX', name: 'Cathay Pacific' }] },
+      global: { stubs: globalStubs },
+    })
+    expect(wrapper.text()).toContain(message)
+    // unrelated fields share the same errors bag: exactly one field renders the message
+    expect(wrapper.text().split(message).length - 1).toBe(1)
   })
 })

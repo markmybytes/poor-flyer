@@ -7,7 +7,7 @@ import { useToast } from 'vue-toast-notification'
 
 const toast = useToast()
 
-const page = reactive<{ props: { flash?: Record<string, string> } }>({ props: {} })
+const page = reactive<{ props: { flash: Record<string, string> } }>({ props: { flash: {} } })
 
 let harness: ReturnType<typeof mount> | null = null
 
@@ -26,7 +26,7 @@ function mountHarness() {
 describe('useFlashToasts', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    page.props = {}
+    page.props = { flash: {} }
     vi.mocked(usePage).mockImplementation(() => page as never)
   })
 
@@ -45,6 +45,14 @@ describe('useFlashToasts', () => {
     expect(toast.success).toHaveBeenCalledTimes(1)
     expect(toast.success).toHaveBeenCalledWith('已更新設定')
     expect(toast.error).not.toHaveBeenCalled()
+  })
+
+  it('toasts a flash already in the store when the component mounts', () => {
+    page.props.flash = { success: '已更新設定' }
+
+    mountHarness()
+
+    expect(toast.success).toHaveBeenCalledWith('已更新設定')
   })
 
   it('routes each notice level to its matching toast method', async () => {

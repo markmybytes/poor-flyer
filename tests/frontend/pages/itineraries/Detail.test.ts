@@ -237,9 +237,25 @@ describe('Itineraries/Detail settings modal', () => {
     )
   })
 
+  it('shows the server message verbatim inline next to the field', async () => {
+    mockPageErrors({ deadline: 'Deadline must be after the last flight.' })
+    const wrapper = mountDetail()
+    await wrapper.find('button[title="設定通知與限期"]').trigger('click')
+    await button(wrapper, '儲存').trigger('click')
+
+    const options = vi.mocked(router.patch).mock.calls.at(-1)![2] as { onError: () => void }
+    options.onError()
+    await nextTick()
+
+    expect(wrapper.text()).toContain('Deadline must be after the last flight.')
+  })
+
   it.each([
-    [{ deadline: 'The deadline must be a future date.' }, '購票限期無效，請重新選擇'],
-    [{ notifyPerLeg: 'The notification setting is invalid.' }, '通知設定無效'],
+    [{ deadline: 'The deadline must be a future date.' }, 'The deadline must be a future date.'],
+    [
+      { notifyPerLeg: 'The notification setting is invalid.' },
+      'The notification setting is invalid.',
+    ],
     [{}, '更新失敗，請稍後再試'],
   ])('maps the server error %o to inline copy', async (errors, copy) => {
     mockPageErrors(errors as Record<string, string>)

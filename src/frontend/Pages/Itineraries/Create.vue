@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import DatePicker from '@/Components/DatePicker.vue'
 import DeadlineDatePicker from '@/Components/DeadlineDatePicker.vue'
+import FieldError from '@/Components/FieldError.vue'
 import FlightFilters from '@/Components/FlightFilters.vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import { Link, router } from '@inertiajs/vue3'
@@ -195,6 +196,8 @@ function submit() {
             </div>
           </fieldset>
 
+          <FieldError field="tripType" />
+
           <div class="space-y-6">
             <div v-for="(leg, index) in form.flights" :key="index">
               <div
@@ -220,6 +223,8 @@ function submit() {
                       maxlength="3"
                       :disabled="ui.processing"
                     />
+
+                    <FieldError :field="`flights.${index}.origin`" />
                   </fieldset>
 
                   <fieldset class="fieldset">
@@ -234,6 +239,8 @@ function submit() {
                       maxlength="3"
                       :disabled="ui.processing"
                     />
+
+                    <FieldError :field="`flights.${index}.destination`" />
                   </fieldset>
 
                   <fieldset class="fieldset">
@@ -258,10 +265,14 @@ function submit() {
                       :disabled="ui.processing"
                       :options="{ startDate: getStartDate(index) }"
                     />
+
+                    <FieldError :field="`flights.${index}.flightDate`" />
                   </fieldset>
                 </div>
               </div>
             </div>
+
+            <FieldError field="flights" />
           </div>
 
           <div class="divider text-base-content/30">分析設定</div>
@@ -279,6 +290,8 @@ function submit() {
                 end: form.flights.at(-1)?.flightDate,
               }"
             />
+
+            <FieldError field="deadline" />
 
             <p class="label mt-1 p-0 text-xs text-base-content/55">
               設定限期後系統方可計算最佳購買時機
@@ -303,6 +316,8 @@ function submit() {
                   <span class="label-text-alt text-base-content/60">每日自動更新並記錄票價</span>
                 </div>
               </label>
+
+              <FieldError field="isActive" />
             </fieldset>
 
             <fieldset class="fieldset">
@@ -324,6 +339,8 @@ function submit() {
                   </span>
                 </div>
               </label>
+
+              <FieldError field="notifyPerLeg" />
             </fieldset>
           </div>
 

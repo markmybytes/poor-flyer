@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime
 
@@ -19,7 +20,7 @@ from fli.models import MaxStops as FliMaxStops
 from fli.search import SearchClientError, SearchFlights
 
 from src.extensions.database import Itinerary
-from src.utils.filters import MaxStops, SearchFilters, resolve_filters
+from src.utils.filters import CabinClass, MaxStops, SearchFilters, parse_airlines
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,25 @@ class ScrapeResult:
     success: bool
     error_message: str | None = None
     results: list[Flight] = field(default_factory=list)
+
+
+def resolve_filters(
+    cabin_class: str | None = None,
+    max_stops: str | None = None,
+    airlines: Sequence[str] | str | None = None,
+) -> SearchFilters:
+    """Apply per-itinerary values over hard-coded fallbacks.
+
+    Omitted values (None) fall back to the constants below — there are no
+    user-facing global defaults (they were removed as UX cruft). An empty
+    airlines list is an explicit no-include-list restriction. Invalid
+    non-empty enum values raise ValueError.
+    """
+    return SearchFilters(
+        cabin_class=CabinClass((cabin_class or CabinClass.ECONOMY).upper()),
+        max_stops=MaxStops((max_stops or MaxStops.ANY).upper()),
+        airlines=parse_airlines(airlines),
+    )
 
 
 def filters_for_itinerary(itinerary: Itinerary) -> SearchFilters:
